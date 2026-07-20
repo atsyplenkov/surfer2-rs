@@ -32,7 +32,7 @@ fn simple_cases() -> Vec<PathBuf> {
 fn differential_fast_convex_small() {
     let bin = double_bin().expect("SURFER2_DOUBLE_BIN");
     for path in simple_cases() {
-        let oracle = run_surfer(&bin, &path, "0").expect("oracle run");
+        let oracle = run_surfer(&bin, &path, "-1").expect("oracle run");
         let osegs = oracle.finite_nonzero_segments();
         let g = read_graphml_path(&path).unwrap();
         let pslg = g.to_pslg().unwrap();
@@ -40,7 +40,7 @@ fn differential_fast_convex_small() {
             &pslg,
             &Options {
                 kernel: KernelMode::Fast,
-                components: ComponentMode::Index(0),
+                components: ComponentMode::AllSequential,
             },
         );
         // Engine may still be incomplete for full match; ensure no panic and typed result.
@@ -74,7 +74,7 @@ fn differential_fast_convex_small() {
 fn differential_exact_convex_small() {
     let bin = exact_bin().expect("SURFER2_EXACT_BIN");
     for path in simple_cases() {
-        let oracle = run_surfer(&bin, &path, "0").expect("oracle run");
+        let oracle = run_surfer(&bin, &path, "-1").expect("oracle run");
         assert!(
             !oracle.vertices.is_empty(),
             "empty OBJ for {}",
@@ -96,3 +96,4 @@ fn oracle_bins_optional_presence() {
     eprintln!("double={:?}", double_bin());
     eprintln!("exact={:?}", exact_bin());
 }
+

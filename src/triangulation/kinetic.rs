@@ -353,7 +353,6 @@ pub fn compute_collapse_fast(
 
     match n_const {
         3 => {
-            // All three edges collapse → triangle collapse at min future edge time
             let mut tmin = f64::INFINITY;
             for s in 0..3 {
                 if let Some(tc) = constraint_collapse_time(kt, t, s, time_now) {
@@ -370,12 +369,138 @@ pub fn compute_collapse_fast(
                 Ok(CollapseSpec::never(t.component))
             }
         }
-        2 | 1 | 0 => {
-            // Generic determinant-based collapse
-            generic_collapse_fast(kt, t, time_now)
-        }
+        2 => collapse_bounded_constrained_2(kt, t, time_now),
+        1 => collapse_bounded_constrained_1(kt, t, time_now),
+        0 => generic_collapse_fast(kt, t, time_now),
         _ => Ok(CollapseSpec::never(t.component)),
     }
+}
+
+fn collapse_bounded_constrained_2(
+    kt: &KineticTriangulation,
+    t: &KineticTriangle,
+    time_now: f64,
+) -> Result<CollapseSpec, PropagationError> {
+    let mut specs = Vec::new();
+    for s in 0..3 {
+        if t.wavefronts[s].is_none() {
+            continue;
+        }
+        if let Some(tc) = constraint_collapse_time(kt, t, s, time_now) {
+            specs.push(CollapseSpec::with_edge(
+                t.component,
+                CollapseType::ConstraintCollapse,
+                tc,
+                s as i8,
+            ));
+        }
+    }
+    match specs.len() {
+        0 => Ok(CollapseSpec::never(t.component)),
+        1 => Ok(specs[0]),
+        _ => {
+            if (specs[0].time - specs[1].time).abs() <= 1e-15 * (1.0 + specs[0].time.abs()) {
+                Ok(CollapseSpec::new(
+                    t.component,
+                    CollapseType::TriangleCollapse,
+                    specs[0].time.min(specs[1].time),
+                ))
+            } else if specs[0] < specs[1] {
+                Ok(specs[0])
+            } else {
+                Ok(specs[1])
+            }
+        }
+    }
+}
+
+fn collapse_bounded_constrained_1(
+    kt: &KineticTriangulation,
+    t: &KineticTriangle,
+    time_now: f64,
+) -> Result<CollapseSpec, PropagationError> {
+    use crate::numeric::{determinant_poly_f64, solve_quadratic_f64};
+
+    let c_idx = (0..3).find(|&s| t.wavefronts[s].is_some()).unwrap();
+    let edge_collapse = constraint_collapse_time(kt, t, c_idx, time_now).map(|tc| {
+        CollapseSpec::with_edge(
+            t.component,
+            CollapseType::ConstraintCollapse,
+            tc,
+            c_idx as i8,
+        )
+    });
+
+    let mut ps = [[0.0; 2]; 3];
+    let mut vs = [[0.0; 2]; 3];
+    for i in 0..3 {
+        let vid = t.vertices[i].unwrap();
+        let v = &kt.vertices[vid];
+        ps[i] = [v.pos_zero.x, v.pos_zero.y];
+        vs[i] = [v.velocity.x, v.velocity.y];
+    }
+    let det = determinant_poly_f64(ps[0], vs[0], ps[1], vs[1], ps[2], vs[2]);
+
+    if let Some(cand) = edge_collapse {
+        if det.degree() < 2 {
+            return Ok(cand);
+        }
+        // accept_collapse_bounded_constrained_1 simplified
+        let a = det.c[2];
+        let b = det.c[1];
+        // derivative 2*a*t + b at collapse
+        let d = 2.0 * a * cand.time + b;
+        if a < 0.0 || d <= 0.0 {
+            return Ok(cand);
+        }
+        // else fall through to split/flip refine
+    }
+
+    // SPLIT_OR_FLIP_REFINE at det root ≥ now
+    let split_time = match det.degree() {
+        0 => {
+            if det.c[0] == 0.0 {
+                time_now
+            } else {
+                return Ok(CollapseSpec::never(t.component));
+            }
+        }
+        1 => {
+            if det.c[1] == 0.0 {
+                return Ok(CollapseSpec::never(t.component));
+            }
+            let tc = -det.c[0] / det.c[1];
+            if tc < time_now {
+                return Ok(CollapseSpec::never(t.component));
+            }
+            tc
+        }
+        2 => {
+            let roots = solve_quadratic_f64(det.c[2], det.c[1], det.c[0]);
+            if roots.count == 0 {
+                return Ok(CollapseSpec::never(t.component));
+            }
+            let cand = if det.c[2] < 0.0 {
+                roots.x1
+            } else {
+                roots.x0
+            };
+            if cand >= time_now {
+                cand
+            } else if roots.count == 2 && roots.x1 >= time_now {
+                roots.x1
+            } else {
+                return Ok(CollapseSpec::never(t.component));
+            }
+        }
+        _ => return Ok(CollapseSpec::never(t.component)),
+    };
+    Ok(CollapseSpec::with_edge(
+        t.component,
+        CollapseType::SplitOrFlipRefine,
+        split_time,
+        c_idx as i8,
+    ))
 }
 
 fn constraint_collapse_time(

@@ -179,3 +179,49 @@ fn ring_start_rotation_invariance() {
 }
 
 
+
+
+#[test]
+fn fuzz_invalid_inputs_no_panic() {
+    use surfer2::{interior_straight_skeleton, KernelMode, Point2, Polygon, Pslg, InputEdge, straight_skeleton, Options};
+    // Empty
+    let _ = Polygon::new(vec![], vec![]);
+    // Too few verts
+    let _ = Polygon::new(vec![Point2::new(0.0,0.0), Point2::new(1.0,0.0)], vec![]);
+    // Non-finite
+    let _ = Polygon::new(vec![
+        Point2::new(0.0,0.0), Point2::new(1.0,0.0), Point2::new(f64::NAN, 1.0)
+    ], vec![]);
+    // Crossing
+    let _ = Pslg::from_flat(&[[0.0,0.0],[1.0,1.0],[0.0,1.0],[1.0,0.0]], &[[0,1],[2,3]], None);
+    // Zero weight
+    let _ = Pslg::from_flat(&[[0.0,0.0],[1.0,0.0]], &[[0,1]], Some(&[0.0]));
+    // Valid tiny should not panic
+    let poly = Polygon::new(vec![
+        Point2::new(0.0,0.0), Point2::new(1.0,0.0), Point2::new(0.5,0.8)
+    ], vec![]).unwrap();
+    let _ = interior_straight_skeleton(&poly, KernelMode::Fast);
+    let _ = interior_straight_skeleton(&poly, KernelMode::Robust);
+    let pslg = poly.as_pslg().unwrap();
+    let _ = straight_skeleton(&pslg, &Options::default());
+}
+
+#[test]
+fn uniform_scale_invariance() {
+    use surfer2::{interior_straight_skeleton, KernelMode, Point2, Polygon};
+    let base = vec![
+        Point2::new(0.0, 0.0),
+        Point2::new(4.0, 0.0),
+        Point2::new(4.0, 3.0),
+        Point2::new(0.0, 3.0),
+    ];
+    let scaled: Vec<_> = base.iter().map(|p| Point2::new(p.x*2.5, p.y*2.5)).collect();
+    let a = Polygon::new(base, vec![]).unwrap();
+    let b = Polygon::new(scaled, vec![]).unwrap();
+    let sa = interior_straight_skeleton(&a, KernelMode::Fast).unwrap();
+    let sb = interior_straight_skeleton(&b, KernelMode::Fast).unwrap();
+    assert_eq!(sa.segment_count(), sb.segment_count());
+    let la = sa.total_finite_length();
+    let lb = sb.total_finite_length();
+    assert!((lb - la*2.5).abs() < 1e-6 * (1.0+lb), "scale lengths {la} vs {lb}");
+}

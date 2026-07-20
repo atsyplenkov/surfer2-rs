@@ -1169,11 +1169,12 @@ fn initialize_kinetic(
             let sl0 = kt.edges[edges[0]].supporting_line;
             let sl1 = kt.edges[edges[1]].supporting_line;
             if let Some((pos, vel)) = intersection_velocity(sl0, sl1) {
+                // Angle at vertex from the two edge directions (into the sector).
+                let ang = vertex_angle_from_lines(sl0, sl1);
                 if let Some(v) = kt.vertices.get_mut(vid) {
-                    // Keep geometric input position as pos_zero for skeleton start;
-                    // velocity from offset-1 intersection.
                     let _ = pos;
                     v.velocity = vel;
+                    v.angle = ang;
                 }
                 continue;
             }
@@ -1186,7 +1187,110 @@ fn initialize_kinetic(
         }
     }
 
+    refine_triangulation_initial(&mut kt)?;
+
     Ok(kt)
+}
+
+
+fn vertex_angle_from_lines(a: SupportingLine, b: SupportingLine) -> crate::wavefront::vertex::AngleType {
+    use crate::wavefront::vertex::AngleType;
+    // Incoming a direction, outgoing b; interior to the left of both normals' sector.
+    // Use directions of supporting lines; reflex if det of unit normals is such that
+    // the turn from a.direction to b.direction is a right turn (CW) for CCW wavefront.
+    let d0 = a.direction;
+    let d1 = b.direction;
+    let cross = d0.x * d1.y - d0.y * d1.x;
+    let dot = d0.x * d1.x + d0.y * d1.y;
+    let scale = d0.x.hypot(d0.y) * d1.x.hypot(d1.y);
+    if scale == 0.0 {
+        return AngleType::Straight;
+    }
+    if cross.abs() <= 1e-14 * scale {
+        return if dot < 0.0 {
+            AngleType::Straight
+        } else {
+            AngleType::Reflex
+        };
+    }
+    // For left-of-edge (CCW rings), interior left means positive cross along chain.
+    // At a vertex, edges meet: from -dir_a to dir_b. Use normals for sector.
+    let na = a.normal_unit;
+    let nb = b.normal_unit;
+    let ncross = na.x * nb.y - na.y * nb.x;
+    let ndot = na.x * nb.x + na.y * nb.y;
+    if ncross.abs() <= 1e-14 {
+        AngleType::Straight
+    } else if ncross > 0.0 {
+        // normals turn CCW → convex sector for left propagation
+        if ndot < 0.0 {
+            AngleType::Obtuse
+        } else {
+            AngleType::Acute
+        }
+    } else {
+        AngleType::Reflex
+    }
+}
+
+fn refine_triangulation_initial(kt: &mut KineticTriangulation) -> Result<(), SkeletonError> {
+    use crate::triangulation::kinetic::{ccw, cw};
+    // One pass + drain: flip triangles with a single reflex unconstrained corner.
+    let mut guard = 0;
+    loop {
+        guard += 1;
+        if guard > 10_000 {
+            break;
+        }
+        let mut flipped = false;
+        let tids: Vec<_> = kt.triangles.keys().collect();
+        for tid in tids {
+            let t = match kt.triangles.get(tid) {
+                Some(t) if t.live() && !t.is_unbounded => t,
+                _ => continue,
+            };
+            let mut reflex_idx = None;
+            let mut n_reflex = 0;
+            for i in 0..3 {
+                if let Some(vid) = t.vertices[i] {
+                    if let Some(v) = kt.vertices.get(vid) {
+                        if !v.is_convex_or_straight() {
+                            n_reflex += 1;
+                            reflex_idx = Some(i);
+                        }
+                    }
+                }
+            }
+            if n_reflex != 1 {
+                continue;
+            }
+            let ri = reflex_idx.unwrap();
+            if t.wavefronts[ri].is_some() {
+                continue; // constrained opposite reflex
+            }
+            let Some(nid) = t.neighbors[ri] else { continue };
+            if kt.triangles.get(nid).map(|n| n.is_unbounded || !n.live()).unwrap_or(true) {
+                continue;
+            }
+            // Flip spoke opposite the reflex vertex; keep only if topology stays valid.
+            if raw_flip(kt, tid, ri, nid).is_err() {
+                continue;
+            }
+            let ok = kt.triangles.get(tid).map(|t| t.check_side_xor().is_ok()).unwrap_or(false)
+                && kt.triangles.get(nid).map(|t| t.check_side_xor().is_ok()).unwrap_or(false);
+            if !ok {
+                // Best-effort: flip back
+                let _ = raw_flip(kt, tid, ri, nid);
+                continue;
+            }
+            flipped = true;
+        }
+        if !flipped {
+            break;
+        }
+    }
+    let _ = (ccw(0), cw(0));
+    Ok(())
 }
 
 fn estimate_vertex_velocity(

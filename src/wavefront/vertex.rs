@@ -39,6 +39,7 @@ pub struct WavefrontVertex {
     /// Ancestry links for DCEL emission: next_vertex[side].
     pub next_vertex: [Option<VertexId>; 2],
     pub prev_vertex: [Option<VertexId>; 2],
+    pub angle: AngleType,
     pub is_initial: bool,
     pub is_degenerate: bool,
     pub dead: bool,
@@ -63,6 +64,7 @@ impl WavefrontVertex {
             pos_stop: None,
             next_vertex: [None, None],
             prev_vertex: [None, None],
+            angle: AngleType::Acute,
             is_initial: false,
             is_degenerate: false,
             dead: false,
@@ -89,6 +91,16 @@ impl WavefrontVertex {
 
     pub fn is_stopped(&self) -> bool {
         self.time_stop.is_some()
+    }
+
+    #[inline]
+    pub fn is_convex_or_straight(&self) -> bool {
+        self.angle != AngleType::Reflex
+    }
+
+    #[inline]
+    pub fn is_reflex_or_straight(&self) -> bool {
+        matches!(self.angle, AngleType::Reflex | AngleType::Straight)
     }
 }
 

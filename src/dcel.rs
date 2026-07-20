@@ -83,14 +83,39 @@ impl Skeleton {
     }
 
     pub fn finite_segments(&self) -> impl Iterator<Item = SkeletonSegment> + '_ {
-        self.segments.iter().copied().filter(|s| {
-            s.start.is_finite()
+        // Bound runaway arcs using only t=0 endpoints (input footprint).
+        let mut min_x = f64::INFINITY;
+        let mut min_y = f64::INFINITY;
+        let mut max_x = f64::NEG_INFINITY;
+        let mut max_y = f64::NEG_INFINITY;
+        let mut any = false;
+        for s in &self.segments {
+            if s.start_time == 0.0 && s.start.is_finite() {
+                any = true;
+                min_x = min_x.min(s.start.x);
+                min_y = min_y.min(s.start.y);
+                max_x = max_x.max(s.start.x);
+                max_y = max_y.max(s.start.y);
+            }
+        }
+        let diag = if any {
+            (max_x - min_x).hypot(max_y - min_y).max(1.0)
+        } else {
+            1.0e6
+        };
+        let max_len = diag * 2.0;
+        self.segments.iter().copied().filter(move |s| {
+            if !(s.start.is_finite()
                 && s.end.is_finite()
-                && s.start.distance_to(s.end) > 0.0
                 && s.start_time.is_finite()
                 && s.end_time.is_finite()
-                && s.end_time >= 0.0
-                && s.start_time >= 0.0
+                && s.end_time >= s.start_time
+                && s.start_time >= 0.0)
+            {
+                return false;
+            }
+            let len = s.start.distance_to(s.end);
+            len > 0.0 && len <= max_len
         })
     }
 

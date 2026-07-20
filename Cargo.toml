@@ -1,0 +1,38 @@
+[package]
+name = "surfer2"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+license = "GPL-3.0-or-later"
+description = "Headless straight-skeleton engine: a source-derived Rust port of cgalab/surfer2"
+repository = "https://github.com/cgalab/surfer2"
+readme = "README.md"
+keywords = ["straight-skeleton", "computational-geometry", "polygon", "pslg"]
+categories = ["algorithms", "graphics", "mathematics"]
+exclude = ["fixtures/gis/*", "benches/data/*"]
+
+[dependencies]
+slotmap = "=1.1.1"
+spade = "=2.15.1"
+robust = "=1.2.0"
+algebraics = { version = "=0.3.0", default-features = false }
+thiserror = "2.0"
+
+[dev-dependencies]
+quick-xml = "0.40.1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+approx = "0.5"
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "magadan"
+harness = false
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+
+[profile.bench]
+lto = "thin"
+codegen-units = 1

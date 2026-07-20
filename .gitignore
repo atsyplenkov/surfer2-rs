@@ -1,0 +1,5 @@
+/target
+
+# Large GIS fixtures live externally; tests use SURFER2_GIS_DATA or default path.
+fixtures/gis/*.gpkg
+/target

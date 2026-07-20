@@ -1,0 +1,17 @@
+Surfer2 Rust port
+Copyright (C) 2026 Surfer2 Rust port contributors
+
+This program is a source-derived port of Surfer2
+(https://github.com/cgalab/surfer2), revision
+c42f9a7f969cd661d060481cd3b8bac2bdfb8dfa.
+
+Upstream Surfer2
+Copyright (C) Computational Geometry and Applications Lab,
+University of Salzburg, and contributors.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+See the LICENSE file for the full GPL-3.0 text.

@@ -266,50 +266,86 @@ impl Propagator {
         use crate::triangulation::kinetic::{ccw, cw};
 
         let edge_idx = spec.relevant_edge as usize;
-        let (va, vb, ea_id, eb_id, na_id, nb_id, collapsing_eid) = {
+        let (va, vb, na_id, nb_id, collapsing_eid, left_sl, right_sl) = {
             let t = &self.kt.triangles[tid];
             let va = t.vertices[ccw(edge_idx)].unwrap();
             let vb = t.vertices[cw(edge_idx)].unwrap();
             let collapsing_eid = t.wavefronts[edge_idx];
-            let ea_id = self.kt.vertices[va].incident_edges[0]
-                .or(self.kt.vertices[va].incident_edges[1]);
-            let eb_id = self.kt.vertices[vb].incident_edges[0]
-                .or(self.kt.vertices[vb].incident_edges[1]);
+            // Surviving wavefronts opposite the collapsing edge (if any).
+            // Side cw(edge) is opposite va?  wavefront on cw(edge_idx) incident to va
+            // side ccw(edge_idx) incident to vb.
+            let wf_left = t.wavefronts[cw(edge_idx)]; // along va
+            let wf_right = t.wavefronts[ccw(edge_idx)]; // along vb
+            let left_sl = wf_left.map(|e| self.kt.edges[e].supporting_line);
+            let right_sl = wf_right.map(|e| self.kt.edges[e].supporting_line);
             (
                 va,
                 vb,
-                ea_id,
-                eb_id,
                 t.neighbors[cw(edge_idx)],
                 t.neighbors[ccw(edge_idx)],
                 collapsing_eid,
+                left_sl,
+                right_sl,
             )
         };
 
         self.kt.stop_vertex(va, spec.time)?;
         self.kt.stop_vertex(vb, spec.time)?;
+
+        // Mark dying before transferring leftover constraints to neighbors.
+        if let Some(tr) = self.kt.triangles.get_mut(tid) {
+            tr.set_dying();
+        }
+        move_constraints_to_neighbor(&mut self.kt, tid, edge_idx)?;
+
         let pos = self.kt.vertices[va].pos_stop.unwrap();
 
         let mut velocity = Point2::new(0.0, 0.0);
-        if let (Some(ea), Some(eb)) = (ea_id, eb_id) {
-            if ea != eb {
-                let sl0 = self.kt.edges[ea].supporting_line;
-                let sl1 = self.kt.edges[eb].supporting_line;
-                if let Some((_, vel)) = intersection_velocity(sl0, sl1) {
-                    velocity = vel;
+        // Prefer supporting lines that will bound the new vertex after transfer.
+        // After move_constraints, leftover constraints sit on neighbors; use the
+        // pre-transfer left/right wavefront lines when both exist (2-constraint case
+        // becomes a continuing vertex between those two directions via the neighbor).
+        // Otherwise fall back to any non-collapsing incident lines on va/vb.
+        let sl_pair = match (left_sl, right_sl) {
+            (Some(a), Some(b)) => Some((a, b)),
+            _ => {
+                // Gather supporting lines of live edges still incident after collapse.
+                let mut lines = Vec::new();
+                for vid in [va, vb] {
+                    for s in 0..2 {
+                        if let Some(eid) = self.kt.vertices[vid].incident_edges[s] {
+                            if Some(eid) != collapsing_eid && !self.kt.edges[eid].dead {
+                                lines.push(self.kt.edges[eid].supporting_line);
+                            }
+                        }
+                    }
                 }
+                if lines.len() >= 2 {
+                    Some((lines[0], lines[1]))
+                } else {
+                    None
+                }
+            }
+        };
+        if let Some((a, b)) = sl_pair {
+            if let Some((_, vel)) = intersection_velocity(a, b) {
+                velocity = vel;
             }
         }
         let mut nv =
             WavefrontVertex::new_kinetic(pos, velocity, spec.time, InfiniteSpeedType::None);
-        if let Some(ea) = ea_id {
-            if Some(ea) != collapsing_eid {
-                nv.incident_edges[0] = Some(ea);
-            }
-        }
-        if let Some(eb) = eb_id {
-            if Some(eb) != collapsing_eid {
-                nv.incident_edges[1] = Some(eb);
+        // Keep non-collapsing incident edge links if present.
+        for vid in [va, vb] {
+            for s in 0..2 {
+                if let Some(eid) = self.kt.vertices[vid].incident_edges[s] {
+                    if Some(eid) != collapsing_eid && !self.kt.edges[eid].dead {
+                        if nv.incident_edges[0].is_none() {
+                            nv.incident_edges[0] = Some(eid);
+                        } else if nv.incident_edges[1].is_none() {
+                            nv.incident_edges[1] = Some(eid);
+                        }
+                    }
+                }
             }
         }
         let nvid = self.kt.vertices.insert(nv);
@@ -732,6 +768,69 @@ fn edge_sl(input: &Pslg, ei: usize) -> Option<SupportingLine> {
     let u = input.vertices()[e.vertices[0]];
     let v = input.vertices()[e.vertices[1]];
     SupportingLine::from_segment(u, v, e.weight)
+}
+
+/// Upstream `move_constraints_to_neighbor`: transfer non-collapsing constraints
+/// from dying triangle `tid` (collapsing side `edge_idx`) onto neighbors.
+fn move_constraints_to_neighbor(
+    kt: &mut KineticTriangulation,
+    tid: TriangleId,
+    edge_idx: usize,
+) -> Result<(), SkeletonError> {
+    use crate::triangulation::kinetic::{ccw, cw};
+
+    // for i in {1,2}: if constrained(edge_idx+i), move to neighbor(edge_idx+3-i)
+    for i in 1..=2usize {
+        let src_side = (edge_idx + i) % 3;
+        let nb_side_of_t = (edge_idx + 3 - i) % 3;
+        let (wf, nb) = {
+            let t = &kt.triangles[tid];
+            (t.wavefronts[src_side], t.neighbors[nb_side_of_t])
+        };
+        let Some(eid) = wf else { continue };
+        let Some(nid) = nb else { continue };
+
+        // index of tid in neighbor
+        let nidx = {
+            let n = &kt.triangles[nid];
+            (0..3)
+                .find(|&s| n.neighbors[s] == Some(tid))
+                .ok_or_else(|| crate::error::PropagationError::TopologyInvariant {
+                    detail: "move_constraint: neighbor missing backref".into(),
+                })?
+        };
+
+        // n must not already be constrained on nidx
+        if kt.triangles[nid].wavefronts[nidx].is_some() {
+            return Err(crate::error::PropagationError::TopologyInvariant {
+                detail: "move_constraint onto constrained side".into(),
+            }
+            .into());
+        }
+
+        // Transfer wavefront: set on neighbor, clear on source, fix endpoints to n's side verts
+        {
+            let n = &kt.triangles[nid];
+            let v0 = n.vertices[ccw(nidx)].unwrap();
+            let v1 = n.vertices[cw(nidx)].unwrap();
+            if let Some(e) = kt.edges.get_mut(eid) {
+                e.endpoints = [v0, v1];
+                e.incident_triangle = Some(nid);
+            }
+        }
+        {
+            let n = kt.triangles.get_mut(nid).unwrap();
+            n.wavefronts[nidx] = Some(eid);
+            n.neighbors[nidx] = None;
+            n.invalidate_collapse();
+        }
+        {
+            let t = kt.triangles.get_mut(tid).unwrap();
+            t.wavefronts[src_side] = None;
+            t.invalidate_collapse();
+        }
+    }
+    Ok(())
 }
 
 fn link_vertex_edge(kt: &mut KineticTriangulation, vid: crate::wavefront::vertex::VertexId, eid: crate::wavefront::edge::EdgeId) {

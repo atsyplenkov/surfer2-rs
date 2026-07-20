@@ -105,6 +105,14 @@ impl Skeleton {
     pub fn total_finite_length(&self) -> f64 {
         self.finite_segments().map(|s| s.start.distance_to(s.end)).sum()
     }
+
+    /// Offset contours at wavefront time `t`.
+    pub fn offset(
+        &self,
+        time: f64,
+    ) -> Result<Vec<crate::offset::OffsetPolyline>, crate::error::SkeletonError> {
+        crate::offset::offset(self, time)
+    }
 }
 
 pub fn build_dcel(kt: &KineticTriangulation) -> Result<Skeleton, SkeletonError> {

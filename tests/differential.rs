@@ -98,3 +98,15 @@ fn oracle_bins_optional_presence() {
 }
 
 
+
+
+#[test]
+fn spoke1() {
+  let path = upstream_test_data().join("special-cases/spoke-1.graphml");
+  let g = support::graphml::read_graphml_path(&path).unwrap();
+  let pslg = g.to_pslg().unwrap();
+  match surfer2::straight_skeleton(&pslg, &surfer2::Options{kernel:surfer2::KernelMode::Fast, components:surfer2::ComponentMode::AllSequential}) {
+    Ok(sk) => eprintln!("spoke1 segs={} nodes={}", sk.segment_count(), sk.node_count()),
+    Err(e) => eprintln!("spoke1 err {e}"),
+  }
+}

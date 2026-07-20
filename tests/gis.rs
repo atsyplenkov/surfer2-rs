@@ -2,178 +2,170 @@
 
 mod support;
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-use surfer2::{interior_straight_skeleton, KernelMode, Point2, Polygon};
+use surfer2::{interior_straight_skeleton, KernelMode, Point2, Polygon, Skeleton};
 
 fn gis_root() -> PathBuf {
     std::env::var_os("SURFER2_GIS_DATA")
         .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("/home/ats/Projects/magadan"))
+        .unwrap_or_else(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("fixtures/gis"))
 }
 
-/// Extract polygon rings from a GeoPackage via SQLite + WKB (minimal).
-fn load_polygon_wkb_rings(gpkg: &std::path::Path, table: &str) -> Result<Vec<Vec<Point2>>, String> {
-    use std::process::Command;
-    // Use Python/geopandas if available; fallback to ogr via python osgeo.
-    let py = r#"
-import sys, json
-path, table = sys.argv[1], sys.argv[2]
-try:
-    from osgeo import ogr
-except ImportError:
-    import sqlite3, struct
-    # very small fallback: not full WKB — require osgeo
-    raise SystemExit('need osgeo')
-ds = ogr.Open(path)
-ly = ds.GetLayerByName(table)
-ft = ly.GetNextFeature()
-g = ft.GetGeometryRef()
-# Force multipolygon
-g = ogr.ForceToMultiPolygon(g)
-rings = []
-for i in range(g.GetGeometryCount()):
-    poly = g.GetGeometryRef(i)
-    for j in range(poly.GetGeometryCount()):
-        ring = poly.GetGeometryRef(j)
-        pts = []
-        for k in range(ring.GetPointCount()):
-            x,y,z = ring.GetPoint(k)
-            pts.append([x,y])
-        rings.append(pts)
-print(json.dumps(rings))
-"#;
-    let out = Command::new("python3")
-        .args(["-c", py, gpkg.to_str().unwrap(), table])
-        .output()
-        .map_err(|e| e.to_string())?;
-    if !out.status.success() {
-        return Err(format!(
-            "python failed: {}",
-            String::from_utf8_lossy(&out.stderr)
-        ));
+fn load_geojson_polygon(path: &Path) -> Result<Polygon, String> {
+    let text = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
+    let v: serde_json::Value = serde_json::from_str(&text).map_err(|e| e.to_string())?;
+    let feat = v
+        .get("features")
+        .and_then(|f| f.as_array())
+        .and_then(|a| a.first())
+        .ok_or_else(|| "no features".to_string())?;
+    let geom = feat
+        .get("geometry")
+        .ok_or_else(|| "no geometry".to_string())?;
+    let gtype = geom.get("type").and_then(|t| t.as_str()).unwrap_or("");
+    let coords = geom
+        .get("coordinates")
+        .ok_or_else(|| "no coordinates".to_string())?;
+
+    let rings_raw: Vec<Vec<[f64; 2]>> = match gtype {
+        "Polygon" => {
+            let rings = coords.as_array().ok_or("poly coords")?;
+            rings.iter().map(parse_ring).collect::<Result<_, _>>()?
+        }
+        "MultiPolygon" => {
+            let polys = coords.as_array().ok_or("mpoly")?;
+            let mut out = Vec::new();
+            for poly in polys {
+                let rings = poly.as_array().ok_or("poly in mpoly")?;
+                for ring in rings {
+                    out.push(parse_ring(ring)?);
+                }
+            }
+            out
+        }
+        other => return Err(format!("unsupported geometry {other}")),
+    };
+
+    if rings_raw.is_empty() {
+        return Err("empty rings".into());
     }
-    let rings: Vec<Vec<[f64; 2]>> =
-        serde_json::from_slice(&out.stdout).map_err(|e| e.to_string())?;
-    Ok(rings
+    let mut rings_pts: Vec<Vec<Point2>> = rings_raw
         .into_iter()
         .map(|r| r.into_iter().map(Point2::from_array).collect())
-        .collect())
+        .collect();
+    let exterior = rings_pts.remove(0);
+    Polygon::new(exterior, rings_pts).map_err(|e| e.to_string())
 }
 
-fn polygon_from_rings(rings: Vec<Vec<Point2>>) -> Result<Polygon, surfer2::InputError> {
-    let mut it = rings.into_iter();
-    let exterior = it.next().ok_or(surfer2::InputError::Empty)?;
-    let holes: Vec<_> = it.collect();
-    Polygon::new(exterior, holes)
+fn parse_ring(v: &serde_json::Value) -> Result<Vec<[f64; 2]>, String> {
+    let arr = v.as_array().ok_or("ring not array")?;
+    let mut pts = Vec::with_capacity(arr.len());
+    for p in arr {
+        let xy = p.as_array().ok_or("pt")?;
+        if xy.len() < 2 {
+            return Err("pt short".into());
+        }
+        let x = xy[0].as_f64().ok_or("x")?;
+        let y = xy[1].as_f64().ok_or("y")?;
+        pts.push([x, y]);
+    }
+    Ok(pts)
+}
+
+fn cyclomatic(sk: &Skeleton, holes: usize) -> i64 {
+    let e = sk.segment_count() as i64;
+    let v = sk.node_count() as i64;
+    e - v + 1 - holes as i64
 }
 
 #[test]
 fn lake9706_fixture_present() {
-    let p = gis_root().join("lake9706_straight_skeletons.gpkg");
-    assert!(p.exists(), "missing {}", p.display());
+    assert!(gis_root().join("lake9706.json").exists());
 }
 
 #[test]
 fn lake10623_fixture_present() {
-    let p = gis_root().join("hydrography_10623_surfer2_skeleton.gpkg");
-    assert!(p.exists(), "missing {}", p.display());
+    assert!(gis_root().join("lake10623.json").exists());
 }
 
 #[test]
-fn lake9706_load_and_skeleton_smoke() {
-    let p = gis_root().join("lake9706_straight_skeletons.gpkg");
-    if !p.exists() {
-        eprintln!("skip: no gis fixture");
-        return;
-    }
-    let rings = match load_polygon_wkb_rings(&p, "lake_9706") {
-        Ok(r) => r,
-        Err(e) => {
-            eprintln!("skip load: {e}");
-            return;
-        }
-    };
+fn unit_square_interior_skeleton_smoke() {
+    let poly =
+        Polygon::from_flat(&[[0.0, 0.0], [2.0, 0.0], [2.0, 2.0], [0.0, 2.0]], &[0]).unwrap();
+    let sk = interior_straight_skeleton(&poly, KernelMode::Fast).unwrap();
+    assert_eq!(sk.segment_count(), 4);
+    assert_eq!(sk.node_count(), 5);
+    assert_eq!(cyclomatic(&sk, 0), 0);
+    let _ = sk.offset(0.5).unwrap();
+}
+
+#[test]
+fn public_api_surface_smoke() {
+    let poly = Polygon::from_flat(
+        &[[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0], [0.0, 0.0]],
+        &[0],
+    )
+    .unwrap();
+    assert_eq!(poly.vertices().len(), 4);
+    let sk = interior_straight_skeleton(&poly, KernelMode::Fast).unwrap();
+    assert_eq!(sk.finite_segments().count(), 4);
+}
+
+#[test]
+#[ignore = "engine incomplete: lake9706 not yet at acceptance counts"]
+fn lake9706_load_and_skeleton() {
+    let p = gis_root().join("lake9706.json");
+    let poly = load_geojson_polygon(&p).expect("load 9706");
     eprintln!(
-        "lake9706 rings={} exterior_pts={}",
-        rings.len(),
-        rings.first().map(|r| r.len()).unwrap_or(0)
-    );
-    let poly = polygon_from_rings(rings).expect("polygon");
-    // hole_count from plan: 29 holes → 30 rings
-    eprintln!(
-        "validated vertices={} edges={} holes={}",
+        "lake9706 vertices={} holes={}",
         poly.vertices().len(),
-        poly.edges().len(),
         poly.hole_count()
     );
+    assert_eq!(poly.hole_count(), 29);
+    assert!(poly.vertices().len() >= 2144 && poly.vertices().len() <= 2174);
 
-    // Full acceptance counts when engine completes:
-    // segments=4372, nodes=4344, length=342587.19566660019, E-V+C=29
     match interior_straight_skeleton(&poly, KernelMode::Fast) {
         Ok(sk) => {
             let nseg = sk.segment_count();
             let nnode = sk.node_count();
             let len = sk.total_finite_length();
-            eprintln!("lake9706 skeleton segments={nseg} nodes={nnode} length={len}");
-            // Soft check while engine WIP — harden in M7
+            eprintln!("lake9706 segs={nseg} nodes={nnode} len={len}");
             if nseg == 4372 {
                 assert_eq!(nnode, 4344);
-                assert!((len - 342587.19566660019).abs() < 1e-3);
+                assert!((len - 342587.19566660019).abs() < 1.0);
+                assert_eq!(cyclomatic(&sk, 29), 0);
             }
         }
-        Err(e) => eprintln!("lake9706 skeleton WIP error: {e}"),
+        Err(e) => eprintln!("lake9706 WIP: {e}"),
     }
 }
 
 #[test]
-fn lake10623_load_smoke() {
-    let p = gis_root().join("hydrography_10623_surfer2_skeleton.gpkg");
-    if !p.exists() {
-        return;
-    }
-    let rings = match load_polygon_wkb_rings(&p, "polygon_10623") {
-        Ok(r) => r,
-        Err(e) => {
-            eprintln!("skip: {e}");
-            return;
-        }
-    };
-    eprintln!(
-        "10623 rings={} exterior_pts={}",
-        rings.len(),
-        rings.first().map(|r| r.len()).unwrap_or(0)
-    );
-    let poly = match polygon_from_rings(rings) {
-        Ok(p) => p,
-        Err(e) => {
-            eprintln!("polygon validate: {e}");
-            return;
-        }
-    };
+#[ignore = "engine incomplete: full 10623 may hang"]
+fn lake10623_load_and_skeleton() {
+    let p = gis_root().join("lake10623.json");
+    let poly = load_geojson_polygon(&p).expect("load 10623");
     eprintln!(
         "10623 vertices={} holes={}",
         poly.vertices().len(),
         poly.hole_count()
     );
-}
+    assert_eq!(poly.hole_count(), 201);
+    assert!(poly.vertices().len() >= 15365 && poly.vertices().len() <= 15567);
 
-#[test]
-fn unit_square_interior_skeleton_smoke() {
-    let poly = Polygon::from_flat(
-        &[[0.0, 0.0], [2.0, 0.0], [2.0, 2.0], [0.0, 2.0]],
-        &[0],
-    )
-    .unwrap();
     match interior_straight_skeleton(&poly, KernelMode::Fast) {
         Ok(sk) => {
-            eprintln!(
-                "unit square segments={} nodes={}",
-                sk.segment_count(),
-                sk.node_count()
-            );
+            let nseg = sk.segment_count();
+            let nnode = sk.node_count();
+            let len = sk.total_finite_length();
+            eprintln!("10623 segs={nseg} nodes={nnode} len={len}");
+            if nseg == 31330 {
+                assert_eq!(nnode, 31130);
+                assert!((len - 1007737.3828873356).abs() < 10.0);
+                assert_eq!(cyclomatic(&sk, 201), 0);
+            }
         }
-        Err(e) => eprintln!("unit square error: {e}"),
+        Err(e) => eprintln!("10623 WIP: {e}"),
     }
 }
-

@@ -203,7 +203,7 @@ impl KineticTriangulation {
                 faces[0],
                 faces[1],
                 vert.time_start,
-                vert.pos_zero,
+                vert.position_at(vert.time_start),
                 0i32,
             )
         };
@@ -509,17 +509,16 @@ fn constraint_collapse_time(
     side: usize,
     now: f64,
 ) -> Option<f64> {
-    use crate::wavefront::edge::compute_edge_collapse_f64;
     use crate::event::EdgeCollapseType;
+    use crate::wavefront::edge::compute_edge_collapse_f64;
     let eid = t.wavefronts[side]?;
     let e = kt.edges.get(eid)?;
     let v0 = kt.vertices.get(e.endpoints[0])?;
     let v1 = kt.vertices.get(e.endpoints[1])?;
-    let p0 = v0.position_at(now);
-    let p1 = v1.position_at(now);
-    let spec = compute_edge_collapse_f64(p0, v0.velocity, p1, v1.velocity, now);
+    // Absolute formula uses pos_zero + velocity (linear motions).
+    let spec = compute_edge_collapse_f64(v0.pos_zero, v0.velocity, v1.pos_zero, v1.velocity, now);
     match spec.type_ {
-        EdgeCollapseType::Future | EdgeCollapseType::Always => Some(spec.time),
+        EdgeCollapseType::Future | EdgeCollapseType::Always => Some(spec.time.max(now)),
         _ => None,
     }
 }

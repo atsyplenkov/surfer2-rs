@@ -20,11 +20,26 @@ fn upstream_test_data() -> PathBuf {
 
 fn simple_cases() -> Vec<PathBuf> {
     let root = upstream_test_data();
-    ["convex03.graphml", "convex04.graphml", "convex07.graphml"]
-        .iter()
-        .map(|n| root.join(n))
-        .filter(|p| p.exists())
-        .collect()
+    [
+        "convex03.graphml",
+        "convex04.graphml",
+        "convex07.graphml",
+        "convex10.graphml",
+        "convex19.graphml",
+        "srpg0000025.graphml",
+        "srpg0000028.graphml",
+        "special-cases/iso-simple-1.graphml",
+        "special-cases/iso-simple-2.graphml",
+        "special-cases/iso-simple-3.graphml",
+        "special-cases/multi-same-speed-event.graphml",
+        "special-cases/collinear-split-event.graphml",
+        "special-cases/spoke-1.graphml",
+        "weighted/srpg_octo0000035-random-1.graphml",
+    ]
+    .iter()
+    .map(|n| root.join(n))
+    .filter(|p| p.exists())
+    .collect()
 }
 
 #[test]
@@ -63,6 +78,16 @@ fn differential_fast_convex_small() {
                     report.node_count_b,
                     report.detail
                 );
+                let name = path.file_name().and_then(|s| s.to_str()).unwrap_or("");
+                // Hard assert only for fully-verified convex fixtures.
+                if matches!(name, "convex03.graphml" | "convex04.graphml" | "convex07.graphml") {
+                    assert_eq!(
+                        report.segment_count_a,
+                        report.segment_count_b,
+                        "segment count mismatch for {}",
+                        path.display()
+                    );
+                }
             }
             Err(e) => eprintln!("{} rust error (engine WIP): {e}", path.display()),
         }
@@ -152,3 +177,5 @@ fn ring_start_rotation_invariance() {
     let sb = interior_straight_skeleton(&b, KernelMode::Fast).unwrap();
     assert_eq!(sa.segment_count(), sb.segment_count());
 }
+
+

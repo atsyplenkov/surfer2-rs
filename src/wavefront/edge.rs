@@ -54,6 +54,9 @@ pub struct EdgeCollapseSpec {
 }
 
 /// Upstream `WavefrontEdge::compute_collapse` (f64).
+///
+/// Uses absolute time from `pos_zero` + constant velocity, matching
+/// `WavefrontEdge.cpp` (orientation of velocities, then projected 1D quotient).
 pub fn compute_edge_collapse_f64(
     p0: Point2,
     v0: Point2,
@@ -61,58 +64,58 @@ pub fn compute_edge_collapse_f64(
     v1: Point2,
     now: f64,
 ) -> EdgeCollapseSpec {
-    // Relative motion of endpoint 1 wrt 0 projected along the edge.
-    let e = Point2::new(p1.x - p0.x, p1.y - p0.y);
-    let rel_v = Point2::new(v1.x - v0.x, v1.y - v0.y);
-    // Orientation of relative velocity vs edge: cross(e, rel_v)
-    let cross = e.x * rel_v.y - e.y * rel_v.x;
-    let e2 = e.x * e.x + e.y * e.y;
-    if e2 == 0.0 {
-        return EdgeCollapseSpec {
-            type_: EdgeCollapseType::Always,
-            time: now,
-        };
-    }
-    // Approaching if endpoints move toward each other along edge.
-    // Use 1D projection: length change rate = dot(rel_v, e_hat) * |e| sign
-    let len = e2.sqrt();
-    let closing = -(rel_v.x * e.x + rel_v.y * e.y) / len; // positive → shrinking
+    // C++: orientation(v0, v1) of the two velocity vectors.
+    let o = v0.x * v1.y - v0.y * v1.x;
+    const EPS: f64 = 0.0;
 
-    // Also check perpendicular relative motion for collinearity of future
-    if cross.abs() <= 1e-30 * (len * (rel_v.x.hypot(rel_v.y) + 1.0)) {
-        // Parallel motion of edge endpoints in plane sense of orientation
-        let dist = len;
-        if dist == 0.0 {
+    if o < EPS {
+        // RIGHT_TURN or COLLINEAR
+        if o < 0.0 {
+            // moving apart (right turn of velocities)
+            return EdgeCollapseSpec {
+                type_: EdgeCollapseType::Past,
+                time: now,
+            };
+        }
+        // collinear velocities
+        let dx = p1.x - p0.x;
+        let dy = p1.y - p0.y;
+        let sqdist = dx * dx + dy * dy;
+        if sqdist == 0.0 {
             return EdgeCollapseSpec {
                 type_: EdgeCollapseType::Always,
                 time: now,
             };
         }
-        if closing > 0.0 {
-            // Should not happen if truly parallel orientation-zero and positive length —
-            // fall through to FUTURE if closing.
-        } else if closing < 0.0 {
-            return EdgeCollapseSpec {
-                type_: EdgeCollapseType::Past,
-                time: now,
-            };
-        } else {
-            return EdgeCollapseSpec {
-                type_: EdgeCollapseType::Never,
-                time: f64::INFINITY,
-            };
-        }
+        return EdgeCollapseSpec {
+            type_: EdgeCollapseType::Never,
+            time: f64::INFINITY,
+        };
     }
 
-    if closing <= 0.0 {
+    // LEFT_TURN: endpoints approach along the edge.
+    // time = d·d / ((v0-v1)·d) projected; use x unless vertical.
+    let edge_vertical = (p1.x - p0.x).abs() == 0.0 && (v0.x - v1.x).abs() == 0.0;
+    let (edge_delta, wfvs_delta) = if !edge_vertical {
+        (p1.x - p0.x, v0.x - v1.x)
+    } else {
+        (p1.y - p0.y, v0.y - v1.y)
+    };
+    if wfvs_delta == 0.0 {
+        return EdgeCollapseSpec {
+            type_: EdgeCollapseType::Never,
+            time: f64::INFINITY,
+        };
+    }
+    let time = edge_delta / wfvs_delta;
+    if time < now {
         return EdgeCollapseSpec {
             type_: EdgeCollapseType::Past,
             time: now,
         };
     }
-    let t = now + len / closing;
     EdgeCollapseSpec {
         type_: EdgeCollapseType::Future,
-        time: t,
+        time,
     }
 }

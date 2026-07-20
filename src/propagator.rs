@@ -543,8 +543,13 @@ impl Propagator {
             }
         }
 
+        // C++ make_vertex: pos_zero is extrapolated to t=0 so p(t)=pos_zero+t*vel.
+        let pos_zero = Point2::new(
+            pos.x - time * velocity.x,
+            pos.y - time * velocity.y,
+        );
         let mut nv =
-            WavefrontVertex::new_kinetic(pos, velocity, time, InfiniteSpeedType::None);
+            WavefrontVertex::new_kinetic(pos_zero, velocity, time, InfiniteSpeedType::None);
         for vid in [va, vb] {
             for s in 0..2 {
                 if let Some(eid) = self.kt.vertices[vid].incident_edges[s] {
@@ -821,6 +826,16 @@ impl Propagator {
         }
         let nva_id = self.kt.vertices.insert(nva);
         let nvb_id = self.kt.vertices.insert(nvb);
+        // Extrapolate pos_zero to t=0 for absolute edge-collapse formulas.
+        for id in [nva_id, nvb_id] {
+            if let Some(v) = self.kt.vertices.get_mut(id) {
+                v.pos_zero = Point2::new(
+                    pos.x - time * v.velocity.x,
+                    pos.y - time * v.velocity.y,
+                );
+            }
+        }
+
         if let Some(e) = self.kt.edges.get_mut(nea) {
             e.endpoints[1] = nva_id;
         }

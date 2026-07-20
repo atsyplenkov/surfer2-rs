@@ -64,10 +64,9 @@ impl EventQueue {
 
     pub fn needs_update(&mut self, tidx: u32) -> Result<(), PropagationError> {
         self.ensure_capacity(tidx as usize + 1);
+        // Drop wins: a dying triangle must not be refreshed.
         if self.in_need_dropping[tidx as usize] {
-            return Err(PropagationError::TopologyInvariant {
-                detail: format!("triangle {tidx} marked both drop and update"),
-            });
+            return Ok(());
         }
         if !self.in_need_update[tidx as usize] {
             self.in_need_update[tidx as usize] = true;
@@ -78,10 +77,10 @@ impl EventQueue {
 
     pub fn needs_dropping(&mut self, tidx: u32) -> Result<(), PropagationError> {
         self.ensure_capacity(tidx as usize + 1);
+        // If previously queued for update, cancel the update.
         if self.in_need_update[tidx as usize] {
-            return Err(PropagationError::TopologyInvariant {
-                detail: format!("triangle {tidx} marked both update and drop"),
-            });
+            self.in_need_update[tidx as usize] = false;
+            self.need_update.retain(|&x| x != tidx);
         }
         if !self.in_need_dropping[tidx as usize] {
             self.in_need_dropping[tidx as usize] = true;

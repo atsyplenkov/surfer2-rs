@@ -82,11 +82,10 @@ impl Propagator {
             kernel,
             stats: Stats::default(),
             finalized: false,
-            check_invariants_each_step: false,
+            check_invariants_each_step: cfg!(debug_assertions),
             simultaneous_streak: 0,
             last_event_time: f64::NEG_INFINITY,
         })
-            check_invariants_each_step: cfg!(debug_assertions),
     }
 
     pub fn current_time(&self) -> f64 {

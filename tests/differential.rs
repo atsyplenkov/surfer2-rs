@@ -225,3 +225,74 @@ fn uniform_scale_invariance() {
     let lb = sb.total_finite_length();
     assert!((lb - la*2.5).abs() < 1e-6 * (1.0+lb), "scale lengths {la} vs {lb}");
 }
+
+
+#[test]
+#[ignore = "requires C++ surfer binaries"]
+fn differential_fast_corpus_soft() {
+    let bin = double_bin().expect("SURFER2_DOUBLE_BIN");
+    let root = upstream_test_data();
+    let mut files = Vec::new();
+    fn walk(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
+        if let Ok(rd) = std::fs::read_dir(dir) {
+            for e in rd.flatten() {
+                let p = e.path();
+                if p.is_dir() {
+                    walk(&p, out);
+                } else if p.extension().and_then(|s| s.to_str()) == Some("graphml") {
+                    out.push(p);
+                }
+            }
+        }
+    }
+    walk(&root, &mut files);
+    files.sort();
+    let mut matched = 0usize;
+    let mut ran = 0usize;
+    for path in files {
+        let oracle = match run_surfer(&bin, &path, "-1") {
+            Ok(o) => o,
+            Err(e) => {
+                eprintln!("skip oracle {}: {e}", path.display());
+                continue;
+            }
+        };
+        let osegs = oracle.finite_nonzero_segments();
+        let g = match read_graphml_path(&path) {
+            Ok(g) => g,
+            Err(e) => {
+                eprintln!("skip read {}: {e}", path.display());
+                continue;
+            }
+        };
+        let Ok(pslg) = g.to_pslg() else { continue };
+        ran += 1;
+        match straight_skeleton(
+            &pslg,
+            &Options {
+                kernel: KernelMode::Fast,
+                components: ComponentMode::AllSequential,
+            },
+        ) {
+            Ok(sk) => {
+                let n = sk.segment_count();
+                let o = osegs.len();
+                let ok = n == o;
+                if ok {
+                    matched += 1;
+                }
+                eprintln!(
+                    "{} rust={n} oracle={o} {}",
+                    path.strip_prefix(&root).unwrap_or(&path).display(),
+                    if ok { "OK" } else { "DIFF" }
+                );
+            }
+            Err(e) => eprintln!(
+                "{} ERR {e}",
+                path.strip_prefix(&root).unwrap_or(&path).display()
+            ),
+        }
+    }
+    eprintln!("matched {matched}/{ran}");
+    assert!(matched >= 5, "expected at least convex set to match, got {matched}/{ran}");
+}

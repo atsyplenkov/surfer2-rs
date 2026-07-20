@@ -332,12 +332,16 @@ impl Propagator {
     ) -> Result<(), SkeletonError> {
         use crate::triangulation::kinetic::{ccw, cw};
         let edge_idx = spec.relevant_edge as usize;
-        let (va, vb) = {
+        // Snapshot supporting lines BEFORE move_constraints clears wavefronts on t.
+        let (va, vb, left_sl, right_sl) = {
             let t = &self.kt.triangles[tid];
-            (
-                t.vertices[ccw(edge_idx)].unwrap(),
-                t.vertices[cw(edge_idx)].unwrap(),
-            )
+            let va = t.vertices[ccw(edge_idx)].unwrap();
+            let vb = t.vertices[cw(edge_idx)].unwrap();
+            let left_sl = t.wavefronts[cw(edge_idx)]
+                .map(|e| self.kt.edges[e].supporting_line);
+            let right_sl = t.wavefronts[ccw(edge_idx)]
+                .map(|e| self.kt.edges[e].supporting_line);
+            (va, vb, left_sl, right_sl)
         };
         self.kt.stop_vertex(va, spec.time)?;
         self.kt.stop_vertex(vb, spec.time)?;
@@ -345,7 +349,7 @@ impl Propagator {
             tr.set_dying();
         }
         move_constraints_to_neighbor(&mut self.kt, tid, edge_idx)?;
-        self.constraint_collapse_part2(tid, edge_idx, spec.time)?;
+        self.constraint_collapse_part2(tid, edge_idx, spec.time, left_sl, right_sl)?;
         Ok(())
     }
 
@@ -372,7 +376,16 @@ impl Propagator {
             if let Some(tr) = self.kt.triangles.get_mut(tid) {
                 tr.set_dying();
             }
-            return self.constraint_collapse_part2(tid, edge_idx, spec.time);
+            let (left_sl, right_sl) = {
+                use crate::triangulation::kinetic::{ccw, cw};
+                let t = &self.kt.triangles[tid];
+                let left_sl = t.wavefronts[cw(edge_idx)]
+                    .map(|e| self.kt.edges[e].supporting_line);
+                let right_sl = t.wavefronts[ccw(edge_idx)]
+                    .map(|e| self.kt.edges[e].supporting_line);
+                (left_sl, right_sl)
+            };
+            return self.constraint_collapse_part2(tid, edge_idx, spec.time, left_sl, right_sl);
         };
 
         let idx_in_n = (0..3)
@@ -465,13 +478,21 @@ impl Propagator {
         }
 
         // Partial: same as constraint collapse part2 on this triangle.
+        let (left_sl, right_sl) = {
+            let t = &self.kt.triangles[tid];
+            let left_sl = t.wavefronts[cw(edge_idx)]
+                .map(|e| self.kt.edges[e].supporting_line);
+            let right_sl = t.wavefronts[ccw(edge_idx)]
+                .map(|e| self.kt.edges[e].supporting_line);
+            (left_sl, right_sl)
+        };
         if let Some(tr) = self.kt.triangles.get_mut(tid) {
             if !tr.is_dying {
                 tr.set_dying();
             }
         }
         move_constraints_to_neighbor(&mut self.kt, tid, edge_idx)?;
-        self.constraint_collapse_part2(tid, edge_idx, time)?;
+        self.constraint_collapse_part2(tid, edge_idx, time, left_sl, right_sl)?;
         let _ = vb;
         Ok(())
     }
@@ -482,26 +503,22 @@ impl Propagator {
         tid: TriangleId,
         edge_idx: usize,
         time: f64,
+        left_sl: Option<SupportingLine>,
+        right_sl: Option<SupportingLine>,
     ) -> Result<(), SkeletonError> {
         use crate::triangulation::kinetic::{ccw, cw};
 
-        let (va, vb, na_id, nb_id, collapsing_eid, left_sl, right_sl) = {
+        let (va, vb, na_id, nb_id, collapsing_eid) = {
             let t = &self.kt.triangles[tid];
             let va = t.vertices[ccw(edge_idx)].unwrap();
             let vb = t.vertices[cw(edge_idx)].unwrap();
             let collapsing_eid = t.wavefronts[edge_idx];
-            let wf_left = t.wavefronts[cw(edge_idx)];
-            let wf_right = t.wavefronts[ccw(edge_idx)];
-            let left_sl = wf_left.map(|e| self.kt.edges[e].supporting_line);
-            let right_sl = wf_right.map(|e| self.kt.edges[e].supporting_line);
             (
                 va,
                 vb,
                 t.neighbors[cw(edge_idx)],
                 t.neighbors[ccw(edge_idx)],
                 collapsing_eid,
-                left_sl,
-                right_sl,
             )
         };
 
@@ -516,26 +533,34 @@ impl Propagator {
             .pos_stop
             .unwrap_or_else(|| self.kt.vertices[va].position_at(time));
 
+        // C++: ea = va.incident_wavefront_edge(0), eb = vb.incident_wavefront_edge(1)
+        // remaining edges after the collapsed one dies. Prefer those; fall back to
+        // triangle-side SLs snapshotted before move_constraints.
+        let ea_id = {
+            let v = &self.kt.vertices[va];
+            [v.incident_edges[0], v.incident_edges[1]]
+                .into_iter()
+                .flatten()
+                .find(|&eid| Some(eid) != collapsing_eid && !self.kt.edges[eid].dead)
+        };
+        let eb_id = {
+            let v = &self.kt.vertices[vb];
+            // Prefer slot 1 then 0 (C++ incident(1) for vb).
+            [v.incident_edges[1], v.incident_edges[0]]
+                .into_iter()
+                .flatten()
+                .find(|&eid| Some(eid) != collapsing_eid && !self.kt.edges[eid].dead)
+        };
         let mut velocity = Point2::new(0.0, 0.0);
-        let sl_pair = match (left_sl, right_sl) {
-            (Some(a), Some(b)) => Some((a, b)),
-            _ => {
-                let mut lines = Vec::new();
-                for vid in [va, vb] {
-                    for s in 0..2 {
-                        if let Some(eid) = self.kt.vertices[vid].incident_edges[s] {
-                            if Some(eid) != collapsing_eid && !self.kt.edges[eid].dead {
-                                lines.push(self.kt.edges[eid].supporting_line);
-                            }
-                        }
-                    }
-                }
-                if lines.len() >= 2 {
-                    Some((lines[0], lines[1]))
-                } else {
-                    None
-                }
-            }
+        let sl_pair = match (ea_id, eb_id) {
+            (Some(a), Some(b)) if a != b => Some((
+                self.kt.edges[a].supporting_line,
+                self.kt.edges[b].supporting_line,
+            )),
+            _ => match (left_sl, right_sl) {
+                (Some(a), Some(b)) => Some((a, b)),
+                _ => None,
+            },
         };
         if let Some((a, b)) = sl_pair {
             if let Some((_, vel)) = intersection_velocity(a, b) {
@@ -548,22 +573,43 @@ impl Propagator {
             pos.x - time * velocity.x,
             pos.y - time * velocity.y,
         );
+        let ang = match (ea_id, eb_id) {
+            (Some(a), Some(b)) => vertex_angle_from_lines(
+                self.kt.edges[a].supporting_line,
+                self.kt.edges[b].supporting_line,
+            ),
+            _ => crate::wavefront::vertex::AngleType::Acute,
+        };
         let mut nv =
             WavefrontVertex::new_kinetic(pos_zero, velocity, time, InfiniteSpeedType::None);
-        for vid in [va, vb] {
-            for s in 0..2 {
-                if let Some(eid) = self.kt.vertices[vid].incident_edges[s] {
-                    if Some(eid) != collapsing_eid && !self.kt.edges[eid].dead {
-                        if nv.incident_edges[0].is_none() {
-                            nv.incident_edges[0] = Some(eid);
-                        } else if nv.incident_edges[1].is_none() {
-                            nv.incident_edges[1] = Some(eid);
-                        }
+        nv.angle = ang;
+        // Ordered: incident[0]=edge into nvid (eb from vb side), incident[1]=edge out (ea).
+        // C++ make_vertex(pos,time,ea,eb): a=ea attaches as edge 1 of new? 
+        // Actually new vertex is between ea and eb: wavefronts[0]=ea, wavefronts[1]=eb
+        // Looking at make_vertex(a,b): incident a and b.
+        nv.incident_edges[0] = ea_id; // edge a
+        nv.incident_edges[1] = eb_id; // edge b
+        let nvid = self.kt.vertices.insert(nv);
+        // Update edge endpoint slots to point at nvid
+        if let Some(eid) = ea_id {
+            if let Some(e) = self.kt.edges.get_mut(eid) {
+                // ea was on va; replace va with nvid
+                for ep in &mut e.endpoints {
+                    if *ep == va || *ep == vb {
+                        *ep = nvid;
                     }
                 }
             }
         }
-        let nvid = self.kt.vertices.insert(nv);
+        if let Some(eid) = eb_id {
+            if let Some(e) = self.kt.edges.get_mut(eid) {
+                for ep in &mut e.endpoints {
+                    if *ep == va || *ep == vb {
+                        *ep = nvid;
+                    }
+                }
+            }
+        }
 
         // Replace va/vb with nvid in all other live triangles.
         let live_ids: Vec<_> = self.kt.triangles.keys().collect();
@@ -1151,8 +1197,14 @@ fn initialize_kinetic(
                 source_edge,
                 source_edge.is_none(),
             ));
-            link_vertex_edge(&mut kt, ea, eid);
-            link_vertex_edge(&mut kt, eb, eid);
+            // C++: vertices[ccw]=edge.v0 has wavefronts[1]=edge;
+            //      vertices[cw]=edge.v1 has wavefronts[0]=edge.
+            if let Some(v) = kt.vertices.get_mut(ea) {
+                v.incident_edges[1] = Some(eid);
+            }
+            if let Some(v) = kt.vertices.get_mut(eb) {
+                v.incident_edges[0] = Some(eid);
+            }
             kt.set_wavefront(tid, s, eid);
         }
     }

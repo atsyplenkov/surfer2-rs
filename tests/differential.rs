@@ -110,3 +110,45 @@ fn spoke1() {
     Err(e) => eprintln!("spoke1 err {e}"),
   }
 }
+
+
+#[test]
+fn transform_translation_invariance() {
+    use surfer2::{interior_straight_skeleton, KernelMode, Point2, Polygon};
+    let base = vec![
+        Point2::new(0.0, 0.0),
+        Point2::new(3.0, 0.0),
+        Point2::new(3.0, 2.0),
+        Point2::new(0.0, 2.0),
+    ];
+    let shifted: Vec<_> = base
+        .iter()
+        .map(|p| Point2::new(p.x + 100.0, p.y - 50.0))
+        .collect();
+    let a = Polygon::new(base, vec![]).unwrap();
+    let b = Polygon::new(shifted, vec![]).unwrap();
+    let sa = interior_straight_skeleton(&a, KernelMode::Fast).unwrap();
+    let sb = interior_straight_skeleton(&b, KernelMode::Fast).unwrap();
+    assert_eq!(sa.segment_count(), sb.segment_count());
+    let la = sa.total_finite_length();
+    let lb = sb.total_finite_length();
+    assert!((la - lb).abs() < 1e-9 * (1.0 + la), "lengths {la} vs {lb}");
+}
+
+#[test]
+fn ring_start_rotation_invariance() {
+    use surfer2::{interior_straight_skeleton, KernelMode, Point2, Polygon};
+    let pts = [
+        Point2::new(0.0, 0.0),
+        Point2::new(2.0, 0.0),
+        Point2::new(2.0, 2.0),
+        Point2::new(0.0, 2.0),
+    ];
+    let a = Polygon::new(pts.to_vec(), vec![]).unwrap();
+    let mut rot = pts.to_vec();
+    rot.rotate_left(1);
+    let b = Polygon::new(rot, vec![]).unwrap();
+    let sa = interior_straight_skeleton(&a, KernelMode::Fast).unwrap();
+    let sb = interior_straight_skeleton(&b, KernelMode::Fast).unwrap();
+    assert_eq!(sa.segment_count(), sb.segment_count());
+}

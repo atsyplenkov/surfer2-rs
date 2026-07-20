@@ -80,7 +80,7 @@ fn differential_fast_convex_small() {
                 );
                 let name = path.file_name().and_then(|s| s.to_str()).unwrap_or("");
                 // Hard assert only for fully-verified convex fixtures.
-                if matches!(name, "convex03.graphml" | "convex04.graphml" | "convex07.graphml") {
+                if matches!(name, "convex03.graphml" | "convex04.graphml" | "convex07.graphml" | "convex10.graphml" | "convex19.graphml") {
                     assert_eq!(
                         report.segment_count_a,
                         report.segment_count_b,

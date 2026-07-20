@@ -84,9 +84,13 @@ impl Skeleton {
 
     pub fn finite_segments(&self) -> impl Iterator<Item = SkeletonSegment> + '_ {
         self.segments.iter().copied().filter(|s| {
-            s.start.distance_to(s.end) > 0.0
+            s.start.is_finite()
+                && s.end.is_finite()
+                && s.start.distance_to(s.end) > 0.0
                 && s.start_time.is_finite()
                 && s.end_time.is_finite()
+                && s.end_time >= 0.0
+                && s.start_time >= 0.0
         })
     }
 

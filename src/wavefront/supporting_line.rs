@@ -82,6 +82,10 @@ pub fn intersection_velocity(a: SupportingLine, b: SupportingLine) -> Option<(Po
     let b1 = b.point_at(1.0);
     let p1 = intersect_lines(a1, a.direction, b1, b.direction)?;
     let vel = Point2::new(p1.x - p0.x, p1.y - p0.y);
+    // Nearly parallel supporting lines → unbounded velocity; treat as missing.
+    if !vel.x.is_finite() || !vel.y.is_finite() || vel.x.hypot(vel.y) > 1e6 {
+        return None;
+    }
     Some((p0, vel))
 }
 

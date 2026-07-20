@@ -176,3 +176,4 @@ fn unit_square_interior_skeleton_smoke() {
         Err(e) => eprintln!("unit square error: {e}"),
     }
 }
+

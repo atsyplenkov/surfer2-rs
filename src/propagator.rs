@@ -426,12 +426,14 @@ impl Propagator {
         tid: TriangleId,
         spec: CollapseSpec,
     ) -> Result<(), SkeletonError> {
+        use crate::triangulation::kinetic::{ccw, cw};
         let side = spec.relevant_edge as usize;
         let (va, vb) = {
             let t = &self.kt.triangles[tid];
-            let a = t.vertices[crate::triangulation::kinetic::ccw(side)].unwrap();
-            let b = t.vertices[crate::triangulation::kinetic::cw(side)].unwrap();
-            (a, b)
+            (
+                t.vertices[ccw(side)].unwrap(),
+                t.vertices[cw(side)].unwrap(),
+            )
         };
         self.kt.stop_vertex(va, spec.time)?;
         self.kt.stop_vertex(vb, spec.time)?;
@@ -445,8 +447,190 @@ impl Propagator {
         tid: TriangleId,
         spec: CollapseSpec,
     ) -> Result<(), SkeletonError> {
-        // Refine: treat as flip for now when spoke; full split port follows handlers.
-        self.handle_flip(tid, spec)
+        use crate::triangulation::kinetic::{ccw, cw};
+
+        let edge_idx = spec.relevant_edge as usize;
+        let time = spec.time;
+        let (v, va, vb) = {
+            let t = &self.kt.triangles[tid];
+            (
+                t.vertices[edge_idx].unwrap(),
+                t.vertices[ccw(edge_idx)].unwrap(),
+                t.vertices[cw(edge_idx)].unwrap(),
+            )
+        };
+        let pos = self.kt.vertices[v].position_at(time);
+        let posa = self.kt.vertices[va].position_at(time);
+        let posb = self.kt.vertices[vb].position_at(time);
+        let d_va = pos.distance_to(posa);
+        let d_vb = pos.distance_to(posb);
+
+        if d_va == 0.0 {
+            return self.handle_spoke_collapse(
+                tid,
+                CollapseSpec::with_edge(
+                    spec.component,
+                    crate::event::CollapseType::SpokeCollapse,
+                    time,
+                    cw(edge_idx) as i8,
+                ),
+            );
+        }
+        if d_vb == 0.0 {
+            return self.handle_spoke_collapse(
+                tid,
+                CollapseSpec::with_edge(
+                    spec.component,
+                    crate::event::CollapseType::SpokeCollapse,
+                    time,
+                    ccw(edge_idx) as i8,
+                ),
+            );
+        }
+
+        let abx = posb.x - posa.x;
+        let aby = posb.y - posa.y;
+        let apx = pos.x - posa.x;
+        let apy = pos.y - posa.y;
+        let ab2 = abx * abx + aby * aby;
+        let tparam = if ab2 > 0.0 {
+            (apx * abx + apy * aby) / ab2
+        } else {
+            0.5
+        };
+        if !(0.0..=1.0).contains(&tparam) {
+            let flip_edge = if d_va > d_vb {
+                cw(edge_idx)
+            } else {
+                ccw(edge_idx)
+            };
+            let longest = d_va.max(d_vb);
+            let refined = CollapseSpec::with_edge_secondary(
+                spec.component,
+                crate::event::CollapseType::VertexMovesOverSpoke,
+                time,
+                flip_edge as i8,
+                longest * longest,
+            );
+            return self.handle_flip(tid, refined);
+        }
+
+        self.handle_split_event(tid, edge_idx, time)
+    }
+
+    fn handle_split_event(
+        &mut self,
+        tid: TriangleId,
+        edge_idx: usize,
+        time: f64,
+    ) -> Result<(), SkeletonError> {
+        use crate::triangulation::kinetic::{ccw, cw};
+
+        let (v, eid, na_id, nb_id) = {
+            let t = &self.kt.triangles[tid];
+            (
+                t.vertices[edge_idx].unwrap(),
+                t.wavefronts[edge_idx].unwrap(),
+                t.neighbors[cw(edge_idx)],
+                t.neighbors[ccw(edge_idx)],
+            )
+        };
+        self.kt.stop_vertex(v, time)?;
+        let pos = self.kt.vertices[v].pos_stop.unwrap();
+        let base_sl = self.kt.edges[eid].supporting_line;
+        let face = self.kt.edges[eid].skeleton_face;
+        let source = self.kt.edges[eid].source_input_edge;
+        let ep0 = self.kt.edges[eid].endpoints[0];
+        let ep1 = self.kt.edges[eid].endpoints[1];
+
+        let nea = self.kt.edges.insert(WavefrontEdge::new(
+            [ep0, v],
+            base_sl,
+            face,
+            source,
+            false,
+        ));
+        let neb = self.kt.edges.insert(WavefrontEdge::new(
+            [v, ep1],
+            base_sl,
+            face,
+            source,
+            false,
+        ));
+        if let Some(e) = self.kt.edges.get_mut(eid) {
+            e.dead = true;
+        }
+
+        let inc = self.kt.vertices[v].incident_edges;
+        let mut nva =
+            WavefrontVertex::new_kinetic(pos, Point2::new(0.0, 0.0), time, InfiniteSpeedType::None);
+        let mut nvb =
+            WavefrontVertex::new_kinetic(pos, Point2::new(0.0, 0.0), time, InfiniteSpeedType::None);
+        nva.incident_edges = [Some(nea), inc[1]];
+        nvb.incident_edges = [inc[0], Some(neb)];
+        if let (Some(ea), Some(eb)) = (nva.incident_edges[0], nva.incident_edges[1]) {
+            if let Some((_, vel)) = intersection_velocity(
+                self.kt.edges[ea].supporting_line,
+                self.kt.edges[eb].supporting_line,
+            ) {
+                nva.velocity = vel;
+            }
+        }
+        if let (Some(ea), Some(eb)) = (nvb.incident_edges[0], nvb.incident_edges[1]) {
+            if let Some((_, vel)) = intersection_velocity(
+                self.kt.edges[ea].supporting_line,
+                self.kt.edges[eb].supporting_line,
+            ) {
+                nvb.velocity = vel;
+            }
+        }
+        let nva_id = self.kt.vertices.insert(nva);
+        let nvb_id = self.kt.vertices.insert(nvb);
+        if let Some(e) = self.kt.edges.get_mut(nea) {
+            e.endpoints[1] = nva_id;
+        }
+        if let Some(e) = self.kt.edges.get_mut(neb) {
+            e.endpoints[0] = nvb_id;
+        }
+
+        if let Some(na) = na_id {
+            if let Some(i) = (0..3).find(|&s| self.kt.triangles[na].neighbors[s] == Some(tid)) {
+                for s in 0..3 {
+                    if self.kt.triangles[na].vertices[s] == Some(v) {
+                        self.kt.set_vertex(na, s, nva_id);
+                    }
+                }
+                self.kt.set_wavefront(na, i, nea);
+                self.queue.needs_update(self.kt.triangles[na].tidx)?;
+            }
+        }
+        if let Some(nb) = nb_id {
+            if let Some(i) = (0..3).find(|&s| self.kt.triangles[nb].neighbors[s] == Some(tid)) {
+                for s in 0..3 {
+                    if self.kt.triangles[nb].vertices[s] == Some(v) {
+                        self.kt.set_vertex(nb, s, nvb_id);
+                    }
+                }
+                self.kt.set_wavefront(nb, i, neb);
+                self.queue.needs_update(self.kt.triangles[nb].tidx)?;
+            }
+        }
+
+        let live: Vec<_> = self.kt.triangles.keys().collect();
+        for oid in live {
+            if oid == tid || !self.kt.triangles[oid].live() {
+                continue;
+            }
+            for s in 0..3 {
+                if self.kt.triangles[oid].vertices[s] == Some(v) {
+                    self.kt.set_vertex(oid, s, nva_id);
+                    self.queue.needs_update(self.kt.triangles[oid].tidx)?;
+                }
+            }
+        }
+
+        self.kill_triangle(tid)?;
+        Ok(())
     }
 
     fn handle_flip(&mut self, tid: TriangleId, spec: CollapseSpec) -> Result<(), SkeletonError> {

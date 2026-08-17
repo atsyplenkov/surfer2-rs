@@ -77,6 +77,29 @@ pub fn intersect_lines(p0: Point2, d0: Point2, p1: Point2, d1: Point2) -> Option
     Some(Point2::new(p0.x + s * d0.x, p0.y + s * d0.y))
 }
 
+/// C++ `compute_velocity` + `make_vertex` pos_zero.
+///
+/// Intersecting lines: t=0 intersection and offset-1 velocity.
+/// Parallel same-direction: common normal; `pos_zero = pos - time * normal`.
+pub fn wavefront_vertex_motion(
+    a: SupportingLine,
+    b: SupportingLine,
+    pos: Point2,
+    time: f64,
+) -> (Point2, Point2) {
+    if let Some((p0, vel)) = intersection_velocity(a, b) {
+        return (p0, vel);
+    }
+    // orientation(a.dir, perp_cw(b.dir)) < 0 ⇔ a·b > 0 ⇔ same direction
+    let dot = a.direction.x * b.direction.x + a.direction.y * b.direction.y;
+    if dot > 0.0 {
+        let vel = a.normal;
+        (Point2::new(pos.x - time * vel.x, pos.y - time * vel.y), vel)
+    } else {
+        (pos, Point2::new(0.0, 0.0))
+    }
+}
+
 /// Velocity of the intersection of two supporting lines (offset to t=1 minus t=0).
 pub fn intersection_velocity(a: SupportingLine, b: SupportingLine) -> Option<(Point2, Point2)> {
     let p0 = intersect_lines(a.point, a.direction, b.point, b.direction)?;
@@ -102,6 +125,19 @@ mod tests {
         // Left of bottom edge is +y
         assert!((s.normal_unit.x).abs() < 1e-15);
         assert!((s.normal_unit.y - 1.0).abs() < 1e-15);
+    }
+
+    #[test]
+    fn parallel_same_dir_uses_normal() {
+        let a = SupportingLine::from_segment(Point2::new(0.0, 0.0), Point2::new(1.0, 0.0), 1.0)
+            .unwrap();
+        let b = SupportingLine::from_segment(Point2::new(0.0, 2.0), Point2::new(1.0, 2.0), 1.0)
+            .unwrap();
+        let pos = Point2::new(0.5, 1.0);
+        let (p0, vel) = wavefront_vertex_motion(a, b, pos, 1.0);
+        assert!((vel.x).abs() < 1e-12);
+        assert!((vel.y - 1.0).abs() < 1e-12);
+        assert!((p0.y - 0.0).abs() < 1e-12);
     }
 
     #[test]

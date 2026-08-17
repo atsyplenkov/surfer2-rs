@@ -15,8 +15,8 @@ use crate::triangulation::kinetic::{
     compute_collapse_fast, KineticTriangulation, SkeletonFaceMeta, TriangleId,
 };
 use crate::wavefront::edge::WavefrontEdge;
-use crate::wavefront::supporting_line::{intersection_velocity, SupportingLine};
-use crate::wavefront::vertex::{InfiniteSpeedType, VertexId, WavefrontVertex};
+use crate::wavefront::supporting_line::{wavefront_vertex_motion, SupportingLine};
+use crate::wavefront::vertex::{infinite_speed_type, InfiniteSpeedType, VertexId, WavefrontVertex};
 use crate::{ComponentMode, KernelMode, Options};
 
 /// Incremental propagator with step/advance_to/finish.
@@ -555,33 +555,29 @@ impl Propagator {
                 _ => None,
             },
         };
-        let (pos_zero, velocity) = match sl_pair.and_then(|(a, b)| intersection_velocity(a, b)) {
-            Some((p0, vel)) => (p0, vel),
-            None => (pos, Point2::new(0.0, 0.0)),
-        };
-        let ang = match (ea_id, eb_id) {
-            (Some(a), Some(b)) => vertex_angle_from_lines(
-                self.kt.edges[a].supporting_line,
-                self.kt.edges[b].supporting_line,
-            ),
+        let ang = match sl_pair {
+            Some((a, b)) => vertex_angle_from_lines(a, b),
             _ => crate::wavefront::vertex::AngleType::Acute,
         };
-        let mut nv =
-            WavefrontVertex::new_kinetic(pos_zero, velocity, time, InfiniteSpeedType::None);
+        let inf = match sl_pair {
+            Some((a, b)) => infinite_speed_type(a.normal, b.normal, a.weight, b.weight, ang),
+            None => InfiniteSpeedType::None,
+        };
+        let (pos_zero, velocity) = if inf != InfiniteSpeedType::None {
+            (pos, Point2::new(0.0, 0.0))
+        } else {
+            match sl_pair {
+                Some((a, b)) => wavefront_vertex_motion(a, b, pos, time),
+                None => (pos, Point2::new(0.0, 0.0)),
+            }
+        };
+        let mut nv = WavefrontVertex::new_kinetic(pos_zero, velocity, time, inf);
         nv.angle = ang;
         nv.incident_edges = [ea_id, eb_id];
         let nvid = self.kt.vertices.insert(nv);
-        // C++ make_vertex(ea,eb): new vertex is ea.v1 and eb.v0.
-        if let Some(eid) = ea_id {
-            if let Some(e) = self.kt.edges.get_mut(eid) {
-                e.endpoints[1] = nvid;
-            }
-        }
-        if let Some(eid) = eb_id {
-            if let Some(e) = self.kt.edges.get_mut(eid) {
-                e.endpoints[0] = nvid;
-            }
-        }
+        // Far ends before the fan walk (C++: v is ea.vertex(1) and eb.vertex(0)).
+        let ea_far = ea_id.map(|e| self.kt.edges[e].endpoints[0]);
+        let eb_far = eb_id.map(|e| self.kt.edges[e].endpoints[1]);
         if let Some(vv) = self.kt.vertices.get_mut(va) {
             vv.next_vertex[0] = Some(nvid);
         }
@@ -595,6 +591,17 @@ impl Propagator {
 
         self.rewrite_star_side(tid, ccw(edge_idx), false, nvid)?;
         self.rewrite_star_side(tid, cw(edge_idx), true, nvid)?;
+        // set_vertex may have written nvid into the wrong endpoint slot.
+        if let (Some(eid), Some(far)) = (ea_id, ea_far) {
+            if let Some(e) = self.kt.edges.get_mut(eid) {
+                e.endpoints = [far, nvid];
+            }
+        }
+        if let (Some(eid), Some(far)) = (eb_id, eb_far) {
+            if let Some(e) = self.kt.edges.get_mut(eid) {
+                e.endpoints = [nvid, far];
+            }
+        }
 
         // Link neighbors across the dying triangle (excluding collapsed side).
         if let (Some(na), Some(nb)) = (na_id, nb_id) {
@@ -861,16 +868,19 @@ impl Propagator {
         let mut vel = Point2::new(0.0, 0.0);
         let mut pos_zero = pos;
         let mut ang = crate::wavefront::vertex::AngleType::Acute;
+        let mut inf = InfiniteSpeedType::None;
         if let (Some(ea), Some(eb)) = (a, b) {
             let sla = self.kt.edges[ea].supporting_line;
             let slb = self.kt.edges[eb].supporting_line;
             ang = vertex_angle_from_lines(sla, slb);
-            if let Some((p0, v)) = intersection_velocity(sla, slb) {
+            inf = infinite_speed_type(sla.normal, slb.normal, sla.weight, slb.weight, ang);
+            if inf == InfiniteSpeedType::None {
+                let (p0, v) = wavefront_vertex_motion(sla, slb, pos, time);
                 pos_zero = p0;
                 vel = v;
             }
         }
-        let mut nv = WavefrontVertex::new_kinetic(pos_zero, vel, time, InfiniteSpeedType::None);
+        let mut nv = WavefrontVertex::new_kinetic(pos_zero, vel, time, inf);
         nv.angle = ang;
         nv.incident_edges = [a, b];
         Ok(self.kt.vertices.insert(nv))
@@ -922,19 +932,173 @@ impl Propagator {
 
     fn handle_inf_opposing(
         &mut self,
-        tid: TriangleId,
+        mut tid: TriangleId,
         spec: CollapseSpec,
     ) -> Result<(), SkeletonError> {
-        let verts: Vec<_> = self.kt.triangles[tid]
+        use crate::triangulation::kinetic::{ccw, cw};
+
+        let time = spec.time;
+        let n_const = self.kt.triangles[tid]
+            .wavefronts
+            .iter()
+            .filter(|w| w.is_some())
+            .count();
+        let n_fast = self.kt.triangles[tid]
             .vertices
             .iter()
             .flatten()
-            .copied()
-            .collect();
-        for v in verts {
-            self.kt.stop_vertex(v, spec.time)?;
+            .filter(|v| self.kt.vertices[**v].infinite_speed != InfiniteSpeedType::None)
+            .count();
+
+        if n_const == 3 {
+            let mut p = None;
+            for i in 0..3 {
+                let v = self.kt.triangles[tid].vertices[i].unwrap();
+                if self.kt.vertices[v].infinite_speed == InfiniteSpeedType::None {
+                    self.kt.stop_vertex(v, time)?;
+                    if p.is_none() {
+                        p = self.kt.vertices[v].pos_stop;
+                    }
+                }
+            }
+            if let Some(pos) = p {
+                for i in 0..3 {
+                    let v = self.kt.triangles[tid].vertices[i].unwrap();
+                    if self.kt.vertices[v].infinite_speed != InfiniteSpeedType::None {
+                        self.kt.stop_vertex_at(v, time, pos)?;
+                    }
+                }
+            }
+            for s in 0..3 {
+                if let Some(eid) = self.kt.triangles[tid].wavefronts[s] {
+                    if let Some(e) = self.kt.edges.get_mut(eid) {
+                        e.dead = true;
+                    }
+                }
+            }
+            self.queue.needs_dropping(self.kt.triangles[tid].tidx)?;
+            if let Some(t) = self.kt.triangles.get_mut(tid) {
+                t.set_dead();
+            }
+            return Ok(());
         }
-        self.kill_triangle(tid)?;
+
+        let Some(fast_idx) = (0..3).find(|&i| {
+            self.kt.triangles[tid].vertices[i]
+                .and_then(|v| self.kt.vertices.get(v))
+                .map(|v| v.infinite_speed != InfiniteSpeedType::None)
+                .unwrap_or(false)
+        }) else {
+            return self.kill_triangle(tid);
+        };
+
+        let v_fast = self.kt.triangles[tid].vertices[fast_idx].unwrap();
+        let mut cur = most_around(&self.kt, tid, fast_idx, true);
+        let mut guard = 0;
+        loop {
+            guard += 1;
+            if guard > 1000 {
+                break;
+            }
+            let Some(idx) = (0..3).find(|&i| self.kt.triangles[cur.0].vertices[i] == Some(v_fast))
+            else {
+                break;
+            };
+            cur.1 = idx;
+            let nidx = ccw(idx);
+            if self.kt.triangles[cur.0].wavefronts[nidx].is_some() {
+                break;
+            }
+            let Some(nid) = self.kt.triangles[cur.0].neighbors[nidx] else {
+                break;
+            };
+            raw_flip(&mut self.kt, cur.0, nidx, nid)?;
+            self.queue.needs_update(self.kt.triangles[nid].tidx)?;
+            if let Some(i) = (0..3).find(|&i| self.kt.triangles[cur.0].vertices[i] == Some(v_fast))
+            {
+                cur = most_around(&self.kt, cur.0, i, true);
+            }
+        }
+
+        tid = cur.0;
+        let vidx = cur.1;
+        let v = self.kt.triangles[tid].vertices[vidx].unwrap();
+        let v_cw = self.kt.triangles[tid].vertices[cw(vidx)].unwrap();
+        let v_ccw = self.kt.triangles[tid].vertices[ccw(vidx)].unwrap();
+        let pos = self.kt.vertices[v].position_at(time);
+        let pcw = self.kt.vertices[v_cw].position_at(time);
+        let pccw = self.kt.vertices[v_ccw].position_at(time);
+        let d_cw = pos.distance_to(pcw);
+        let d_ccw = pos.distance_to(pccw);
+
+        let (collapse, o) = if self.kt.vertices[v_cw].infinite_speed != InfiniteSpeedType::None {
+            (cw(vidx), v_ccw)
+        } else if self.kt.vertices[v_ccw].infinite_speed != InfiniteSpeedType::None {
+            (ccw(vidx), v_cw)
+        } else if (d_cw - d_ccw).abs() <= 1e-12 * (1.0 + d_cw) {
+            // Equal spokes: stop both, spoke-collapse the remaining neighbor.
+            self.kt.stop_vertex(v_cw, time)?;
+            self.kt.stop_vertex(v_ccw, time)?;
+            let p = self.kt.vertices[v_cw].pos_stop.unwrap_or(pcw);
+            self.kt.stop_vertex_at(v, time, p)?;
+            for s in [cw(vidx), ccw(vidx)] {
+                if let Some(eid) = self.kt.triangles[tid].wavefronts[s] {
+                    if let Some(e) = self.kt.edges.get_mut(eid) {
+                        e.dead = true;
+                    }
+                }
+            }
+            if let Some(nid) = self.kt.triangles[tid].neighbors[vidx] {
+                let idx_in_n = (0..3)
+                    .find(|&s| self.kt.triangles[nid].neighbors[s] == Some(tid))
+                    .ok_or_else(|| crate::error::PropagationError::TopologyInvariant {
+                        detail: "opposing spoke: backref".into(),
+                    })?;
+                if let Some(tr) = self.kt.triangles.get_mut(tid) {
+                    tr.neighbors[vidx] = None;
+                }
+                if let Some(n) = self.kt.triangles.get_mut(nid) {
+                    n.neighbors[idx_in_n] = None;
+                }
+                self.spoke_collapse_part2(nid, idx_in_n, time)?;
+            }
+            if let Some(tr) = self.kt.triangles.get_mut(tid) {
+                tr.set_dying();
+            }
+            self.queue.needs_dropping(self.kt.triangles[tid].tidx)?;
+            if let Some(t) = self.kt.triangles.get_mut(tid) {
+                t.set_dead();
+            }
+            return Ok(());
+        } else if d_cw < d_ccw {
+            (ccw(vidx), v_cw)
+        } else {
+            (cw(vidx), v_ccw)
+        };
+
+        self.kt.stop_vertex(o, time)?;
+        let p = self.kt.vertices[o]
+            .pos_stop
+            .unwrap_or_else(|| self.kt.vertices[o].position_at(time));
+        self.kt.stop_vertex_at(v, time, p)?;
+        let (left_sl, right_sl) = {
+            let t = &self.kt.triangles[tid];
+            (
+                t.wavefronts[cw(collapse)].map(|e| self.kt.edges[e].supporting_line),
+                t.wavefronts[ccw(collapse)].map(|e| self.kt.edges[e].supporting_line),
+            )
+        };
+        if let Some(tr) = self.kt.triangles.get_mut(tid) {
+            tr.set_dying();
+        }
+        let receivers = move_constraints_to_neighbor(&mut self.kt, tid, collapse)?;
+        for ntid in receivers {
+            if self.kt.triangles[ntid].live() {
+                self.queue.needs_update(self.kt.triangles[ntid].tidx)?;
+            }
+        }
+        self.constraint_collapse_part2(tid, collapse, time, left_sl, right_sl)?;
+        let _ = n_fast;
         Ok(())
     }
 
@@ -1251,9 +1415,7 @@ fn create_kinetic_vertices(kt: &mut KineticTriangulation) -> Result<(), Skeleton
             let pos = kt.vertices[start_v].pos_zero;
             let sl_l = kt.edges[l].supporting_line;
             let sl_r = kt.edges[r].supporting_line;
-            let vel = intersection_velocity(sl_l, sl_r)
-                .map(|(_, v)| v)
-                .unwrap_or(Point2::new(0.0, 0.0));
+            let (_, vel) = wavefront_vertex_motion(sl_l, sl_r, pos, 0.0);
             let ang = vertex_angle_from_lines(sl_l, sl_r);
             let mut nv = WavefrontVertex::new_kinetic(pos, vel, 0.0, InfiniteSpeedType::None);
             nv.angle = ang;
@@ -1422,9 +1584,7 @@ fn make_initial_kv(
         (Some(ea), Some(eb)) => {
             let sla = kt.edges[ea].supporting_line;
             let slb = kt.edges[eb].supporting_line;
-            let vel = intersection_velocity(sla, slb)
-                .map(|(_, v)| v)
-                .unwrap_or(Point2::new(0.0, 0.0));
+            let (_, vel) = wavefront_vertex_motion(sla, slb, pos, 0.0);
             (vel, vertex_angle_from_lines(sla, slb))
         }
         _ => (

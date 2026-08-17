@@ -200,8 +200,13 @@ impl KineticTriangulation {
         }
     }
 
-    pub fn stop_vertex(&mut self, v: VertexId, t: f64) -> Result<(), PropagationError> {
-        let (pos, left_face, right_face, start_t, start_pos, component) = {
+    pub fn stop_vertex_at(
+        &mut self,
+        v: VertexId,
+        t: f64,
+        pos: Point2,
+    ) -> Result<(), PropagationError> {
+        let (left_face, right_face, start_t, start_pos) = {
             let vert = self
                 .vertices
                 .get(v)
@@ -211,7 +216,6 @@ impl KineticTriangulation {
             if vert.is_stopped() {
                 return Ok(());
             }
-            let pos = vert.position_at(t);
             let mut faces = [0u32, 0u32];
             for s in 0..2 {
                 if let Some(eid) = vert.incident_edges[s] {
@@ -221,18 +225,15 @@ impl KineticTriangulation {
                 }
             }
             (
-                pos,
                 faces[0],
                 faces[1],
                 vert.time_start,
                 vert.position_at(vert.time_start),
-                0i32,
             )
         };
         if let Some(vert) = self.vertices.get_mut(v) {
             vert.stop(t, pos);
         }
-        // Emit arc record (finite)
         self.arcs.push(ArcRecord {
             start: start_pos,
             end: Some(pos),
@@ -240,11 +241,18 @@ impl KineticTriangulation {
             end_time: Some(t),
             left_face,
             right_face,
-            component,
+            component: 0,
             from_input_edge: false,
         });
-        let _ = component;
         Ok(())
+    }
+
+    pub fn stop_vertex(&mut self, v: VertexId, t: f64) -> Result<(), PropagationError> {
+        let pos = match self.vertices.get(v) {
+            Some(vert) if !vert.is_stopped() => vert.position_at(t),
+            _ => return Ok(()),
+        };
+        self.stop_vertex_at(v, t, pos)
     }
 
     /// Validate live triangles' local topology.

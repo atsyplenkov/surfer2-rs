@@ -183,6 +183,7 @@ fn convex_frozen_segment_counts() {
         ("convex03.graphml", "convex03-double.obj", 3),
         ("convex04.graphml", "convex04-double.obj", 5),
         ("convex07.graphml", "convex07-double.obj", 11),
+        ("convex19.graphml", "", 35),
     ];
     for (graph, obj, want) in cases {
         let gpath = upstream_test_data().join(graph);
@@ -200,12 +201,34 @@ fn convex_frozen_segment_counts() {
         )
         .unwrap();
         assert_eq!(sk.segment_count(), want, "{graph}");
-        let op = root.join(obj);
-        if op.exists() {
-            let frozen = ObjSkeleton::parse(&std::fs::read_to_string(&op).unwrap()).unwrap();
-            assert_eq!(frozen.finite_nonzero_segments().len(), want, "frozen {obj}");
+        if !obj.is_empty() {
+            let op = root.join(obj);
+            if op.exists() {
+                let frozen = ObjSkeleton::parse(&std::fs::read_to_string(&op).unwrap()).unwrap();
+                assert_eq!(frozen.finite_nonzero_segments().len(), want, "frozen {obj}");
+            }
         }
     }
+}
+
+#[test]
+fn convex_allseq_has_unbounded_hull() {
+    let path = upstream_test_data().join("convex03.graphml");
+    if !path.exists() {
+        return;
+    }
+    let g = read_graphml_path(&path).unwrap();
+    let pslg = g.to_pslg().unwrap();
+    let prop = surfer2::Propagator::from_pslg(
+        &pslg,
+        &Options {
+            kernel: KernelMode::Fast,
+            components: ComponentMode::AllSequential,
+        },
+    )
+    .unwrap();
+    assert!(prop.kt.infinite_vertex.is_some());
+    assert!(prop.kt.triangles.values().any(|t| t.is_unbounded));
 }
 
 #[test]

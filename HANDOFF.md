@@ -1,0 +1,114 @@
+# Handoff: surfer2 Rust port (headless)
+
+Date: 2026-08-17
+Repo: `/home/ats/Development/surfer2` — git `master` (see latest commits below)
+Upstream: `cgalab/surfer2` @ `c42f9a7f969cd661d060481cd3b8bac2bdfb8dfa`
+Ponytail **full** is on (user rule). Off only: `stop ponytail` / `normal mode`.
+
+Plan file `local://surfer2-rust-port-plan.md` is **not on disk**. Do not invent it.
+
+## Goal
+
+Native Rust crate `surfer2` (GPL-3.0-or-later): headless computational semantics of Surfer2 — PSLG + polygon-with-holes, weighted wavefronts, component modes, kinetic propagation, in-memory DCEL/offsets, Fast/Robust kernels. No GraphML/OBJ/CGAL/Boost/C++ at runtime.
+
+## Oracle
+
+`/tmp/surfer2` cloned at the pinned rev. Bins:
+
+- `/tmp/surfer2/build-double/cc/surfer` (`-DNT_USE_DOUBLE=ON`)
+- `/tmp/surfer2/build-exact/cc/surfer`
+
+Local `/tmp` patches only (not in the Rust repo): skip Qt GUI, CGAL 6 empty `CGAL_USE_FILE`, `std::get_if` for intersections. Built against Homebrew CGAL 6 + Boost 1.92.
+
+`KineticTriangulation.cpp` lives at `/tmp/surfer2/surf/src/KineticTriangulation.cpp`.
+
+## What landed this session (unbounded hull, convex only)
+
+Do not re-read the whole C++ tree for work already landed.
+
+Prior commits (still current):
+
+| SHA | What |
+|---|---|
+| `68c34bc` | Split-event fan walk; one kinetic vertex per wavefront sector; degree-1 bevels |
+| `575e0c5` | Lock convex03/04/07 = 3/5/11; spoke-1 / deg1 smoke |
+| `81f51a0` | Successor `pos_zero` from line intersection |
+| `b25b290` | Parallel opposite lines → `Opposing`; opposing-face handler; spoke-1 interior 16/16 |
+
+This session:
+
+- `step_around` returns `None` when circulating around `kt.infinite_vertex` (the unbounded ring is a cycle).
+- `most_around` / `rewrite_star_side` / `create_kinetic_vertices` stop if the walk returns to start.
+- `compute_unbounded_fast` ports C++ unbounded collapse: hull-edge constraint collapse, one-sided CH-leave (`vertex_leaves_ch`), unconstrained triple determinant (`generic_collapse_time_3`).
+- `set_vertex` keeps `is_unbounded` in sync with the infinite vertex; `stop_vertex` ignores it.
+- `attach_unbounded_hull` (AllSequential / AllSimultaneous only): one unbounded triangle per unique **constrained** convex-hull edge, vertices `[∞, b, a]`, linked around `∞`. No neighbor to the finite triangle (each side has its own wavefront).
+- **Bail-out:** if any **unconstrained** point-set hull edge exists, attach does nothing. Walking finite ↔ unbounded on those edges merges interior and exterior sectors (spoke-1 AllSequential dropped to 5 segs).
+- Tests: `convex_frozen_segment_counts` includes convex19 = 35; `convex_allseq_has_unbounded_hull` asserts `infinite_vertex` + at least one unbounded triangle.
+
+`C++ split_vertex` (360–416) is still **bevel-only**. Split *events* are `handle_split_event`.
+
+## Current numbers (C++ double `--component=-1`)
+
+| Case | Rust | C++ | Note |
+|---|---|---|---|
+| convex03/04/07/19 | 3/5/11/35 | same | locked; AllSequential now has unbounded faces (exterior is rays) |
+| spoke-1 **interior** (`Index(0)`) | **16** | 16 | done |
+| spoke-1 both (`AllSequential`) | **22** | 26 | attach skipped (unconstrained CH); still missing exterior 4 segs |
+| spoke-2 / spoke-3 | 22 / 24 | 26 / 26 | same class |
+| corpus soft | **4/33** OK | — | floor ≥4; lost `issue2-minimal1` (33 vs 25) and `iso-simple-3` (19 vs 13) after opposing handler |
+| lake9706 / 10623 | ignored | 4372 / 31330 segs | still incomplete |
+
+C++ spoke-1 split: interior 16 (7 events) + exterior 10 (2 events @ 32) = 26.
+
+## What was tried and failed (do not repeat blindly)
+
+1. **Full CH ring including unconstrained hull edges**, neighbor finite ↔ unbounded: init topology can be fixed by pairing duplicate missing-neighbor sides (colinear CDT faces), but `create_kinetic_vertices` then walks interior triangle `1-2-3` through spoke `1-3` into the unbounded ring and pairs an **interior** wavefront with an **exterior** one. Result: 5 finite segs.
+2. **Constrained-CH unbounded only, no bail-out** (spoke-1 still attached 6 U's, fragmented ring): 18 segs (regression from 22). Dummy endpoints remain on incomplete exterior fans; extra constraint/opposing events eat segs.
+3. Processing unbounded triangles first so interior overwrites shared corners: not enough; the leak is the unconstrained spoke around a CH vertex, not just last-writer.
+
+## Next implementation (already decided)
+
+**1. Unconstrained-CH unbounded neighbors, sector-bounded walk**
+
+- Need one unbounded triangle per *unique CDT hull edge* (constrained **and** unconstrained) so exterior KVs at vertices like spoke-1 `1` connect exterior `0-1` to exterior `1-2`.
+- Must **not** let `create_kinetic_vertices` / `step_around` cross from an interior wavefront to an exterior wavefront around the same input point.
+- Pair missed finite neighbors (same canonical endpoints, two sides, no neighbor) — those are colinear CDT faces, not hull.
+- Prove convex 3/5/11/35 still hold, then spoke-1 AllSequential **26**.
+- After that: recover issue2-minimal1 / iso-simple-3 if opposing over-emits; then lakes.
+
+**2. Do not do first:** Robust kernel wiring, lake 10623, benches, additive weights.
+
+## Critical files
+
+- `src/propagator.rs` — `attach_unbounded_hull`, `initialize_kinetic` (wavefronts over all triangles, skip orientation swap when opposite vertex is `∞`), `create_kinetic_vertices`, `handle_split_or_flip` (unbounded → `handle_ccw_leaves`), `rewrite_star_side`, `handle_inf_opposing`
+- `src/triangulation/around_vertex.rs` — infinite-vertex guard; cycle stop in `most_around`
+- `src/triangulation/kinetic.rs` — `set_vertex` `is_unbounded`; `compute_unbounded_fast`; `vertex_leaves_ch`; `generic_collapse_time_3`
+- Tests: `tests/differential.rs` (`spoke1` ≥22, `spoke1_interior_count` =16, `convex_frozen_segment_counts`, `convex_allseq_has_unbounded_hull`)
+
+## Constraints (unchanged)
+
+Single crate, GPL-3.0-or-later, `Point2` f64, FFI-friendly, deps: slotmap 1.1.1, spade 2.15.1, robust 1.2.0, algebraics 0.3.0. IEEE bits stay; no origin shift. `CollapseType` source order is priority. No triangle-ID tiebreak. DCEL from arc records. Additive weights omitted.
+
+## Commands
+
+```bash
+cd /home/ats/Development/surfer2
+cargo test
+SURFER2_DOUBLE_BIN=/tmp/surfer2/build-double/cc/surfer \
+SURFER2_EXACT_BIN=/tmp/surfer2/build-exact/cc/surfer \
+  cargo test --test differential -- --ignored --nocapture
+cargo test --test differential spoke1 convex -- --nocapture
+```
+
+Env: `SURFER2_TEST_DATA` default `/tmp/surfer2/test-data`; `SURFER2_GIS_DATA` default `fixtures/gis`.
+
+## Suggested skills
+
+- **ponytail** (full) — already required by user rule; keep the ladder; no extra modules.
+- **commit** — if asked to commit; split by meaning; do not commit rustfmt-only `tests/support/*`.
+- **tdd** — only if the user asks test-first; otherwise one gate test per logic change.
+- Do **not** invoke design/execute-plan unless the user asks to re-plan the whole port.
+
+## Voice for the next agent
+
+User wants implementation, not more architecture. Default next cut: sector-bounded walk so unconstrained-CH unbounded neighbors are safe. Prove convex03–19 still 3/5/11/35, then spoke-1 26.

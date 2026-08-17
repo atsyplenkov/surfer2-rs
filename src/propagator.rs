@@ -534,25 +534,17 @@ impl Propagator {
             .pos_stop
             .unwrap_or_else(|| self.kt.vertices[va].position_at(time));
 
-        // C++: ea = va.incident_wavefront_edge(0), eb = vb.incident_wavefront_edge(1)
-        // remaining edges after the collapsed one dies. Prefer those; fall back to
-        // triangle-side SLs snapshotted before move_constraints.
-        let ea_id = {
-            let v = &self.kt.vertices[va];
-            [v.incident_edges[0], v.incident_edges[1]]
+        // C++: ea = va.incident(0), eb = vb.incident(1). Fall back to the
+        // other slot if that one is the collapsing edge.
+        let remaining = |vid: VertexId, prefer: usize| {
+            let inc = self.kt.vertices[vid].incident_edges;
+            [inc[prefer], inc[1 - prefer]]
                 .into_iter()
                 .flatten()
                 .find(|&eid| Some(eid) != collapsing_eid && !self.kt.edges[eid].dead)
         };
-        let eb_id = {
-            let v = &self.kt.vertices[vb];
-            // Prefer slot 1 then 0 (C++ incident(1) for vb).
-            [v.incident_edges[1], v.incident_edges[0]]
-                .into_iter()
-                .flatten()
-                .find(|&eid| Some(eid) != collapsing_eid && !self.kt.edges[eid].dead)
-        };
-        let mut velocity = Point2::new(0.0, 0.0);
+        let ea_id = remaining(va, 0);
+        let eb_id = remaining(vb, 1);
         let sl_pair = match (ea_id, eb_id) {
             (Some(a), Some(b)) if a != b => Some((
                 self.kt.edges[a].supporting_line,
@@ -563,14 +555,10 @@ impl Propagator {
                 _ => None,
             },
         };
-        if let Some((a, b)) = sl_pair {
-            if let Some((_, vel)) = intersection_velocity(a, b) {
-                velocity = vel;
-            }
-        }
-
-        // C++ make_vertex: pos_zero is extrapolated to t=0 so p(t)=pos_zero+t*vel.
-        let pos_zero = Point2::new(pos.x - time * velocity.x, pos.y - time * velocity.y);
+        let (pos_zero, velocity) = match sl_pair.and_then(|(a, b)| intersection_velocity(a, b)) {
+            Some((p0, vel)) => (p0, vel),
+            None => (pos, Point2::new(0.0, 0.0)),
+        };
         let ang = match (ea_id, eb_id) {
             (Some(a), Some(b)) => vertex_angle_from_lines(
                 self.kt.edges[a].supporting_line,
@@ -581,29 +569,17 @@ impl Propagator {
         let mut nv =
             WavefrontVertex::new_kinetic(pos_zero, velocity, time, InfiniteSpeedType::None);
         nv.angle = ang;
-        // Ordered: incident[0]=edge into nvid (eb from vb side), incident[1]=edge out (ea).
-        // C++ make_vertex(pos,time,ea,eb): a=ea attaches as edge 1 of new?
-        // Actually new vertex is between ea and eb: wavefronts[0]=ea, wavefronts[1]=eb
-        // Looking at make_vertex(a,b): incident a and b.
-        nv.incident_edges[0] = ea_id; // edge a
-        nv.incident_edges[1] = eb_id; // edge b
+        nv.incident_edges = [ea_id, eb_id];
         let nvid = self.kt.vertices.insert(nv);
+        // C++ make_vertex(ea,eb): new vertex is ea.v1 and eb.v0.
         if let Some(eid) = ea_id {
             if let Some(e) = self.kt.edges.get_mut(eid) {
-                for ep in &mut e.endpoints {
-                    if *ep == va || *ep == vb {
-                        *ep = nvid;
-                    }
-                }
+                e.endpoints[1] = nvid;
             }
         }
         if let Some(eid) = eb_id {
             if let Some(e) = self.kt.edges.get_mut(eid) {
-                for ep in &mut e.endpoints {
-                    if *ep == va || *ep == vb {
-                        *ep = nvid;
-                    }
-                }
+                e.endpoints[0] = nvid;
             }
         }
         if let Some(vv) = self.kt.vertices.get_mut(va) {

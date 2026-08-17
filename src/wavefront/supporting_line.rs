@@ -23,22 +23,24 @@ pub struct SupportingLine {
 }
 
 impl SupportingLine {
-    pub fn from_segment(u: Point2, v: Point2, weight: f64) -> Option<Self> {
-        let direction = Point2::new(v.x - u.x, v.y - u.y);
+    pub fn from_point_dir(point: Point2, direction: Point2, weight: f64) -> Option<Self> {
         let len = direction.x.hypot(direction.y);
         if !(len > 0.0 && weight.is_finite() && weight > 0.0) {
             return None;
         }
-        // Left normal: (-dy, dx) / len
         let normal_unit = Point2::new(-direction.y / len, direction.x / len);
         let normal = Point2::new(normal_unit.x * weight, normal_unit.y * weight);
         Some(Self {
-            point: u,
+            point,
             direction,
             weight,
             normal_unit,
             normal,
         })
+    }
+
+    pub fn from_segment(u: Point2, v: Point2, weight: f64) -> Option<Self> {
+        Self::from_point_dir(u, Point2::new(v.x - u.x, v.y - u.y), weight)
     }
 
     /// Line origin at time t (point translated by t*normal); direction unchanged.

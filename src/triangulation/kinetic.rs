@@ -145,7 +145,13 @@ impl KineticTriangulation {
         self.tidx_map.get(tidx as usize).copied().flatten()
     }
 
-    pub fn set_neighbor(&mut self, a: TriangleId, side_a: Side, b: Option<TriangleId>, side_b: Side) {
+    pub fn set_neighbor(
+        &mut self,
+        a: TriangleId,
+        side_a: Side,
+        b: Option<TriangleId>,
+        side_b: Side,
+    ) {
         if let Some(ta) = self.triangles.get_mut(a) {
             ta.neighbors[side_a] = b;
             ta.wavefronts[side_a] = None;
@@ -172,9 +178,25 @@ impl KineticTriangulation {
     }
 
     pub fn set_vertex(&mut self, t: TriangleId, i: Side, v: VertexId) {
-        if let Some(tr) = self.triangles.get_mut(t) {
+        // C++ KineticTriangle::set_vertex: constrained sides incident to i
+        // keep wavefront endpoints [0]=ccw(side), [1]=cw(side).
+        let (cw_e, ccw_e) = {
+            let Some(tr) = self.triangles.get_mut(t) else {
+                return;
+            };
             tr.vertices[i] = Some(v);
             tr.invalidate_collapse();
+            (tr.wavefronts[cw(i)], tr.wavefronts[ccw(i)])
+        };
+        if let Some(eid) = cw_e {
+            if let Some(e) = self.edges.get_mut(eid) {
+                e.endpoints[0] = v;
+            }
+        }
+        if let Some(eid) = ccw_e {
+            if let Some(e) = self.edges.get_mut(eid) {
+                e.endpoints[1] = v;
+            }
         }
     }
 
@@ -365,13 +387,24 @@ pub fn compute_collapse_fast(
                     CollapseType::TriangleCollapse,
                     tmin,
                 ))
+            } else if t
+                .vertices
+                .iter()
+                .flatten()
+                .all(|v| kt.vertices.get(*v).map(|x| x.is_stopped()).unwrap_or(false))
+            {
+                Ok(CollapseSpec::new(
+                    t.component,
+                    CollapseType::TriangleCollapse,
+                    time_now,
+                ))
             } else {
-                Ok(CollapseSpec::never(t.component))
+                generic_collapse_fast(kt, t, time_now)
             }
         }
         2 => collapse_bounded_constrained_2(kt, t, time_now),
         1 => collapse_bounded_constrained_1(kt, t, time_now),
-        0 => generic_collapse_fast(kt, t, time_now),
+        0 => compute_flip_event_fast(kt, t, time_now),
         _ => Ok(CollapseSpec::never(t.component)),
     }
 }
@@ -480,11 +513,7 @@ fn collapse_bounded_constrained_1(
             if roots.count == 0 {
                 return Ok(CollapseSpec::never(t.component));
             }
-            let cand = if det.c[2] < 0.0 {
-                roots.x1
-            } else {
-                roots.x0
-            };
+            let cand = if det.c[2] < 0.0 { roots.x1 } else { roots.x0 };
             if cand >= time_now {
                 cand
             } else if roots.count == 2 && roots.x1 >= time_now {
@@ -523,6 +552,34 @@ fn constraint_collapse_time(
     }
 }
 
+fn compute_flip_event_fast(
+    kt: &KineticTriangulation,
+    t: &KineticTriangle,
+    time_now: f64,
+) -> Result<CollapseSpec, PropagationError> {
+    let could_flip = t.vertices.iter().flatten().any(|&vid| {
+        kt.vertices
+            .get(vid)
+            .map(|v| v.is_reflex_or_straight())
+            .unwrap_or(false)
+    });
+    if !could_flip {
+        return Ok(CollapseSpec::never(t.component));
+    }
+    let result = generic_collapse_fast(kt, t, time_now)?;
+    if result.type_ == CollapseType::VertexMovesOverSpoke {
+        let i = result.relevant_edge as usize;
+        let reflex = t.vertices[i]
+            .and_then(|vid| kt.vertices.get(vid))
+            .map(|v| v.is_reflex_or_straight())
+            .unwrap_or(false);
+        if !reflex {
+            return Ok(CollapseSpec::never(t.component));
+        }
+    }
+    Ok(result)
+}
+
 fn generic_collapse_fast(
     kt: &KineticTriangulation,
     t: &KineticTriangle,
@@ -536,9 +593,12 @@ fn generic_collapse_fast(
         let vid = t.vertices[i].ok_or_else(|| PropagationError::TopologyInvariant {
             detail: "generic collapse missing vertex".into(),
         })?;
-        let v = kt.vertices.get(vid).ok_or_else(|| PropagationError::TopologyInvariant {
-            detail: "generic collapse dangling vertex".into(),
-        })?;
+        let v = kt
+            .vertices
+            .get(vid)
+            .ok_or_else(|| PropagationError::TopologyInvariant {
+                detail: "generic collapse dangling vertex".into(),
+            })?;
         // Position polynomials are relative to t=0: pos_zero + t * vel
         ps[i] = [v.pos_zero.x, v.pos_zero.y];
         vs[i] = [v.velocity.x, v.velocity.y];
@@ -570,11 +630,7 @@ fn generic_collapse_fast(
             }
             // Upstream: sign of leading coeff selects root
             let sign2 = det.c[2].signum();
-            let candidate = if sign2 < 0.0 {
-                roots.x1
-            } else {
-                roots.x0
-            };
+            let candidate = if sign2 < 0.0 { roots.x1 } else { roots.x0 };
             if candidate < time_now {
                 if roots.count == 2 && roots.x1 >= time_now {
                     roots.x1
@@ -610,10 +666,19 @@ fn classify_at_time(
         let b = pts[cw(s)];
         let len = a.distance_to(b);
         lengths[s] = len;
-        if len == 0.0 {
+    }
+    let max_l = lengths[0].max(lengths[1]).max(lengths[2]);
+    // Fast kernel: det root is not exact; treat a collapsed spoke as zero
+    // when it is tiny vs the other sides (C++ uses exact NT == 0).
+    let eps = 1e-9 * (1.0 + max_l);
+    for s in 0..3 {
+        if lengths[s] <= eps {
             zero_edges += 1;
             zero_side = s;
         }
+    }
+    if zero_edges == 2 {
+        zero_edges = 3;
     }
     match zero_edges {
         3 => Ok(CollapseSpec::new(

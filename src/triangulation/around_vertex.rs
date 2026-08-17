@@ -3,13 +3,54 @@
 //! Upstream: `AroundVertexIterator` in `KineticTriangulation.h`.
 
 use super::kinetic::{ccw, cw, KineticTriangulation, Side, TriangleId};
-use crate::wavefront::vertex::VertexId;
+
+/// One C++ `AroundVertexIterator` step.
+///
+/// `++` uses the cw table (`use_cw = true`); `--` uses ccw.
+pub fn step_around(
+    kt: &KineticTriangulation,
+    tid: TriangleId,
+    v_idx: Side,
+    use_cw: bool,
+) -> Option<(TriangleId, Side)> {
+    let t = kt.triangles.get(tid)?;
+    let next = if use_cw {
+        t.neighbors[cw(v_idx)]
+    } else {
+        t.neighbors[ccw(v_idx)]
+    }?;
+    let n = kt.triangles.get(next)?;
+    let t_in_n = (0..3).find(|&s| n.neighbors[s] == Some(tid))?;
+    let v_in_n = if use_cw { cw(t_in_n) } else { ccw(t_in_n) };
+    Some((next, v_in_n))
+}
+
+/// Walk `++`/`--` until there is no neighbor (C++ `most_cw` / `most_ccw`).
+pub fn most_around(
+    kt: &KineticTriangulation,
+    tid: TriangleId,
+    v_idx: Side,
+    use_cw: bool,
+) -> (TriangleId, Side) {
+    let mut cur = (tid, v_idx);
+    let mut guard = 0;
+    loop {
+        guard += 1;
+        if guard > 10_000 {
+            return cur;
+        }
+        match step_around(kt, cur.0, cur.1, use_cw) {
+            Some(n) => cur = n,
+            None => return cur,
+        }
+    }
+}
 
 /// Yield (triangle, index_of_vertex_in_triangle) circulating CCW around `v`.
 pub fn triangles_around_vertex(
     kt: &KineticTriangulation,
     start: TriangleId,
-    v: VertexId,
+    v: crate::wavefront::vertex::VertexId,
 ) -> Vec<(TriangleId, Side)> {
     let mut out = Vec::new();
     let mut current = Some(start);
@@ -32,12 +73,10 @@ pub fn triangles_around_vertex(
         }
         let Some(i) = idx else { break };
         if out.iter().any(|(id, _)| *id == t) {
-            break; // closed loop
+            break;
         }
         out.push((t, i));
-        // Step to neighbor across edge cw(i) → next around vertex
-        current = tri.neighbors[cw(i)];
-        let _ = ccw(i);
+        current = step_around(kt, t, i, true).map(|(id, _)| id);
     }
     out
 }

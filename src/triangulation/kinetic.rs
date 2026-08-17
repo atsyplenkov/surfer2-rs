@@ -180,11 +180,13 @@ impl KineticTriangulation {
     pub fn set_vertex(&mut self, t: TriangleId, i: Side, v: VertexId) {
         // C++ KineticTriangle::set_vertex: constrained sides incident to i
         // keep wavefront endpoints [0]=ccw(side), [1]=cw(side).
+        let inf = self.infinite_vertex;
         let (cw_e, ccw_e) = {
             let Some(tr) = self.triangles.get_mut(t) else {
                 return;
             };
             tr.vertices[i] = Some(v);
+            tr.is_unbounded = inf.is_some() && tr.vertices.iter().any(|x| *x == inf);
             tr.invalidate_collapse();
             (tr.wavefronts[cw(i)], tr.wavefronts[ccw(i)])
         };
@@ -206,6 +208,9 @@ impl KineticTriangulation {
         t: f64,
         pos: Point2,
     ) -> Result<(), PropagationError> {
+        if self.infinite_vertex == Some(v) {
+            return Ok(());
+        }
         let (left_face, right_face, start_t, start_pos) = {
             let vert = self
                 .vertices
@@ -248,6 +253,9 @@ impl KineticTriangulation {
     }
 
     pub fn stop_vertex(&mut self, v: VertexId, t: f64) -> Result<(), PropagationError> {
+        if self.infinite_vertex == Some(v) {
+            return Ok(());
+        }
         let pos = match self.vertices.get(v) {
             Some(vert) if !vert.is_stopped() => vert.position_at(t),
             _ => return Ok(()),
@@ -377,8 +385,12 @@ pub fn compute_collapse_fast(
         }
     }
 
-    if t.is_unbounded {
-        return compute_unbounded_fast(kt, t, time_now, &const_sides);
+    let unbounded = t.is_unbounded
+        || kt
+            .infinite_vertex
+            .is_some_and(|inf| t.vertices.iter().any(|v| *v == Some(inf)));
+    if unbounded {
+        return compute_unbounded_fast(kt, t, time_now);
     }
 
     match n_const {
@@ -740,21 +752,174 @@ fn compute_unbounded_fast(
     kt: &KineticTriangulation,
     t: &KineticTriangle,
     time_now: f64,
-    _const_sides: &[bool; 3],
 ) -> Result<CollapseSpec, PropagationError> {
-    // Simplified: try constraint collapses; else NEVER
-    for s in 0..3 {
-        if t.wavefronts[s].is_some() {
-            if let Some(tc) = constraint_collapse_time(kt, t, s, time_now) {
-                return Ok(CollapseSpec::with_edge(
-                    t.component,
-                    CollapseType::ConstraintCollapse,
-                    tc,
-                    s as i8,
-                ));
+    let Some(inf) = kt.infinite_vertex else {
+        return Ok(CollapseSpec::never(t.component));
+    };
+    let Some(idx) = t.vertices.iter().position(|v| *v == Some(inf)) else {
+        return Ok(CollapseSpec::never(t.component));
+    };
+
+    let edge_collapse = if t.wavefronts[idx].is_some() {
+        match constraint_collapse_time(kt, t, idx, time_now) {
+            Some(tc) => CollapseSpec::with_edge(
+                t.component,
+                CollapseType::ConstraintCollapse,
+                tc,
+                idx as i8,
+            ),
+            None => CollapseSpec::never(t.component),
+        }
+    } else {
+        CollapseSpec::never(t.component)
+    };
+
+    let Some(nid) = t.neighbors[cw(idx)] else {
+        return Ok(edge_collapse);
+    };
+    let n = match kt.triangles.get(nid) {
+        Some(n) if n.live() => n,
+        _ => return Ok(edge_collapse),
+    };
+    let Some(nidx) = n.vertices.iter().position(|v| *v == Some(inf)) else {
+        return Ok(edge_collapse);
+    };
+
+    let this_c = t.wavefronts[idx].is_some();
+    let n_c = n.wavefronts[nidx].is_some();
+    if this_c && n_c {
+        return Ok(edge_collapse);
+    }
+    if this_c || n_c {
+        let (eid, vid) = if this_c {
+            (t.wavefronts[idx], n.vertices[ccw(nidx)])
+        } else {
+            (n.wavefronts[nidx], t.vertices[cw(idx)])
+        };
+        let (Some(eid), Some(vid)) = (eid, vid) else {
+            return Ok(edge_collapse);
+        };
+        if Some(vid) == kt.infinite_vertex {
+            return Ok(edge_collapse);
+        }
+        let e = &kt.edges[eid];
+        let v = &kt.vertices[vid];
+        let leaves = vertex_leaves_ch(v, &e.supporting_line, time_now);
+        let vertex_spec = match leaves {
+            Some(tc) => {
+                CollapseSpec::with_edge(t.component, CollapseType::CcwVertexLeavesCh, tc, idx as i8)
+            }
+            None => CollapseSpec::never(t.component),
+        };
+        return Ok(
+            if vertex_spec.cmp_priority(&edge_collapse) == std::cmp::Ordering::Less {
+                vertex_spec
+            } else {
+                edge_collapse
+            },
+        );
+    }
+
+    let (Some(u), Some(v), Some(w)) = (
+        t.vertices[cw(idx)],
+        t.vertices[ccw(idx)],
+        n.vertices[ccw(nidx)],
+    ) else {
+        return Ok(CollapseSpec::never(t.component));
+    };
+    if [u, v, w].iter().any(|x| kt.infinite_vertex == Some(*x)) {
+        return Ok(CollapseSpec::never(t.component));
+    }
+    let vu = &kt.vertices[u];
+    let vv = &kt.vertices[v];
+    let vw = &kt.vertices[w];
+    if vu.velocity == vv.velocity && vv.velocity == vw.velocity {
+        return Ok(CollapseSpec::never(t.component));
+    }
+    match generic_collapse_time_3(vu, vv, vw, time_now) {
+        Some(tc) => Ok(CollapseSpec::with_edge(
+            t.component,
+            CollapseType::CcwVertexLeavesCh,
+            tc,
+            idx as i8,
+        )),
+        None => Ok(CollapseSpec::never(t.component)),
+    }
+}
+
+fn vertex_leaves_ch(
+    v: &WavefrontVertex,
+    e: &crate::wavefront::supporting_line::SupportingLine,
+    time_now: f64,
+) -> Option<f64> {
+    let approach = e.weight - (v.velocity.x * e.normal_unit.x + v.velocity.y * e.normal_unit.y);
+    if approach > 0.0 {
+        return None;
+    }
+    let dist =
+        (v.pos_zero.x - e.point.x) * e.normal_unit.x + (v.pos_zero.y - e.point.y) * e.normal_unit.y;
+    if approach == 0.0 {
+        return None;
+    }
+    let tc = dist / approach;
+    if tc >= time_now {
+        Some(tc)
+    } else {
+        None
+    }
+}
+
+fn generic_collapse_time_3(
+    u: &WavefrontVertex,
+    v: &WavefrontVertex,
+    w: &WavefrontVertex,
+    time_now: f64,
+) -> Option<f64> {
+    use crate::numeric::{determinant_poly_f64, solve_quadratic_f64};
+    let det = determinant_poly_f64(
+        [u.pos_zero.x, u.pos_zero.y],
+        [u.velocity.x, u.velocity.y],
+        [v.pos_zero.x, v.pos_zero.y],
+        [v.velocity.x, v.velocity.y],
+        [w.pos_zero.x, w.pos_zero.y],
+        [w.velocity.x, w.velocity.y],
+    );
+    match det.degree() {
+        0 => {
+            if det.c[0] == 0.0 {
+                Some(time_now)
+            } else {
+                None
             }
         }
+        1 => {
+            if det.c[1] == 0.0 {
+                return None;
+            }
+            let tc = -det.c[0] / det.c[1];
+            if tc >= time_now {
+                Some(tc)
+            } else {
+                None
+            }
+        }
+        2 => {
+            let roots = solve_quadratic_f64(det.c[2], det.c[1], det.c[0]);
+            if roots.count == 0 {
+                return None;
+            }
+            if det.c[2] < 0.0 {
+                if roots.x1 >= time_now {
+                    Some(roots.x1)
+                } else {
+                    None
+                }
+            } else if roots.x0 >= time_now {
+                Some(roots.x0)
+            } else {
+                None
+            }
+        }
+        _ => None,
     }
-    let _ = kt;
-    Ok(CollapseSpec::never(t.component))
 }

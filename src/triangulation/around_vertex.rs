@@ -14,6 +14,11 @@ pub fn step_around(
     use_cw: bool,
 ) -> Option<(TriangleId, Side)> {
     let t = kt.triangles.get(tid)?;
+    // C++ never circulates around the infinite vertex (the unbounded
+    // ring is a cycle). Walking it does not terminate.
+    if kt.infinite_vertex.is_some() && t.vertices[v_idx] == kt.infinite_vertex {
+        return None;
+    }
     let next = if use_cw {
         t.neighbors[cw(v_idx)]
     } else {
@@ -40,7 +45,12 @@ pub fn most_around(
             return cur;
         }
         match step_around(kt, cur.0, cur.1, use_cw) {
-            Some(n) => cur = n,
+            Some(n) => {
+                if n.0 == tid {
+                    return cur;
+                }
+                cur = n;
+            }
             None => return cur,
         }
     }

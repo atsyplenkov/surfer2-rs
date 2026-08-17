@@ -676,6 +676,14 @@ impl Propagator {
 
         let edge_idx = spec.relevant_edge as usize;
         let time = spec.time;
+        if self.kt.triangles[tid].is_unbounded
+            || self.kt.triangles[tid]
+                .vertices
+                .iter()
+                .any(|v| *v == self.kt.infinite_vertex)
+        {
+            return self.handle_ccw_leaves(tid, spec);
+        }
         let (v, va, vb) = {
             let t = &self.kt.triangles[tid];
             (
@@ -897,11 +905,11 @@ impl Propagator {
         let mut guard = 0;
         while let Some((id, idx)) = cur {
             guard += 1;
-            if guard > 10_000 {
-                return Err(crate::error::PropagationError::TopologyInvariant {
-                    detail: "split: star walk did not terminate".into(),
-                }
-                .into());
+            if guard > 10_000 || id == start {
+                break;
+            }
+            if self.kt.infinite_vertex == self.kt.triangles[id].vertices[idx] {
+                break;
             }
             self.kt.set_vertex(id, idx, new_v);
             if self.kt.triangles[id].live() {
@@ -993,6 +1001,9 @@ impl Propagator {
         };
 
         let v_fast = self.kt.triangles[tid].vertices[fast_idx].unwrap();
+        if self.kt.infinite_vertex == Some(v_fast) {
+            return self.kill_triangle(tid);
+        }
         let mut cur = most_around(&self.kt, tid, fast_idx, true);
         let mut guard = 0;
         loop {
@@ -1291,9 +1302,13 @@ fn initialize_kinetic(
         }
     }
 
+    if restrict < 0 && interior_filter.is_none() {
+        attach_unbounded_hull(&mut kt, basic, &tri_map, input);
+    }
+
     // Wavefront edges: one per constrained triangle side, oriented so the left
     // normal points into the triangle (toward the opposite vertex).
-    let tids: Vec<_> = tri_map.iter().flatten().copied().collect();
+    let tids: Vec<_> = kt.triangles.keys().collect();
     for &tid in &tids {
         for s in 0..3 {
             // Skip if already has neighbor (unconstrained) or wavefront.
@@ -1305,7 +1320,14 @@ fn initialize_kinetic(
             }
             // Determine if this side is constrained in the basic map
             let basic_ti = tri_map.iter().position(|x| *x == Some(tid));
-            let source_edge = basic_ti.and_then(|ti| basic.constraints[ti][s]);
+            let source_edge = basic_ti
+                .and_then(|ti| basic.constraints[ti][s])
+                .or_else(|| {
+                    let t = &kt.triangles[tid];
+                    let va = t.vertices[ccw(s)]?;
+                    let vb = t.vertices[cw(s)]?;
+                    input_edge_between(input, &kt, va, vb)
+                });
             let weight = source_edge
                 .map(|ei| input.edges()[ei as usize].weight)
                 .unwrap_or(1.0);
@@ -1318,12 +1340,14 @@ fn initialize_kinetic(
                     t.vertices[s].unwrap(),
                 )
             };
+            let vc_inf = kt.infinite_vertex == Some(vc);
             let mut pa = kt.vertices[va].pos_zero;
             let mut pb = kt.vertices[vb].pos_zero;
             let pc = kt.vertices[vc].pos_zero;
-            // Ensure left-of pa→pb contains pc
+            // Ensure left-of pa→pb contains pc. Infinite opposite: keep
+            // stored order (ccw→cw), which already faces the unbounded side.
             let cross = (pb.x - pa.x) * (pc.y - pa.y) - (pb.y - pa.y) * (pc.x - pa.x);
-            let (ea, eb) = if cross >= 0.0 {
+            let (ea, eb) = if vc_inf || cross >= 0.0 {
                 (va, vb)
             } else {
                 std::mem::swap(&mut pa, &mut pb);
@@ -1366,6 +1390,169 @@ fn initialize_kinetic(
     Ok(kt)
 }
 
+fn edge_on_point_set_hull(pts: &[Point2], a: Point2, b: Point2) -> bool {
+    let mut sign = 0i8;
+    for p in pts {
+        let c = (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x);
+        let s = if c > 1e-12 {
+            1
+        } else if c < -1e-12 {
+            -1
+        } else {
+            0
+        };
+        if s == 0 {
+            continue;
+        }
+        if sign == 0 {
+            sign = s;
+        } else if s != sign {
+            return false;
+        }
+    }
+    true
+}
+
+fn input_edge_between(
+    input: &Pslg,
+    kt: &KineticTriangulation,
+    va: VertexId,
+    vb: VertexId,
+) -> Option<u32> {
+    let ia = kt.vertices.get(va)?.source_input_vertex? as usize;
+    let ib = kt.vertices.get(vb)?.source_input_vertex? as usize;
+    input
+        .edges()
+        .iter()
+        .position(|e| {
+            let (a, b) = e.normalized_endpoints();
+            (a == ia && b == ib) || (a == ib && b == ia)
+        })
+        .map(|i| i as u32)
+}
+
+/// One unbounded triangle per CDT hull edge + a shared infinite vertex.
+/// C++ `initialize_tds` copies infinite faces from the CDT.
+fn attach_unbounded_hull(
+    kt: &mut KineticTriangulation,
+    basic: &crate::triangulation::basic::BasicTriangulation,
+    tri_map: &[Option<TriangleId>],
+    _input: &Pslg,
+) {
+    use crate::triangulation::kinetic::{ccw, cw};
+
+    // Unconstrained CH edges need a neighbor into the ring; walking that
+    // neighbor merges interior/exterior sectors. Convex closed PSLGs only.
+    let unconstrained_ch = (0..tri_map.len()).any(|ti| {
+        let Some(tid) = tri_map[ti] else {
+            return false;
+        };
+        (0..3).any(|s| {
+            kt.triangles[tid].neighbors[s].is_none() && basic.constraints[ti][s].is_none() && {
+                let t = &kt.triangles[tid];
+                match (t.vertices[ccw(s)], t.vertices[cw(s)]) {
+                    (Some(a), Some(b)) => edge_on_point_set_hull(
+                        &basic.vertices,
+                        kt.vertices[a].pos_zero,
+                        kt.vertices[b].pos_zero,
+                    ),
+                    _ => false,
+                }
+            }
+        })
+    });
+    if unconstrained_ch {
+        return;
+    }
+
+    let mut seen: Vec<(u32, u32, TriangleId, usize, VertexId, VertexId)> = Vec::new();
+    let mut hull = Vec::new();
+    for (ti, tid) in tri_map.iter().enumerate() {
+        let Some(tid) = *tid else { continue };
+        for s in 0..3 {
+            if kt.triangles[tid].neighbors[s].is_some() {
+                continue;
+            }
+            if basic.constraints[ti][s].is_none() {
+                continue;
+            }
+            let t = &kt.triangles[tid];
+            let Some(a) = t.vertices[ccw(s)] else {
+                continue;
+            };
+            let Some(b) = t.vertices[cw(s)] else { continue };
+            let (ia, ib) = match (
+                kt.vertices[a].source_input_vertex,
+                kt.vertices[b].source_input_vertex,
+            ) {
+                (Some(ia), Some(ib)) => (ia.min(ib), ia.max(ib)),
+                _ => continue,
+            };
+            if let Some(idx) = seen.iter().position(|e| e.0 == ia && e.1 == ib) {
+                let (_, _, otid, os, _, _) = seen.swap_remove(idx);
+                kt.set_neighbor(tid, s, Some(otid), os);
+            } else {
+                seen.push((ia, ib, tid, s, a, b));
+            }
+        }
+    }
+    for (_ia, _ib, tid, s, a, b) in seen {
+        let pa = kt.vertices[a].pos_zero;
+        let pb = kt.vertices[b].pos_zero;
+        if !edge_on_point_set_hull(&basic.vertices, pa, pb) {
+            continue;
+        }
+        hull.push((tid, s, a, b, kt.triangles[tid].component));
+    }
+    if hull.is_empty() {
+        return;
+    }
+
+    let ub_comp = kt
+        .triangles
+        .values()
+        .map(|t| t.component)
+        .max()
+        .unwrap_or(0)
+        + 1;
+
+    let mut inf = WavefrontVertex::new_kinetic(
+        Point2::new(0.0, 0.0),
+        Point2::new(0.0, 0.0),
+        0.0,
+        InfiniteSpeedType::None,
+    );
+    inf.is_initial = true;
+    let inf_id = kt.vertices.insert(inf);
+    kt.infinite_vertex = Some(inf_id);
+
+    // U: [∞, b, a] so hull side 0 has ccw=b, cw=a (exterior left of b→a).
+    let mut ub = Vec::with_capacity(hull.len());
+    for (_ftid, _fs, a, b, _) in &hull {
+        let uid = kt.alloc_triangle(ub_comp);
+        kt.set_vertex(uid, 0, inf_id);
+        kt.set_vertex(uid, 1, *b);
+        kt.set_vertex(uid, 2, *a);
+        ub.push(uid);
+    }
+
+    // Link adjacent unbounded triangles at each hull vertex.
+    // U with vertices[1]=V neighbors U' with vertices[2]=V across ∞–V.
+    for i in 0..ub.len() {
+        let v = kt.triangles[ub[i]].vertices[1];
+        let Some(v) = v else { continue };
+        for j in 0..ub.len() {
+            if i == j {
+                continue;
+            }
+            if kt.triangles[ub[j]].vertices[2] == Some(v) {
+                kt.set_neighbor(ub[i], 2, Some(ub[j]), 1);
+                break;
+            }
+        }
+    }
+}
+
 /// C++ `create_kinetic_vertices`: one kinetic vertex per wavefront sector,
 /// not one per input point (interior and exterior must not share a vertex).
 fn create_kinetic_vertices(kt: &mut KineticTriangulation) -> Result<(), SkeletonError> {
@@ -1385,7 +1572,9 @@ fn create_kinetic_vertices(kt: &mut KineticTriangulation) -> Result<(), Skeleton
                 Some(v) => v,
                 None => continue,
             };
-            if kt.vertices[start_v].source_input_vertex.is_none() {
+            if kt.infinite_vertex == Some(start_v)
+                || kt.vertices[start_v].source_input_vertex.is_none()
+            {
                 continue;
             }
 
@@ -1400,8 +1589,8 @@ fn create_kinetic_vertices(kt: &mut KineticTriangulation) -> Result<(), Skeleton
                     .into());
                 }
                 match step_around(kt, most.0, most.1, true) {
-                    Some(n) => most = n,
-                    None => break,
+                    Some(n) if n != (tid, i) => most = n,
+                    _ => break,
                 }
             }
             let Some(r) = kt.triangles[most.0].wavefronts[cw(most.1)] else {
@@ -1430,8 +1619,14 @@ fn create_kinetic_vertices(kt: &mut KineticTriangulation) -> Result<(), Skeleton
                 if wguard > 10_000 {
                     break;
                 }
+                if kt.infinite_vertex == kt.triangles[id].vertices[idx] {
+                    break;
+                }
                 kt.set_vertex(id, idx, nvid);
                 walk = step_around(kt, id, idx, true);
+                if walk == Some((tid, i)) {
+                    break;
+                }
             }
         }
     }

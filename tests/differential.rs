@@ -117,7 +117,6 @@ fn differential_exact_convex_small() {
     }
 }
 
-
 #[test]
 fn oracle_bins_optional_presence() {
     // Non-ignored smoke: just report whether bins exist.
@@ -127,6 +126,9 @@ fn oracle_bins_optional_presence() {
 
 #[test]
 fn iso_simple3_and_issue2_counts() {
+    // issue2-minimal1: C++ double (`/tmp/surfer2/build-double/cc/surfer`,
+    // `--component=-1`) emits 25 finite nonzero OBJ segments. Rust 24 is a
+    // real split/flip timing difference, not a forgotten C++ count.
     let cases = [
         ("special-cases/iso-simple-3.graphml", 13),
         ("issue2/issue2-minimal1.graphml", 24),
@@ -179,7 +181,10 @@ fn spoke1() {
         },
     )
     .unwrap();
-    assert!(prop.kt.infinite_vertex.is_some(), "spoke-1 should attach CH");
+    assert!(
+        prop.kt.infinite_vertex.is_some(),
+        "spoke-1 should attach CH"
+    );
     // C++ OBJ lists 26: 16 interior + 6 pocket + 4 face-cycle chords
     // (CH corner → pocket) created by write_obj skipping the infinite vertex.
     assert_eq!(sk.segment_count(), 22, "nodes={}", sk.node_count());
@@ -201,6 +206,109 @@ fn spoke1_interior_count() {
     )
     .expect("spoke-1 interior");
     assert_eq!(sk.segment_count(), 16, "nodes={}", sk.node_count());
+}
+
+#[test]
+fn corpus_strict_count_gates() {
+    // Frozen against C++ double `--component=-1` finite-nonzero OBJ counts
+    // except spoke-*: C++ OBJ is 26 = 22 kinetic + 4 skip-∞ face chords.
+    let cases = [
+        ("convex03.graphml", 3),
+        ("convex04.graphml", 5),
+        ("convex07.graphml", 11),
+        ("convex19.graphml", 35),
+        ("special-cases/iso-simple-1.graphml", 12),
+        ("special-cases/iso-simple-2.graphml", 16),
+        ("special-cases/iso-simple-3.graphml", 13),
+        ("special-cases/spoke-1.graphml", 22),
+        ("weighted/srpg_octo0000035-random-2.graphml", 131),
+    ];
+    for (rel, want) in cases {
+        let path = upstream_test_data().join(rel);
+        if !path.exists() {
+            continue;
+        }
+        let g = read_graphml_path(&path).unwrap();
+        let pslg = g.to_pslg().unwrap();
+        let sk = straight_skeleton(
+            &pslg,
+            &Options {
+                components: ComponentMode::AllSequential,
+            },
+        )
+        .unwrap_or_else(|e| panic!("{rel}: {e}"));
+        assert_eq!(sk.segment_count(), want, "{rel}");
+        assert_dcel_contract(&sk, rel);
+    }
+}
+
+fn assert_dcel_contract(sk: &surfer2::Skeleton, tag: &str) {
+    let n = sk.halfedges().len();
+    assert!(n >= 2 && n % 2 == 0, "{tag}: halfedge count {n}");
+    for (i, he) in sk.halfedges().iter().enumerate() {
+        let twin = he.twin.0 as usize;
+        assert!(twin < n, "{tag} twin range {i}");
+        assert_eq!(sk.halfedges()[twin].twin.0 as usize, i, "{tag} twin {i}");
+        assert!((he.next.0 as usize) < n, "{tag} next {i}");
+        assert!((he.prev.0 as usize) < n, "{tag} prev {i}");
+        assert!((he.origin.0 as usize) < sk.nodes().len(), "{tag} origin {i}");
+        assert!((he.face.0 as usize) < sk.faces().len(), "{tag} face {i}");
+    }
+    for (fi, face) in sk.faces().iter().enumerate() {
+        let Some(start) = face.halfedge else { continue };
+        let mut he = start.0 as usize;
+        let mut saw = false;
+        for _ in 0..=n {
+            if sk.halfedges()[he].face.0 as usize == fi {
+                saw = true;
+            }
+            he = sk.halfedges()[he].next.0 as usize;
+            if he == start.0 as usize {
+                break;
+            }
+        }
+        assert!(saw, "{tag} face {fi} start halfedge not on face");
+        assert_eq!(he, start.0 as usize, "{tag} face {fi} walk not cyclic");
+    }
+    let comps: std::collections::HashSet<_> = sk.faces().iter().map(|f| f.component).collect();
+    assert!(!comps.is_empty(), "{tag} no face components");
+}
+
+#[test]
+fn component_modes_convex03() {
+    let path = upstream_test_data().join("convex03.graphml");
+    if !path.exists() {
+        return;
+    }
+    let g = read_graphml_path(&path).unwrap();
+    let pslg = g.to_pslg().unwrap();
+    let interior = straight_skeleton(
+        &pslg,
+        &Options {
+            components: ComponentMode::Index(0),
+        },
+    )
+    .unwrap();
+    let all = straight_skeleton(
+        &pslg,
+        &Options {
+            components: ComponentMode::AllSequential,
+        },
+    )
+    .unwrap();
+    assert!(
+        all.segment_count() >= interior.segment_count(),
+        "AllSequential {} < Index(0) {}",
+        all.segment_count(),
+        interior.segment_count()
+    );
+    let _ = straight_skeleton(
+        &pslg,
+        &Options {
+            components: ComponentMode::AllSimultaneous,
+        },
+    )
+    .unwrap();
 }
 
 #[test]
@@ -321,10 +429,7 @@ fn ring_start_rotation_invariance() {
 
 #[test]
 fn fuzz_invalid_inputs_no_panic() {
-    use surfer2::{
-        interior_straight_skeleton, straight_skeleton, Options, Point2,
-        Polygon, Pslg,
-    };
+    use surfer2::{interior_straight_skeleton, straight_skeleton, Options, Point2, Polygon, Pslg};
     // Empty
     let _ = Polygon::new(vec![], vec![]);
     // Too few verts

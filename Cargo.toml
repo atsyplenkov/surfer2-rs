@@ -15,7 +15,6 @@ exclude = ["fixtures/gis/*", "benches/data/*"]
 slotmap = "=1.1.1"
 spade = "=2.15.1"
 robust = "=1.2.0"
-algebraics = { version = "=0.3.0", default-features = false }
 thiserror = "2.0"
 
 [dev-dependencies]

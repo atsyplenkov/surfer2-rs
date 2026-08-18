@@ -4,14 +4,14 @@
 //! Until then this benches the unit-square path as a smoke microbench.
 
 use criterion::{criterion_group, criterion_main, Criterion};
-use surfer2::{interior_straight_skeleton, KernelMode, Polygon};
+use surfer2::{interior_straight_skeleton, Polygon};
 
 fn bench_unit_square(c: &mut Criterion) {
     let poly =
         Polygon::from_flat(&[[0.0, 0.0], [2.0, 0.0], [2.0, 2.0], [0.0, 2.0]], &[0]).unwrap();
     c.bench_function("unit_square_fast", |b| {
         b.iter(|| {
-            let sk = interior_straight_skeleton(&poly, KernelMode::Fast).unwrap();
+            let sk = interior_straight_skeleton(&poly).unwrap();
             std::hint::black_box(sk.segment_count())
         });
     });
@@ -46,7 +46,7 @@ fn bench_lake9706_if_present(c: &mut Criterion) {
 
     c.bench_function("lake9706_fast", |b| {
         b.iter(|| {
-            match interior_straight_skeleton(&poly, KernelMode::Fast) {
+            match interior_straight_skeleton(&poly) {
                 Ok(sk) => std::hint::black_box(sk.segment_count()),
                 Err(_) => 0,
             }

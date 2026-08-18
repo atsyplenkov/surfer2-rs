@@ -21,10 +21,10 @@ upstream kinetic triangulation / wavefront propagation engine.
 ## Usage (planned public surface)
 
 ```rust
-use surfer2::{interior_straight_skeleton, KernelMode, Polygon};
+use surfer2::{interior_straight_skeleton, Polygon};
 
 let polygon = Polygon::from_flat(&xy, &ring_offsets)?;
-let sk = interior_straight_skeleton(&polygon, KernelMode::Robust)?;
+let sk = interior_straight_skeleton(&polygon)?;
 for seg in sk.finite_segments() {
     let _ = (seg.start, seg.end, seg.start_time, seg.end_time);
 }

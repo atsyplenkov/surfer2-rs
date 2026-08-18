@@ -17,7 +17,7 @@ use crate::triangulation::kinetic::{
 use crate::wavefront::edge::WavefrontEdge;
 use crate::wavefront::supporting_line::{wavefront_vertex_motion, SupportingLine};
 use crate::wavefront::vertex::{infinite_speed_type, InfiniteSpeedType, VertexId, WavefrontVertex};
-use crate::{ComponentMode, KernelMode, Options};
+use crate::{ComponentMode, Options};
 
 /// f64 stand-in for C++ `pos_stop` equality at UTM scale.
 const JUNCTION_M: f64 = 5e-3;
@@ -27,7 +27,6 @@ pub struct Propagator {
     pub kt: KineticTriangulation,
     pub queue: EventQueue,
     pub time: f64,
-    pub kernel: KernelMode,
     pub stats: Stats,
     pub finalized: bool,
     /// When true, run topology invariants after every event (debug/tests).
@@ -56,12 +55,11 @@ impl Propagator {
         }
         let mut kt = initialize_kinetic(&basic, input, restrict, None)?;
         let mut queue = EventQueue::with_capacity(kt.next_tidx as usize);
-        seed_queue(&mut kt, &mut queue, 0.0, options.kernel)?;
+        seed_queue(&mut kt, &mut queue, 0.0)?;
         Ok(Self {
             kt,
             queue,
             time: 0.0,
-            kernel: options.kernel,
             stats: Stats::default(),
             finalized: false,
             check_invariants_each_step: cfg!(debug_assertions),
@@ -70,7 +68,7 @@ impl Propagator {
         })
     }
 
-    pub fn from_polygon(polygon: &Polygon, kernel: KernelMode) -> Result<Self, SkeletonError> {
+    pub fn from_polygon(polygon: &Polygon) -> Result<Self, SkeletonError> {
         let pslg = polygon.as_pslg()?;
         let basic = build_basic_triangulation(&pslg)?;
         let interior = select_polygon_interior(&basic)?;
@@ -78,12 +76,11 @@ impl Propagator {
         let comp = basic.components[interior[0]].unwrap_or(0);
         let mut kt = initialize_kinetic(&basic, &pslg, comp as i32, Some(&interior))?;
         let mut queue = EventQueue::with_capacity(kt.next_tidx as usize);
-        seed_queue(&mut kt, &mut queue, 0.0, kernel)?;
+        seed_queue(&mut kt, &mut queue, 0.0)?;
         Ok(Self {
             kt,
             queue,
             time: 0.0,
-            kernel,
             stats: Stats::default(),
             finalized: false,
             check_invariants_each_step: cfg!(debug_assertions),
@@ -126,7 +123,7 @@ impl Propagator {
         // Watchdog for non-advancing fast kernel
         if spec.time <= self.last_event_time {
             self.simultaneous_streak += 1;
-            if self.kernel == KernelMode::Fast && self.simultaneous_streak > 10_000 {
+            if self.simultaneous_streak > 10_000 {
                 return Err(crate::error::PropagationError::NonAdvancingLoop {
                     component: spec.component as usize,
                     time: spec.time,
@@ -155,7 +152,7 @@ impl Propagator {
 
         let kt = &self.kt;
         self.queue
-            .process_pending_updates(|tidx| recompute_collapse(kt, tidx, self.time, self.kernel))?;
+            .process_pending_updates(|tidx| recompute_collapse(kt, tidx, self.time))?;
 
         // M3/M4: optional topology invariants after every event.
         if self.check_invariants_each_step {
@@ -1450,7 +1447,6 @@ fn recompute_collapse(
     kt: &KineticTriangulation,
     tidx: u32,
     now: f64,
-    kernel: KernelMode,
 ) -> Result<CollapseSpec, crate::error::PropagationError> {
     let tid = kt.triangle_by_tidx(tidx).ok_or_else(|| {
         crate::error::PropagationError::InconsistentEvent {
@@ -1468,14 +1464,13 @@ fn recompute_collapse(
     if !t.live() {
         return Ok(CollapseSpec::never(t.component));
     }
-    compute_collapse(kt, t, now, kernel)
+    compute_collapse(kt, t, now)
 }
 
 fn seed_queue(
     kt: &mut KineticTriangulation,
     queue: &mut EventQueue,
     now: f64,
-    kernel: KernelMode,
 ) -> Result<(), SkeletonError> {
     let tidxs: Vec<(u32, TriangleId)> = kt
         .triangles
@@ -1484,7 +1479,7 @@ fn seed_queue(
         .map(|(id, t)| (t.tidx, id))
         .collect();
     for (tidx, tid) in tidxs {
-        let spec = compute_collapse(kt, &kt.triangles[tid], now, kernel)?;
+        let spec = compute_collapse(kt, &kt.triangles[tid], now)?;
         queue.seed(tidx, spec);
     }
     Ok(())

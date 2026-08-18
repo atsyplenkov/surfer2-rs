@@ -10,7 +10,7 @@ use std::path::PathBuf;
 use support::graph_match::{differential_tol, match_segments};
 use support::graphml::read_graphml_path;
 use support::oracle::{double_bin, exact_bin, run_surfer};
-use surfer2::{straight_skeleton, ComponentMode, KernelMode, Options, Point2};
+use surfer2::{straight_skeleton, ComponentMode, Options, Point2};
 
 fn upstream_test_data() -> PathBuf {
     std::env::var_os("SURFER2_TEST_DATA")
@@ -54,7 +54,6 @@ fn differential_fast_convex_small() {
         let sk = straight_skeleton(
             &pslg,
             &Options {
-                kernel: KernelMode::Fast,
                 components: ComponentMode::AllSequential,
             },
         );
@@ -118,23 +117,6 @@ fn differential_exact_convex_small() {
     }
 }
 
-#[test]
-fn robust_matches_fast_convex03() {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("fixtures/graphml/convex03.graphml");
-    if !path.exists() {
-        return;
-    }
-    let g = read_graphml_path(&path).unwrap();
-    let pslg = g.to_pslg().unwrap();
-    let opts = |k| Options {
-        kernel: k,
-        components: ComponentMode::AllSequential,
-    };
-    let fast = straight_skeleton(&pslg, &opts(KernelMode::Fast)).unwrap();
-    let rob = straight_skeleton(&pslg, &opts(KernelMode::Robust)).unwrap();
-    assert_eq!(fast.segment_count(), rob.segment_count());
-    assert_eq!(fast.segment_count(), 3);
-}
 
 #[test]
 fn oracle_bins_optional_presence() {
@@ -161,7 +143,6 @@ fn iso_simple3_and_issue2_counts() {
         let sk = surfer2::straight_skeleton(
             &pslg,
             &surfer2::Options {
-                kernel: surfer2::KernelMode::Fast,
                 components: surfer2::ComponentMode::AllSequential,
             },
         )
@@ -182,7 +163,6 @@ fn spoke1() {
     let sk = surfer2::straight_skeleton(
         &pslg,
         &surfer2::Options {
-            kernel: surfer2::KernelMode::Fast,
             components: surfer2::ComponentMode::AllSequential,
         },
     )
@@ -195,7 +175,6 @@ fn spoke1() {
     let prop = surfer2::Propagator::from_pslg(
         &pslg,
         &surfer2::Options {
-            kernel: surfer2::KernelMode::Fast,
             components: surfer2::ComponentMode::AllSequential,
         },
     )
@@ -217,7 +196,6 @@ fn spoke1_interior_count() {
     let sk = surfer2::straight_skeleton(
         &pslg,
         &surfer2::Options {
-            kernel: surfer2::KernelMode::Fast,
             components: surfer2::ComponentMode::Index(0),
         },
     )
@@ -245,7 +223,6 @@ fn convex_frozen_segment_counts() {
         let sk = straight_skeleton(
             &pslg,
             &Options {
-                kernel: KernelMode::Fast,
                 components: ComponentMode::AllSequential,
             },
         )
@@ -272,7 +249,6 @@ fn convex_allseq_has_unbounded_hull() {
     let prop = surfer2::Propagator::from_pslg(
         &pslg,
         &Options {
-            kernel: KernelMode::Fast,
             components: ComponentMode::AllSequential,
         },
     )
@@ -293,7 +269,6 @@ fn degree_one_simple_no_panic() {
     let sk = surfer2::straight_skeleton(
         &pslg,
         &surfer2::Options {
-            kernel: surfer2::KernelMode::Fast,
             components: surfer2::ComponentMode::AllSequential,
         },
     );
@@ -305,7 +280,7 @@ fn degree_one_simple_no_panic() {
 
 #[test]
 fn transform_translation_invariance() {
-    use surfer2::{interior_straight_skeleton, KernelMode, Point2, Polygon};
+    use surfer2::{interior_straight_skeleton, Point2, Polygon};
     let base = vec![
         Point2::new(0.0, 0.0),
         Point2::new(3.0, 0.0),
@@ -318,8 +293,8 @@ fn transform_translation_invariance() {
         .collect();
     let a = Polygon::new(base, vec![]).unwrap();
     let b = Polygon::new(shifted, vec![]).unwrap();
-    let sa = interior_straight_skeleton(&a, KernelMode::Fast).unwrap();
-    let sb = interior_straight_skeleton(&b, KernelMode::Fast).unwrap();
+    let sa = interior_straight_skeleton(&a).unwrap();
+    let sb = interior_straight_skeleton(&b).unwrap();
     assert_eq!(sa.segment_count(), sb.segment_count());
     let la = sa.total_finite_length();
     let lb = sb.total_finite_length();
@@ -328,7 +303,7 @@ fn transform_translation_invariance() {
 
 #[test]
 fn ring_start_rotation_invariance() {
-    use surfer2::{interior_straight_skeleton, KernelMode, Point2, Polygon};
+    use surfer2::{interior_straight_skeleton, Point2, Polygon};
     let pts = [
         Point2::new(0.0, 0.0),
         Point2::new(2.0, 0.0),
@@ -339,15 +314,15 @@ fn ring_start_rotation_invariance() {
     let mut rot = pts.to_vec();
     rot.rotate_left(1);
     let b = Polygon::new(rot, vec![]).unwrap();
-    let sa = interior_straight_skeleton(&a, KernelMode::Fast).unwrap();
-    let sb = interior_straight_skeleton(&b, KernelMode::Fast).unwrap();
+    let sa = interior_straight_skeleton(&a).unwrap();
+    let sb = interior_straight_skeleton(&b).unwrap();
     assert_eq!(sa.segment_count(), sb.segment_count());
 }
 
 #[test]
 fn fuzz_invalid_inputs_no_panic() {
     use surfer2::{
-        interior_straight_skeleton, straight_skeleton, InputEdge, KernelMode, Options, Point2,
+        interior_straight_skeleton, straight_skeleton, Options, Point2,
         Polygon, Pslg,
     };
     // Empty
@@ -381,15 +356,15 @@ fn fuzz_invalid_inputs_no_panic() {
         vec![],
     )
     .unwrap();
-    let _ = interior_straight_skeleton(&poly, KernelMode::Fast);
-    let _ = interior_straight_skeleton(&poly, KernelMode::Robust);
+    let _ = interior_straight_skeleton(&poly);
+    let _ = interior_straight_skeleton(&poly);
     let pslg = poly.as_pslg().unwrap();
     let _ = straight_skeleton(&pslg, &Options::default());
 }
 
 #[test]
 fn uniform_scale_invariance() {
-    use surfer2::{interior_straight_skeleton, KernelMode, Point2, Polygon};
+    use surfer2::{interior_straight_skeleton, Point2, Polygon};
     let base = vec![
         Point2::new(0.0, 0.0),
         Point2::new(4.0, 0.0),
@@ -402,8 +377,8 @@ fn uniform_scale_invariance() {
         .collect();
     let a = Polygon::new(base, vec![]).unwrap();
     let b = Polygon::new(scaled, vec![]).unwrap();
-    let sa = interior_straight_skeleton(&a, KernelMode::Fast).unwrap();
-    let sb = interior_straight_skeleton(&b, KernelMode::Fast).unwrap();
+    let sa = interior_straight_skeleton(&a).unwrap();
+    let sb = interior_straight_skeleton(&b).unwrap();
     assert_eq!(sa.segment_count(), sb.segment_count());
     let la = sa.total_finite_length();
     let lb = sb.total_finite_length();
@@ -456,7 +431,6 @@ fn differential_fast_corpus_soft() {
         match straight_skeleton(
             &pslg,
             &Options {
-                kernel: KernelMode::Fast,
                 components: ComponentMode::AllSequential,
             },
         ) {

@@ -31,16 +31,6 @@ pub use offset::{offset, OffsetPolyline};
 pub use propagator::Propagator;
 pub use stats::Stats;
 
-/// Numeric kernel selection.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum KernelMode {
-    /// Upstream-style `f64` execution; may return structured precision errors.
-    Fast,
-    /// Interval-filtered exact kernel (default).
-    #[default]
-    Robust,
-}
-
 /// Which planar component(s) to propagate.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ComponentMode {
@@ -60,14 +50,12 @@ impl Default for ComponentMode {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Options {
-    pub kernel: KernelMode,
     pub components: ComponentMode,
 }
 
 impl Default for Options {
     fn default() -> Self {
         Self {
-            kernel: KernelMode::Robust,
             components: ComponentMode::AllSequential,
         }
     }
@@ -80,10 +68,7 @@ pub fn straight_skeleton(input: &Pslg, options: &Options) -> Result<Skeleton, Sk
 }
 
 /// Interior straight skeleton of a polygon with holes.
-pub fn interior_straight_skeleton(
-    polygon: &Polygon,
-    kernel: KernelMode,
-) -> Result<Skeleton, SkeletonError> {
-    let prop = Propagator::from_polygon(polygon, kernel)?;
+pub fn interior_straight_skeleton(polygon: &Polygon) -> Result<Skeleton, SkeletonError> {
+    let prop = Propagator::from_polygon(polygon)?;
     prop.into_skeleton()
 }

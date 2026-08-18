@@ -64,12 +64,9 @@ pub enum TriangulationError {
     RegionClassification,
 }
 
-/// Failures during kinetic propagation or exact/fast numeric evaluation.
+/// Failures during kinetic propagation.
 #[derive(Debug, Clone, PartialEq, Error)]
 pub enum PropagationError {
-    #[error("fast kernel predicate uncertain at time {time}")]
-    UncertainPredicate { time: f64 },
-
     #[error("inconsistent event for triangle {triangle:?} at time {time}")]
     InconsistentEvent { triangle: u64, time: f64 },
 
@@ -81,9 +78,6 @@ pub enum PropagationError {
 
     #[error("topology invariant violated: {detail}")]
     TopologyInvariant { detail: String },
-
-    #[error("exact algebraic evaluation failed: {detail}")]
-    ExactEvaluation { detail: String },
 }
 
 /// Failures while building or querying the skeleton DCEL / offsets.

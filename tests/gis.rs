@@ -5,7 +5,7 @@ mod support;
 use std::path::{Path, PathBuf};
 
 use support::oracle::ObjSkeleton;
-use surfer2::{interior_straight_skeleton, KernelMode, Point2, Polygon, Skeleton};
+use surfer2::{interior_straight_skeleton, Point2, Polygon, Skeleton};
 
 fn gis_root() -> PathBuf {
     std::env::var_os("SURFER2_GIS_DATA")
@@ -118,14 +118,11 @@ fn lake10623_fixture_present() {
 fn unit_square_interior_skeleton_smoke() {
     let poly =
         Polygon::from_flat(&[[0.0, 0.0], [2.0, 0.0], [2.0, 2.0], [0.0, 2.0]], &[0]).unwrap();
-    let sk = interior_straight_skeleton(&poly, KernelMode::Fast).unwrap();
+    let sk = interior_straight_skeleton(&poly).unwrap();
     assert_eq!(sk.segment_count(), 4);
     assert_eq!(sk.node_count(), 5);
     assert_eq!(cyclomatic(&sk, 0), 0);
     let _ = sk.offset(0.5).unwrap();
-    let sk_r = interior_straight_skeleton(&poly, KernelMode::Robust).unwrap();
-    assert_eq!(sk_r.segment_count(), 4);
-    assert_eq!(sk_r.node_count(), 5);
 }
 
 #[test]
@@ -136,7 +133,7 @@ fn public_api_surface_smoke() {
     )
     .unwrap();
     assert_eq!(poly.vertices().len(), 4);
-    let sk = interior_straight_skeleton(&poly, KernelMode::Fast).unwrap();
+    let sk = interior_straight_skeleton(&poly).unwrap();
     assert_eq!(sk.finite_segments().count(), 4);
 }
 
@@ -152,7 +149,7 @@ fn lake9706_load_and_skeleton() {
     assert_eq!(poly.hole_count(), 29);
     assert!(poly.vertices().len() >= 2144 && poly.vertices().len() <= 2174);
 
-    let sk = interior_straight_skeleton(&poly, KernelMode::Fast).expect("lake9706");
+    let sk = interior_straight_skeleton(&poly).expect("lake9706");
     let nseg = sk.segment_count();
     let nnode = sk.node_count();
     let len = sk.total_finite_length();
@@ -178,7 +175,7 @@ fn lake9706_matches_cpp_double_interior() {
     assert!((cpp_len - 342587.19566660019).abs() < 1.0);
 
     let poly = load_geojson_polygon(&gis_root().join("lake9706.json")).expect("load");
-    let sk = interior_straight_skeleton(&poly, KernelMode::Fast).expect("rust sk");
+    let sk = interior_straight_skeleton(&poly).expect("rust sk");
     let rust: Vec<_> = sk.finite_segments().collect();
     let rust_len: f64 = rust.iter().map(|s| s.start.distance_to(s.end)).sum();
     let rust_nodes = unique_xy(rust.iter().flat_map(|s| [s.start, s.end]));
@@ -237,7 +234,7 @@ fn lake10623_load_and_skeleton() {
     assert_eq!(poly.hole_count(), 201);
     assert!(poly.vertices().len() >= 15365 && poly.vertices().len() <= 15567);
 
-    match interior_straight_skeleton(&poly, KernelMode::Fast) {
+    match interior_straight_skeleton(&poly) {
         Ok(sk) => {
             let nseg = sk.segment_count();
             let nnode = sk.node_count();
@@ -252,9 +249,3 @@ fn lake10623_load_and_skeleton() {
         Err(e) => eprintln!("10623 WIP: {e}"),
     }
 }
-
-
-
-
-
-

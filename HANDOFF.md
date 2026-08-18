@@ -67,11 +67,9 @@ C++ spoke-1 OBJ: 16 interior + 6 pocket + 4 skip-∞ chords = 26.
 
 ## Next implementation (already decided)
 
-**1. Lakes / remaining corpus**
+**1. lake9706 4181 → 4372**
 
-Opposing over-emit is gone after unconstrained-CH attach. iso-simple-3 = 13. issue2-minimal1 = 24 (remembered C++ OBJ 25). Do not chase the 1 without a double bin.
-
-Then lakes. Do not emit OBJ skip-∞ chords.
+Interior path (`from_polygon`, no U). Completes; short 191 segs, node count inflated (10690 vs 4344). Diagnose missing events / leftover dummy vertices. Do not start 10623.
 
 **2. Do not do first:** Robust kernel wiring, lake 10623, benches, additive weights.
 

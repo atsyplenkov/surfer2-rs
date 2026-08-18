@@ -1,9 +1,8 @@
 # Handoff: surfer2 Rust port (headless)
 
 Date: 2026-08-18
-Repo: `/home/ats/Development/surfer2` — last commit `893df11` on `master`. **Working tree is dirty** (Robust deleted, lake10623 exact OBJ + gates, API no longer has `KernelMode`). Do not assume `23e9ce0`.
+Repo: `/home/ats/Development/surfer2` — last commit `9463c01` on `master`. **Working tree is dirty** only for rustfmt-only `tests/support/{graph_match,graphml,oracle}.rs`. Do not assume `348e53c`.
 Upstream: `cgalab/surfer2` @ `c42f9a7f969cd661d060481cd3b8bac2bdfb8dfa`
-Ponytail **off** is the standing user rule for coding. This session often ran **off** (`/ponytail off`).
 
 Plan file `local://surfer2-rust-port-plan.md` is **not on disk**. Do not invent it.
 
@@ -29,9 +28,9 @@ Local `/tmp` patches only (not in the Rust repo): skip Qt GUI (`subdirs (surf cc
 Frozen OBJs in-repo:
 
 - `fixtures/gis/lake9706-cpp-double.obj` — 4372 segs, 4344 nodes, len 342587.19567 (`--component=1`).
-- `fixtures/gis/lake10623-cpp-exact.obj` — **2.1 MB**, 31330 segs, 31130 unique xy, len 1007737.382887 (`--component=r`). Regenerated this session. Keep it.
+- `fixtures/gis/lake10623-cpp-exact.obj` — **2.1 MB**, 31330 segs, 31130 unique xy, len 1007737.382887 (`--component=r`). Keep it.
 
-Magadan recipe that produced the original 10623 exact skeleton: `/home/ats/Projects/magadan/extract_surfer2_10623.R` (`surfer <- "/tmp/surfer2/build-exact/cc/surfer"`). GPKG restored this session at `/home/ats/Projects/magadan/hydrography_10623_surfer2_skeleton.gpkg` (5.4 MB). GraphML/OBJ from that script are `tempfile()` — the frozen OBJ in this repo is the keep.
+Magadan recipe that produced the original 10623 exact skeleton: `/home/ats/Projects/magadan/extract_surfer2_10623.R` (`surfer <- "/tmp/surfer2/build-exact/cc/surfer"`). GPKG at `/home/ats/Projects/magadan/hydrography_10623_surfer2_skeleton.gpkg` (5.4 MB). GraphML/OBJ from that script are `tempfile()` — the frozen OBJ in this repo is the keep.
 
 July Magadan used exact, **not** double. A later double `--component=1` on 10623 is a replay of a crash they already had.
 
@@ -53,15 +52,12 @@ July Magadan used exact, **not** double. A later double `--component=1` on 10623
 | `5697966` | delete stitch + 5 mm grid; `spawn_child_to_neighbor`; chain-walk nodes |
 | `740718a` | stop invariant (`seal_stops` + `fill_missing_next`) |
 | `e04ee3f` | first triangulation linear time |
-| `23e9ce0` | Robust kernel wired (now **deleted** in the dirty tree) |
-| `893df11` | last commit: handoff after spawn / stop invariant / linear init / Robust |
-
-Uncommitted this session (do not treat as landed until committed):
-
-- Delete Robust / `KernelMode` / `algebraics` / `exact.rs` / `interval.rs`.
-- `interior_straight_skeleton(&poly)` only.
-- lake10623 live gates + frozen exact OBJ.
-- `lake10623_matches_cpp_exact_interior` (99 % / 1 cm, 98 % / 1 mm, max ≤ 3 m).
+| `23e9ce0` | Robust kernel wired (later deleted) |
+| `893df11` | handoff after spawn / stop invariant / linear init / Robust |
+| `21f26f5` | delete Robust / `KernelMode` / `algebraics` / `exact.rs` / `interval.rs`. `interior_straight_skeleton(&poly)` only. |
+| `ede6169` | lake10623 live gates + frozen exact OBJ |
+| `348e53c` | handoff after Robust deletion and the leftover-edge diagnosis |
+| `9463c01` | leftover-after-split guard; lake10623 31329 / 31130 / max ≤ 0.15 m |
 
 Hull attach does **not** affect lakes. Lakes use `from_polygon` / `interior_straight_skeleton` (interior only, no U).
 
@@ -81,48 +77,39 @@ Do not commit rustfmt-only `tests/support/{graph_match,graphml,oracle}.rs` (dirt
 | iso-simple-3 | 13 | 13 | locked; **1-const collapse-now broke this — do not retry blindly** |
 | issue2-minimal1 | 24 | 25 remembered | do not chase +1 without a double bin |
 | lake9706 | **4372** / **4344** / **342587.671** | **4372** / **4344** / **342587.196** (double) | **gate green**; cyclomatic 0; graph max 0.13 m |
-| lake10623 | **31327** / **31128** / **1007632.725** | **exact 31330** / **31130** / **1007737.383** | live; cyclomatic **−1**; 31113/31130 within 1 mm; **max 2.33 m** |
+| lake10623 | **31329** / **31130** / **1007709.386** | **exact 31330** / **31130** / **1007737.383** | live; cyclomatic **−1**; **nodes match**; 31115/31130 within 1 mm; **max 0.079 m** |
 
 `lake9706_load_and_skeleton`, `lake9706_matches_cpp_double_interior`, `lake10623_load_and_skeleton`, `lake10623_matches_cpp_exact_interior` are live.
 
-Release wall: lake9706 ~47–51 ms; lake10623 ~3.8 s. Debug lake10623 ~2 min.
+Release wall: lake9706 ~47–51 ms; lake10623 ~3.8–9 s (two overlay tests ~18 s together). Debug lake10623 ~2 min.
 
 ## Honest algorithm status
 
 1. **31.7 m ridge (`stop_collapse_pair`)** — keep.
 2. **0.40 m ridge (`spawn_child_to_neighbor`)** — keep. Parent still dies ~0.05 s later than C++ on 9706 (`tparam ≈ -0.012` flip then later triangle-collapse). Do not hunt that 9706 flip unless asked.
-3. **lake10623 3-ridge / 2-node gap** — **diagnosed, not fixed.** See next section.
-4. Robust — deleted on purpose. C++ exact is a different binary, not a second Rust engine.
+3. **lake10623 leftover endpoints** — **fixed this session.** Both C++ extra nodes (2.33 m / 2.26 m) now exist. Graph max 2.33 m → **0.079 m**.
+4. **lake10623 1-ridge / 28 m length gap** — **still open.** Nodes match; segs 31329 vs 31330; len 1007709 vs 1007737. Cyclomatic still −1. Residual max is centimetre-scale (exact vs f64 + the known 5.4 cm pair at `y=7037202`).
+5. Robust — deleted on purpose. C++ exact is a different binary, not a second Rust engine.
 
-## lake10623 gap (read this before touching spawn or collapse)
+## Leftover-after-split guard (`9463c01`)
 
-The graphs already agree almost everywhere. 17 C++ nodes sit >1 mm from Rust; only **two** are real misses. The rest are 1–8 cm jitter (exact vs f64).
+C++ exact has two same-time events at 41.4672 (#14922/#14923) and 55.9355 (#16531/#16532). Rust takes `SplitOrFlipRefine` then `handle_split_event` at both (`tparam` 0.126 and 0.35 — on the segment). The missing C++ node was **not** the splitter: it was the leftover constraint endpoint (`ep0` / `ep1`) that stayed `time_stop = None`. C++'s second event stops that endpoint.
 
-| C++ extra node | Dist | C++ time | What it is |
-|---|---:|---:|---|
-| `(554196.067, 6982052.692)` | **2.33 m** | **55.9355** | Degree-3 junction. All three neighbours exist in Rust. |
-| `(550628.310, 7004760.297)` | **2.26 m** | **41.4672** | Degree-3 with a 2.26 m same-time stub to a Rust node. |
-| pair at `y=7037202` | 5.4 cm | ~23.17 | Known 31.7 m + 0.40 m 9706 pattern. Leave it. |
+Measured leftovers:
 
-C++ exact also has events at those times (log `/tmp/lake10623-exact.stderr` if still present): #14922/#14923 at 41.4672, #16531/#16532 at 55.9355 (two events each). Rust **does** take `SplitOrFlipRefine` then `handle_split_event` at both times (`tparam` 0.126 and 0.35 — **on the segment**, not a flip).
+| t | Child vel | Leftover | nconst | Natural collapse | Guard |
+|---|---|---:|---:|---|---|
+| 41.4672 | `(1.55, −252513)` | 2.22 m | 2 | **Never** | force ConstraintCollapse-now |
+| 55.9355 | `(0,0)` | 29.18 m | 2 | ConstraintCollapse of the *other* edge | force because child speed is 0 |
 
-The missing C++ node is **not** the splitter. It is a **constraint endpoint** (`ep0` at 41.467, `ep1` at 55.935) that stays `time_stop = None` after our split. C++’s **second same-time event** stops that endpoint. We never queue that event.
+`make_split_successor` flags a child as ill when `|vel|` is 0, non-finite, or `> 1e4`. `force_leftover_collapse_now` then:
 
-After the 41.467 split (measured):
+1. Skip 3-const leftovers (they TriangleCollapse later; forcing one edge dropped a 9706 ridge).
+2. Skip unless leftover would be **Never**, *or* the child velocity is exactly 0.
+3. Park the child at the split (`pos_zero = pos`, `vel = 0`) so `stop_collapse_pair` sees a degenerate newborn and snaps it onto the live endpoint.
+4. Cache `ConstraintCollapse` of the leftover edge at `time` on **that face only**. The child is **not** marked infinitely-fast (that would collapse the whole star).
 
-- leftover edge `nea` (`ep0`–new child, 2.22 m): collapse **Past**, because the split child velocity is **`(1.55, −252513)` m/s**.
-- neighbour `na` (2-const): **Never**.
-- neighbour `nb` (3-const): TriangleCollapse at 44.2, not now.
-
-`intersection_velocity` only rejects `|vel| > 1e6`; 252 km/s slips through. The leftover 2-const never dies, so `ep0` walks until 49.623.
-
-After the 55.935 split: leftover `neb` 29.18 m, child velocity `(0,0)`, `o ≈ 0` classified **Past** (our `o == 0` falls into the LEFT_TURN quotient). C++ exact treats `orientation == 0` as **collinear → NEVER** (nonzero distance).
-
-`src/propagator.rs` `handle_split_event` / `make_split_successor` and `src/wavefront/edge.rs` `compute_edge_collapse_f64` / `src/wavefront/supporting_line.rs` `intersection_velocity` are the files.
-
-**Intended next cut (not tried):** if a **just-created split child** is ill-conditioned (huge velocity or zero velocity next to a live endpoint a few metres away), treat **that leftover face only** as infinitely-fast / collapse-now — C++’s second event. Do **not** apply this to every 2-const Never on the lake.
-
-Loop: `lake10623_matches_cpp_exact_interior` (want segs 31330, max ≪ 2.33 m) **and** `lake9706_*` **and** `iso_simple3_and_issue2_counts`. One guard on the new child, not a lake special case.
+Do **not** raise this into `intersection_velocity` or `compute_edge_collapse_f64`. Those global knobs already failed (see below).
 
 ## What was tried and failed (do not repeat blindly)
 
@@ -141,25 +128,30 @@ Lake era:
 8. Degrade non-meeting 2-const TriangleCollapse to ConstraintCollapse of the short edge: lake length −230 m. Spawn the DCEL child; do not `part2` that edge.
 9. Leave isolated triangle-collapse verts live: `NonAdvancingLoop` at t≈23.226.
 
-This session (10623 hunt, all **reverted**, tree should match pre-hunt algorithm):
+Previous 10623 hunt (reverted before this session):
 
 10. **Late `spawn_child_to_neighbor`** (ignore time, take closest in-gap neighbour): +9.06 m bogus child at the *late* parent. 31327→31328, **max still 2.33 m**. Wrong ridge.
 11. **Cap `|vel| > 1e3`** in `intersection_velocity` (was 1e6): 9706 4372→4368, 10623 max **32 m**.
 12. **`o <= 0` as collinear** in `compute_edge_collapse_f64` (C++-shaped): 9706 stayed green; leftover 2-const at 55.935 became TriangleCollapse-now; 10623 **31325 / max 3.29 m**. Too many faces died.
 
-Do not re-apply 10–12 globally. The next change must be **local to the new split child**.
+This session (keep the last one; the earlier ones were tightened, not reverted):
+
+13. **Force leftover collapse on every ill split child**, including 3-const: 9706 4372→4371 (one 3-const leftover at t=38.907, leftover 6.7 m, speed 118 km/s).
+14. **Force every 2-const ill leftover** (ignore natural collapse): 10623 31329 / max **20 m**. Seven earlier leftovers (t=9.8…30.3) still had a future collapse on the other constraint.
+15. **Never-only leftover force**: closed 41.467, skipped 55.935 (natural was ConstraintCollapse of the other edge). 31328 / 31129 / max still 2.33 m.
+16. **Never, or child speed == 0** (current): both leftovers fire. 31329 / 31130 / max 0.079 m. **Keep.**
 
 ## Next session
 
-**Do first if continuing 10623:** the leftover-edge-after-split guard above. Instrumentation prefix used this session was `[DEBUG-evt]` / `[DEBUG-a4f2]` — none should remain in the tree.
+**Do first if continuing 10623:** the remaining **1-ridge / ~28 m length** gap (31329 vs 31330). Nodes already match. Do not widen the leftover guard — forcing extra 2-const leftovers raised max to 20 m. Look at DCEL emission after the two new leftover ConstraintCollapses: each new junction is degree-3 in C++; we may be missing one spoke off a snapped child (`spawn_child_to_neighbor` / `fill_missing_next` / the 55.935 leftover is 29 m, C++ length delta is 28 m).
 
-**Do not do first unless asked:** 9706 0.05 s south-reflex flip, U faces, skip-∞ chords, 1-const collapse-now, per-event refine, additive weights, revive Robust, global `o` / `|vel|` knobs, late spawn.
+**Do not do first unless asked:** 9706 0.05 s south-reflex flip, U faces, skip-∞ chords, 1-const collapse-now, per-event refine, additive weights, revive Robust, global `o` / `|vel|` knobs, late spawn, force leftover on 3-const, force leftover whenever the child is merely fast.
 
 ## Critical files
 
-- `src/propagator.rs` — `handle_split_event`, `make_split_successor`, `spawn_child_to_neighbor`, `stop_collapse_pair`, `seal_stops` / `fill_missing_next`.
-- `src/wavefront/edge.rs` — `compute_edge_collapse_f64` (`o < 0` → Past; `o == 0` currently falls through to LEFT_TURN quotient — C++ would call that collinear).
-- `src/wavefront/supporting_line.rs` — `intersection_velocity` (`|vel| > 1e6` → treat as no intersection).
+- `src/propagator.rs` — `handle_split_event`, `make_split_successor`, `force_leftover_collapse_now`, `spawn_child_to_neighbor`, `stop_collapse_pair`, `seal_stops` / `fill_missing_next`.
+- `src/wavefront/edge.rs` — `compute_edge_collapse_f64` (`o < 0` → Past; `o == 0` currently falls through to LEFT_TURN quotient — C++ would call that collinear). Do not flip this globally.
+- `src/wavefront/supporting_line.rs` — `intersection_velocity` (`|vel| > 1e6` → treat as no intersection). Do not lower the cap.
 - `src/triangulation/kinetic.rs` — `compute_collapse` is the only (f64) path.
 - `src/dcel.rs` — `EndpointUf` from `next_vertex`/`prev_vertex`.
 - Tests: `tests/gis.rs` (9706 + 10623 + exact OBJ overlay); `tests/differential.rs`.
@@ -203,11 +195,10 @@ cmake --build /tmp/surfer2/build-exact --target surfer
 
 ## Suggested skills
 
-- **ponytail** (full) — standing user rule for coding unless they said off.
-- **commit** — if asked; split by meaning (Robust deletion ≠ 10623 OBJ/tests). Do not commit rustfmt-only `tests/support/*`.
-- **tdd** — only if asked; `lake10623_matches_cpp_exact_interior` is the lock for the gap.
-- **diagnosing-bugs** — leftover-edge-after-split is the open bug. Do **not** invoke design/execute-plan unless asked to re-plan the whole port.
+- **commit** — if asked; split by meaning (leftover guard ≠ rustfmt-only `tests/support/*`). Do not commit rustfmt-only `tests/support/*`.
+- **tdd** — only if asked; `lake10623_matches_cpp_exact_interior` is the lock (max ≤ 0.15 m; nodes 31130).
+- **diagnosing-bugs** — remaining 1-ridge gap. Do **not** invoke design/execute-plan unless asked to re-plan the whole port.
 
 ## Voice for the next agent
 
-You are not stuck. Robust is gone; the product is one f64 engine. lake9706 is green. lake10623 Fast finishes and matches C++ exact on 31113/31130 nodes to 1 mm. The 2.33 m / 3-seg gap is **after a successful split**: the constraint endpoint stays live; C++ kills it with a second same-time event. Next change is a **local** infinitely-fast / collapse-now on the just-born split child when its velocity is degenerate — not spawn, not global `o`, not a 1e3 velocity cap. Re-run 9706 and iso-simple-3 after any such guard.
+You are not stuck. Robust is gone; the product is one f64 engine. lake9706 is green. lake10623 Fast finishes with **the same 31130 unique-xy nodes as C++ exact**; graph max is 8 cm, not 2.33 m. The leftover-after-split guard is the C++ second same-time event, local to the leftover face. One ridge / 28 m of length is still missing. Next change is DCEL / spoke emission after those two leftover ConstraintCollapses — not a wider leftover force, not spawn-late, not global `o` / `|vel|`. Re-run 9706 and iso-simple-3 after any such change.

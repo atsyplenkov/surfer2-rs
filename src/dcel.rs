@@ -117,7 +117,7 @@ impl Skeleton {
                 return false;
             }
             let len = s.start.distance_to(s.end);
-            len > 0.0 && len <= max_len
+            len > 1e-9 && len <= max_len
         })
     }
 
@@ -126,7 +126,18 @@ impl Skeleton {
     }
 
     pub fn node_count(&self) -> usize {
-        self.nodes.iter().filter(|n| !n.is_infinite).count()
+        let mut seen = std::collections::HashSet::new();
+        for he in &self.halfedges {
+            if he.is_input {
+                continue;
+            }
+            let n = &self.nodes[he.origin.0 as usize];
+            if n.is_infinite {
+                continue;
+            }
+            seen.insert(he.origin.0);
+        }
+        seen.len()
     }
 
     pub fn segment_count(&self) -> usize {
@@ -315,7 +326,15 @@ fn ensure_node(
     p: Point2,
     time: f64,
 ) -> NodeId {
-    let key = ((p.x.to_bits(), p.y.to_bits()), time.to_bits());
+    let _ = time;
+    // ponytail: 1 mm grid; per-junction identity if parent/child bits keep drifting
+    let key = (
+        (
+            (p.x * 1000.0).round() as i64 as u64,
+            (p.y * 1000.0).round() as i64 as u64,
+        ),
+        0,
+    );
     if let Some(&i) = node_key.get(&key) {
         return NodeId(i);
     }

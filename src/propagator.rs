@@ -182,11 +182,25 @@ impl Propagator {
         if self.finalized {
             return Ok(());
         }
+        let mut used = std::collections::HashSet::new();
+        for t in self.kt.triangles.values() {
+            for v in t.vertices.into_iter().flatten() {
+                used.insert(v);
+            }
+        }
         // Stop remaining free vertices as rays
         let ids: Vec<_> = self.kt.vertices.keys().collect();
         for vid in ids {
             let stopped = self.kt.vertices[vid].is_stopped();
             let is_inf = self.kt.infinite_vertex == Some(vid);
+            let dummy = self.kt.vertices[vid].source_input_vertex.is_some()
+                && !used.contains(&vid);
+            if dummy {
+                if let Some(vv) = self.kt.vertices.get_mut(vid) {
+                    vv.time_stop = Some(f64::INFINITY);
+                }
+                continue;
+            }
             if !stopped && !is_inf {
                 let v = &self.kt.vertices[vid];
                 let start = v.position_at(v.time_start);

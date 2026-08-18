@@ -123,6 +123,9 @@ fn unit_square_interior_skeleton_smoke() {
     assert_eq!(sk.node_count(), 5);
     assert_eq!(cyclomatic(&sk, 0), 0);
     let _ = sk.offset(0.5).unwrap();
+    let sk_r = interior_straight_skeleton(&poly, KernelMode::Robust).unwrap();
+    assert_eq!(sk_r.segment_count(), 4);
+    assert_eq!(sk_r.node_count(), 5);
 }
 
 #[test]

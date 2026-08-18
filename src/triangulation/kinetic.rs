@@ -8,8 +8,10 @@ use slotmap::{new_key_type, SlotMap};
 use crate::error::PropagationError;
 use crate::event::{CollapseSpec, CollapseType};
 use crate::geometry::Point2;
+use crate::numeric::ExactValue;
 use crate::wavefront::edge::{EdgeId, WavefrontEdge};
 use crate::wavefront::vertex::{InfiniteSpeedType, VertexId, WavefrontVertex};
+use crate::KernelMode;
 
 new_key_type! { pub struct TriangleId; }
 
@@ -321,6 +323,18 @@ impl KineticTriangulation {
             }
         }
         Ok(())
+    }
+}
+
+pub fn compute_collapse(
+    kt: &KineticTriangulation,
+    t: &KineticTriangle,
+    time_now: f64,
+    kernel: KernelMode,
+) -> Result<CollapseSpec, PropagationError> {
+    match kernel {
+        KernelMode::Fast => compute_collapse_fast(kt, t, time_now),
+        KernelMode::Robust => compute_collapse_robust(kt, t, time_now),
     }
 }
 
@@ -943,4 +957,354 @@ fn generic_collapse_time_3(
         }
         _ => None,
     }
+}
+
+fn ev(x: f64) -> Result<ExactValue, PropagationError> {
+    ExactValue::from_f64(x).map_err(Into::into)
+}
+
+fn ev_f64(x: &ExactValue) -> Result<f64, PropagationError> {
+    x.to_f64_checked().map_err(Into::into)
+}
+
+/// Interval-filtered exact collapse. Unbounded hull stays on the fast path.
+fn compute_collapse_robust(
+    kt: &KineticTriangulation,
+    t: &KineticTriangle,
+    time_now: f64,
+) -> Result<CollapseSpec, PropagationError> {
+    if let Some(c) = t.collapse_cache {
+        return Ok(c);
+    }
+    if t.is_dead || t.is_dying {
+        return Ok(CollapseSpec::never(t.component));
+    }
+    let mut inf = InfiniteSpeedType::None;
+    for i in 0..3 {
+        if let Some(vid) = t.vertices[i] {
+            if let Some(v) = kt.vertices.get(vid) {
+                match v.infinite_speed {
+                    InfiniteSpeedType::Opposing => {
+                        inf = InfiniteSpeedType::Opposing;
+                        break;
+                    }
+                    InfiniteSpeedType::Weighted => inf = InfiniteSpeedType::Weighted,
+                    InfiniteSpeedType::None => {}
+                }
+            }
+        }
+    }
+    if inf != InfiniteSpeedType::None {
+        return compute_collapse_fast(kt, t, time_now);
+    }
+    let n_const = t.wavefronts.iter().filter(|w| w.is_some()).count();
+    let unbounded = t.is_unbounded
+        || kt
+            .infinite_vertex
+            .is_some_and(|inf| t.vertices.iter().any(|v| *v == Some(inf)));
+    if unbounded {
+        return compute_unbounded_fast(kt, t, time_now);
+    }
+    match n_const {
+        3 => {
+            let mut tmin = None;
+            for s in 0..3 {
+                if let Some(tc) = constraint_collapse_time_exact(kt, t, s, time_now)? {
+                    tmin = Some(match tmin {
+                        None => tc,
+                        Some(prev) => {
+                            if tc.cmp(&prev)? == std::cmp::Ordering::Less {
+                                tc
+                            } else {
+                                prev
+                            }
+                        }
+                    });
+                }
+            }
+            let time = match tmin {
+                Some(t) => ev_f64(&t)?,
+                None => time_now,
+            };
+            Ok(CollapseSpec::new(
+                t.component,
+                CollapseType::TriangleCollapse,
+                time,
+            ))
+        }
+        2 => collapse_bounded_constrained_2_robust(kt, t, time_now),
+        1 => collapse_bounded_constrained_1_robust(kt, t, time_now),
+        0 => compute_flip_event_robust(kt, t, time_now),
+        _ => Ok(CollapseSpec::never(t.component)),
+    }
+}
+
+fn constraint_collapse_time_exact(
+    kt: &KineticTriangulation,
+    t: &KineticTriangle,
+    side: usize,
+    now: f64,
+) -> Result<Option<ExactValue>, PropagationError> {
+    let Some(eid) = t.wavefronts[side] else {
+        return Ok(None);
+    };
+    let e = &kt.edges[eid];
+    let v0 = &kt.vertices[e.endpoints[0]];
+    let v1 = &kt.vertices[e.endpoints[1]];
+    let o = ev(v0.velocity.x)?
+        .mul(&ev(v1.velocity.y)?)
+        .sub(&ev(v0.velocity.y)?.mul(&ev(v1.velocity.x)?));
+    match o.sign()? {
+        -1 => Ok(None),
+        0 => {
+            let dx = ev(v1.pos_zero.x)?.sub(&ev(v0.pos_zero.x)?);
+            let dy = ev(v1.pos_zero.y)?.sub(&ev(v0.pos_zero.y)?);
+            let sq = dx.mul(&dx).add(&dy.mul(&dy));
+            if sq.sign()? == 0 {
+                Ok(Some(ev(now)?))
+            } else {
+                Ok(None)
+            }
+        }
+        _ => {
+            let vertical = ev(v1.pos_zero.x)?.sub(&ev(v0.pos_zero.x)?).sign()? == 0
+                && ev(v0.velocity.x)?.sub(&ev(v1.velocity.x)?).sign()? == 0;
+            let (edge_delta, wfvs_delta) = if !vertical {
+                (
+                    ev(v1.pos_zero.x)?.sub(&ev(v0.pos_zero.x)?),
+                    ev(v0.velocity.x)?.sub(&ev(v1.velocity.x)?),
+                )
+            } else {
+                (
+                    ev(v1.pos_zero.y)?.sub(&ev(v0.pos_zero.y)?),
+                    ev(v0.velocity.y)?.sub(&ev(v1.velocity.y)?),
+                )
+            };
+            if wfvs_delta.sign()? == 0 {
+                return Ok(None);
+            }
+            let time = edge_delta.div(&wfvs_delta)?;
+            if time.cmp(&ev(now)?)? == std::cmp::Ordering::Less {
+                Ok(None)
+            } else {
+                Ok(Some(time))
+            }
+        }
+    }
+}
+
+fn collapse_bounded_constrained_2_robust(
+    kt: &KineticTriangulation,
+    t: &KineticTriangle,
+    time_now: f64,
+) -> Result<CollapseSpec, PropagationError> {
+    let mut specs: Vec<(CollapseSpec, ExactValue)> = Vec::new();
+    for s in 0..3 {
+        if t.wavefronts[s].is_none() {
+            continue;
+        }
+        if let Some(tc) = constraint_collapse_time_exact(kt, t, s, time_now)? {
+            specs.push((
+                CollapseSpec::with_edge(
+                    t.component,
+                    CollapseType::ConstraintCollapse,
+                    ev_f64(&tc)?,
+                    s as i8,
+                ),
+                tc,
+            ));
+        }
+    }
+    match specs.len() {
+        0 => {
+            if signed_area_exact(kt, t, time_now)? < 0 {
+                Ok(CollapseSpec::new(
+                    t.component,
+                    CollapseType::TriangleCollapse,
+                    time_now,
+                ))
+            } else {
+                Ok(CollapseSpec::never(t.component))
+            }
+        }
+        1 => Ok(specs[0].0),
+        _ => {
+            if specs[0].1.cmp(&specs[1].1)? == std::cmp::Ordering::Equal {
+                Ok(CollapseSpec::new(
+                    t.component,
+                    CollapseType::TriangleCollapse,
+                    specs[0].0.time.min(specs[1].0.time),
+                ))
+            } else if specs[0].0 < specs[1].0 {
+                Ok(specs[0].0)
+            } else {
+                Ok(specs[1].0)
+            }
+        }
+    }
+}
+
+fn collapse_bounded_constrained_1_robust(
+    kt: &KineticTriangulation,
+    t: &KineticTriangle,
+    time_now: f64,
+) -> Result<CollapseSpec, PropagationError> {
+    use crate::numeric::determinant_poly_exact;
+    let c_idx = (0..3).find(|&s| t.wavefronts[s].is_some()).unwrap();
+    let edge_collapse = constraint_collapse_time_exact(kt, t, c_idx, time_now)?;
+    let mut ps = [[0.0; 2]; 3];
+    let mut vs = [[0.0; 2]; 3];
+    for i in 0..3 {
+        let v = &kt.vertices[t.vertices[i].unwrap()];
+        ps[i] = [v.pos_zero.x, v.pos_zero.y];
+        vs[i] = [v.velocity.x, v.velocity.y];
+    }
+    let det = determinant_poly_exact(ps[0], vs[0], ps[1], vs[1], ps[2], vs[2])?;
+    if let Some(ref tc) = edge_collapse {
+        if det.degree()? < 2 {
+            return Ok(CollapseSpec::with_edge(
+                t.component,
+                CollapseType::ConstraintCollapse,
+                ev_f64(tc)?,
+                c_idx as i8,
+            ));
+        }
+        let d = ev(2.0)?.mul(&det.c[2]).mul(tc).add(&det.c[1]);
+        if det.c[2].sign()? < 0 || d.sign()? <= 0 {
+            return Ok(CollapseSpec::with_edge(
+                t.component,
+                CollapseType::ConstraintCollapse,
+                ev_f64(tc)?,
+                c_idx as i8,
+            ));
+        }
+    }
+    match det_root_ge_now(&det, time_now)? {
+        Some(t0) => Ok(CollapseSpec::with_edge(
+            t.component,
+            CollapseType::SplitOrFlipRefine,
+            ev_f64(&t0)?,
+            c_idx as i8,
+        )),
+        None => Ok(CollapseSpec::never(t.component)),
+    }
+}
+
+fn signed_area_exact(
+    kt: &KineticTriangulation,
+    t: &KineticTriangle,
+    time: f64,
+) -> Result<i8, PropagationError> {
+    let [Some(a), Some(b), Some(c)] = t.vertices else {
+        return Ok(0);
+    };
+    let pa = kt.vertices[a].position_at(time);
+    let pb = kt.vertices[b].position_at(time);
+    let pc = kt.vertices[c].position_at(time);
+    let det = ev(pb.x)?
+        .sub(&ev(pa.x)?)
+        .mul(&ev(pc.y)?.sub(&ev(pa.y)?))
+        .sub(&ev(pb.y)?.sub(&ev(pa.y)?).mul(&ev(pc.x)?.sub(&ev(pa.x)?)));
+    Ok(det.sign()?)
+}
+
+fn det_root_ge_now(
+    det: &crate::numeric::ExactPoly2,
+    time_now: f64,
+) -> Result<Option<ExactValue>, PropagationError> {
+    let now = ev(time_now)?;
+    match det.degree()? {
+        0 => {
+            if det.c[0].sign()? == 0 {
+                Ok(Some(now))
+            } else {
+                Ok(None)
+            }
+        }
+        1 => {
+            if det.c[1].sign()? == 0 {
+                return Ok(None);
+            }
+            let tc = det.c[0].neg().div(&det.c[1])?;
+            if tc.cmp(&now)? == std::cmp::Ordering::Less {
+                Ok(None)
+            } else {
+                Ok(Some(tc))
+            }
+        }
+        2 => {
+            let disc = det.c[1]
+                .mul(&det.c[1])
+                .sub(&ev(4.0)?.mul(&det.c[2]).mul(&det.c[0]));
+            if disc.sign()? < 0 {
+                return Ok(None);
+            }
+            let sqrt = disc.sqrt()?;
+            let two_a = ev(2.0)?.mul(&det.c[2]);
+            if two_a.sign()? == 0 {
+                return Ok(None);
+            }
+            let t0 = det.c[1].neg().sub(&sqrt).div(&two_a)?;
+            let t1 = det.c[1].neg().add(&sqrt).div(&two_a)?;
+            let (lo, hi) = if t0.cmp(&t1)? == std::cmp::Ordering::Greater {
+                (t1, t0)
+            } else {
+                (t0, t1)
+            };
+            let cand = if det.c[2].sign()? < 0 {
+                hi.clone()
+            } else {
+                lo
+            };
+            if cand.cmp(&now)? != std::cmp::Ordering::Less {
+                Ok(Some(cand))
+            } else if hi.cmp(&now)? != std::cmp::Ordering::Less {
+                Ok(Some(hi))
+            } else {
+                Ok(None)
+            }
+        }
+        _ => Ok(None),
+    }
+}
+
+fn compute_flip_event_robust(
+    kt: &KineticTriangulation,
+    t: &KineticTriangle,
+    time_now: f64,
+) -> Result<CollapseSpec, PropagationError> {
+    use crate::numeric::determinant_poly_exact;
+    let could_flip = t.vertices.iter().flatten().any(|&vid| {
+        kt.vertices
+            .get(vid)
+            .map(|v| v.is_reflex_or_straight())
+            .unwrap_or(false)
+    });
+    if !could_flip {
+        return Ok(CollapseSpec::never(t.component));
+    }
+    let mut ps = [[0.0; 2]; 3];
+    let mut vs = [[0.0; 2]; 3];
+    for i in 0..3 {
+        let v = &kt.vertices[t.vertices[i].unwrap()];
+        ps[i] = [v.pos_zero.x, v.pos_zero.y];
+        vs[i] = [v.velocity.x, v.velocity.y];
+    }
+    let det = determinant_poly_exact(ps[0], vs[0], ps[1], vs[1], ps[2], vs[2])?;
+    let Some(tc) = det_root_ge_now(&det, time_now)? else {
+        return Ok(CollapseSpec::never(t.component));
+    };
+    let time = ev_f64(&tc)?;
+    let spec = classify_at_time(kt, t, time)?;
+    if spec.type_ == CollapseType::VertexMovesOverSpoke {
+        let i = spec.relevant_edge as usize;
+        let reflex = t.vertices[i]
+            .and_then(|vid| kt.vertices.get(vid))
+            .map(|v| v.is_reflex_or_straight())
+            .unwrap_or(false);
+        if !reflex {
+            return Ok(CollapseSpec::never(t.component));
+        }
+    }
+    Ok(spec)
 }

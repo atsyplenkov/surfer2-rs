@@ -162,6 +162,56 @@ pub fn determinant_poly_f64(
     Poly2::quadratic(c0, c1, c2)
 }
 
+/// Same expansion as `determinant_poly_f64` with exact dyadic coefficients.
+pub fn determinant_poly_exact(
+    p0: [f64; 2],
+    v0: [f64; 2],
+    p1: [f64; 2],
+    v1: [f64; 2],
+    p2: [f64; 2],
+    v2: [f64; 2],
+) -> Result<ExactPoly2, ExactError> {
+    let x = |p: [f64; 2], i: usize| ExactValue::from_f64(p[i]);
+    let x0 = x(p0, 0)?;
+    let y0 = x(p0, 1)?;
+    let x1 = x(p1, 0)?;
+    let y1 = x(p1, 1)?;
+    let x2 = x(p2, 0)?;
+    let y2 = x(p2, 1)?;
+    let u0 = x(v0, 0)?;
+    let w0 = x(v0, 1)?;
+    let u1 = x(v1, 0)?;
+    let w1 = x(v1, 1)?;
+    let u2 = x(v2, 0)?;
+    let w2 = x(v2, 1)?;
+    let c0 = x0
+        .mul(&y1)
+        .add(&x1.mul(&y2))
+        .add(&x2.mul(&y0))
+        .sub(&y0.mul(&x1).add(&y1.mul(&x2)).add(&y2.mul(&x0)));
+    let c1 = u0
+        .mul(&y1)
+        .add(&x0.mul(&w1))
+        .add(&u1.mul(&y2))
+        .add(&x1.mul(&w2))
+        .add(&u2.mul(&y0))
+        .add(&x2.mul(&w0))
+        .sub(
+            &w0.mul(&x1)
+                .add(&y0.mul(&u1))
+                .add(&w1.mul(&x2))
+                .add(&y1.mul(&u2))
+                .add(&w2.mul(&x0))
+                .add(&y2.mul(&u0)),
+        );
+    let c2 = u0
+        .mul(&w1)
+        .add(&u1.mul(&w2))
+        .add(&u2.mul(&w0))
+        .sub(&w0.mul(&u1).add(&w1.mul(&u2)).add(&w2.mul(&u0)));
+    Ok(ExactPoly2 { c: [c0, c1, c2] })
+}
+
 /// Interval enclosure of a Poly2 evaluation.
 pub fn poly2_eval_interval(p: Poly2, t: Interval) -> Interval {
     let a0 = Interval::point(p.c[0]);

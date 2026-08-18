@@ -13,4 +13,7 @@ mod polynomial;
 
 pub use exact::{ExactError, ExactValue};
 pub use interval::Interval;
-pub use polynomial::{determinant_poly_f64, solve_quadratic_f64, Poly1, Poly2, QuadraticRoots};
+pub use polynomial::{
+    determinant_poly_exact, determinant_poly_f64, solve_quadratic_f64, ExactPoly2, Poly1, Poly2,
+    QuadraticRoots,
+};

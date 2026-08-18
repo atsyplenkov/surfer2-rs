@@ -119,6 +119,24 @@ fn differential_exact_convex_small() {
 }
 
 #[test]
+fn robust_matches_fast_convex03() {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("fixtures/graphml/convex03.graphml");
+    if !path.exists() {
+        return;
+    }
+    let g = read_graphml_path(&path).unwrap();
+    let pslg = g.to_pslg().unwrap();
+    let opts = |k| Options {
+        kernel: k,
+        components: ComponentMode::AllSequential,
+    };
+    let fast = straight_skeleton(&pslg, &opts(KernelMode::Fast)).unwrap();
+    let rob = straight_skeleton(&pslg, &opts(KernelMode::Robust)).unwrap();
+    assert_eq!(fast.segment_count(), rob.segment_count());
+    assert_eq!(fast.segment_count(), 3);
+}
+
+#[test]
 fn oracle_bins_optional_presence() {
     // Non-ignored smoke: just report whether bins exist.
     eprintln!("double={:?}", double_bin());

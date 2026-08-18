@@ -49,6 +49,11 @@ impl Pslg {
         Ok(Self { vertices, edges })
     }
 
+    /// Already-validated clone; `Polygon::new` already ran `validate_pslg`.
+    pub(crate) fn from_validated(vertices: Vec<Point2>, edges: Vec<InputEdge>) -> Self {
+        Self { vertices, edges }
+    }
+
     pub fn from_flat(
         xy: &[[f64; 2]],
         edge_vertices: &[[usize; 2]],
@@ -175,7 +180,7 @@ impl Polygon {
 
     /// View as a PSLG (shared topology; weight 1 on every edge).
     pub fn as_pslg(&self) -> Result<Pslg, InputError> {
-        Pslg::new(self.vertices.clone(), self.edges.clone())
+        Ok(Pslg::from_validated(self.vertices.clone(), self.edges.clone()))
     }
 }
 

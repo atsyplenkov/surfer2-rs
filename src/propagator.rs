@@ -1510,10 +1510,21 @@ fn initialize_kinetic(
     }
 
     // Create triangles first (vertices only).
+    let keep: Option<Vec<bool>> = interior_filter.map(|f| {
+        let mut k = vec![false; basic.triangles.len()];
+        for &ti in f {
+            if ti < k.len() {
+                k[ti] = true;
+            }
+        }
+        k
+    });
     let mut tri_map: Vec<Option<TriangleId>> = vec![None; basic.triangles.len()];
+    let mut tid_to_ti: std::collections::HashMap<TriangleId, usize> =
+        std::collections::HashMap::new();
     for (ti, tri) in basic.triangles.iter().enumerate() {
-        if let Some(filter) = interior_filter {
-            if !filter.contains(&ti) {
+        if let Some(ref k) = keep {
+            if !k[ti] {
                 continue;
             }
         } else {
@@ -1532,6 +1543,7 @@ fn initialize_kinetic(
             kt.set_vertex(tid, i, input_vertex_ids[tri[i]]);
         }
         tri_map[ti] = Some(tid);
+        tid_to_ti.insert(tid, ti);
     }
 
     // Neighbors across unconstrained sides.
@@ -1572,10 +1584,9 @@ fn initialize_kinetic(
                     continue;
                 }
             }
-            // Determine if this side is constrained in the basic map
-            let basic_ti = tri_map.iter().position(|x| *x == Some(tid));
-            let source_edge = basic_ti
-                .and_then(|ti| basic.constraints[ti][s])
+            let source_edge = tid_to_ti
+                .get(&tid)
+                .and_then(|&ti| basic.constraints[ti][s])
                 .or_else(|| {
                     let t = &kt.triangles[tid];
                     let va = t.vertices[ccw(s)]?;

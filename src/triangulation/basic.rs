@@ -5,7 +5,7 @@
 //!
 //! Spade is confined here; no Spade handle crosses into the kinetic engine.
 
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::{HashMap, VecDeque};
 
 use spade::{ConstrainedDelaunayTriangulation, Point2 as SpadePoint, Triangulation as _};
 
@@ -70,7 +70,8 @@ pub fn build_basic_triangulation(pslg: &Pslg) -> Result<BasicTriangulation, Tria
     }
 
     // Map canonical endpoint pair → input edge id and insert constraints.
-    let mut edge_lookup: BTreeMap<(usize, usize), u32> = BTreeMap::new();
+    let mut edge_lookup: HashMap<(usize, usize), u32> =
+        HashMap::with_capacity(pslg.edges().len());
     for (ei, e) in pslg.edges().iter().enumerate() {
         let (a, b) = e.normalized_endpoints();
         edge_lookup.insert((a, b), ei as u32);
@@ -91,53 +92,40 @@ pub fn build_basic_triangulation(pslg: &Pslg) -> Result<BasicTriangulation, Tria
     }
 
     // Collect finite faces
-    let mut face_ids: BTreeMap<FaceKey, usize> = BTreeMap::new();
     let mut triangles = Vec::new();
-    let mut face_handles = Vec::new();
-
     for face in cdt.inner_faces() {
-        let verts: Vec<usize> = face
-            .vertices()
-            .iter()
-            .map(|v| v.data().input_index)
-            .collect();
-        if verts.len() != 3 {
+        let vs = face.vertices();
+        if vs.len() != 3 {
             continue;
         }
-        let tri = [verts[0], verts[1], verts[2]];
-        // Ensure CCW
-        let tri = ensure_ccw(pslg.vertices(), tri);
-        let idx = triangles.len();
-        face_ids.insert(FaceKey::from_tri(tri), idx);
-        triangles.push(tri);
-        face_handles.push(face);
+        let tri = [
+            vs[0].data().input_index,
+            vs[1].data().input_index,
+            vs[2].data().input_index,
+        ];
+        triangles.push(ensure_ccw(pslg.vertices(), tri));
     }
 
     let n = triangles.len();
     let mut neighbors = vec![[None; 3]; n];
     let mut constraints = vec![[None; 3]; n];
-
+    let mut directed: HashMap<(usize, usize), usize> = HashMap::with_capacity(n * 3);
     for (ti, tri) in triangles.iter().enumerate() {
         for s in 0..3 {
             let a = tri[(s + 1) % 3];
             let b = tri[(s + 2) % 3];
-            let key = canonical(a, b);
-            if let Some(&eid) = edge_lookup.get(&key) {
+            directed.insert((a, b), ti);
+            if let Some(&eid) = edge_lookup.get(&canonical(a, b)) {
                 constraints[ti][s] = Some(eid);
             }
-            // Neighbor across side: face with edge b→a (opposite orientation)
-            let opp = [b, a];
-            // Find other triangle containing both vertices with opposite side
-            // Scan is OK for modest n; GIS lakes use kinetic path after copy.
-            for (tj, other) in triangles.iter().enumerate() {
-                if tj == ti {
-                    continue;
-                }
-                if let Some(side) = side_index(*other, opp[0], opp[1]) {
-                    neighbors[ti][s] = Some(tj);
-                    let _ = side;
-                    break;
-                }
+        }
+    }
+    for (ti, tri) in triangles.iter().enumerate() {
+        for s in 0..3 {
+            let a = tri[(s + 1) % 3];
+            let b = tri[(s + 2) % 3];
+            if let Some(&tj) = directed.get(&(b, a)) {
+                neighbors[ti][s] = Some(tj);
             }
         }
     }
@@ -146,43 +134,12 @@ pub fn build_basic_triangulation(pslg: &Pslg) -> Result<BasicTriangulation, Tria
     let first = pslg.edges().first().ok_or(TriangulationError::RegionClassification)?;
     let u = first.vertices[0];
     let v = first.vertices[1];
-    let mut components = vec![None; n];
-    let mut max_component = None;
+    let left = directed.get(&(u, v)).copied();
+    let right = directed.get(&(v, u)).copied();
 
-    // Find triangles incident to directed edge u→v (left) and v→u (right).
-    let left = find_tri_with_directed(&triangles, u, v);
-    let right = find_tri_with_directed(&triangles, v, u);
-
+    let mut assigned = vec![None; n];
     let mut next_id = 0u32;
-    let mut queue_regions: VecDeque<(usize, u32)> = VecDeque::new();
-
-    if let Some(t) = left {
-        components[t] = Some(0);
-        queue_regions.push_back((t, 0));
-        next_id = 1;
-        max_component = Some(0);
-    }
-    if let Some(t) = right {
-        if components[t].is_none() {
-            let id = if left.is_some() { 1 } else { 0 };
-            components[t] = Some(id);
-            queue_regions.push_back((t, id));
-            next_id = id + 1;
-            max_component = Some(id);
-        }
-    }
-
-    // BFS across non-constraint sides same component; constraint sides seed new.
-    let mut discovered = vec![false; n];
-    // Re-do proper flood like upstream: from seeds, expand unconstrained;
-    // constrained neighbors get new IDs in edge-discovery order.
-    let mut pending: VecDeque<usize> = VecDeque::new();
-    let mut assigned = components.clone();
-
-    // Reset and implement cleaner version
-    assigned = vec![None; n];
-    next_id = 0;
-    max_component = None;
+    let mut max_component = None;
 
     let mut seed_order: Vec<usize> = Vec::new();
     if let Some(t) = left {
@@ -384,38 +341,6 @@ fn canonical(a: usize, b: usize) -> (usize, usize) {
         (b, a)
     }
 }
-
-fn side_index(tri: [usize; 3], a: usize, b: usize) -> Option<usize> {
-    // Side s opposite vertex s connects (s+1)-(s+2)
-    for s in 0..3 {
-        let u = tri[(s + 1) % 3];
-        let v = tri[(s + 2) % 3];
-        if u == a && v == b {
-            return Some(s);
-        }
-    }
-    None
-}
-
-fn find_tri_with_directed(triangles: &[[usize; 3]], a: usize, b: usize) -> Option<usize> {
-    for (i, t) in triangles.iter().enumerate() {
-        if side_index(*t, a, b).is_some() {
-            return Some(i);
-        }
-    }
-    None
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-struct FaceKey([usize; 3]);
-
-impl FaceKey {
-    fn from_tri(mut t: [usize; 3]) -> Self {
-        t.sort_unstable();
-        Self(t)
-    }
-}
-
 
 impl From<InputError> for TriangulationError {
     fn from(_: InputError) -> Self {

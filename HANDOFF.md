@@ -54,7 +54,8 @@ This session:
 | spoke-2 / spoke-3 | **22** / **22** | 26 OBJ | leave-CH at `-0.0` was a flip loop; locked |
 | iso-simple-3 | **13** | 13 | locked; old 19 was pre-attach |
 | issue2-minimal1 | **24** | 25 remembered | 1 off; likely OBJ skip-∞. Interior 20 |
-| lake9706 / 10623 | ignored | 4372 / 31330 segs | still incomplete |
+| lake9706 | **4181** / 10690 nodes | 4372 / 4344 | runs (~10s); 191 segs short, extra nodes |
+| lake10623 | ignored | 31330 | do not run yet |
 
 C++ spoke-1 OBJ: 16 interior + 6 pocket + 4 skip-∞ chords = 26.
 

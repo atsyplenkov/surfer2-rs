@@ -7,8 +7,6 @@
 //! propagation semantics. GUI, CLI, GraphML/OBJ serializers, Boost, and CGAL
 //! are out of scope.
 
-
-
 pub mod dcel;
 pub mod error;
 pub mod event;
@@ -48,6 +46,9 @@ impl Default for ComponentMode {
     }
 }
 
+/// Propagation options. Additive GraphML `edge-weight-additive` is not a
+/// field: upstream parses that attribute and never applies it. Only
+/// multiplicative `InputEdge::weight` (`edge-weight`) affects speed.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Options {
     pub components: ComponentMode,

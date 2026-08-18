@@ -38,8 +38,8 @@ Known parity gaps:
   south-reflex ridge (same 1/1 topology delta). Segment counts, node counts,
   and cyclomatic numbers match. A global “near-miss is a split” rule is
   unsafe: lake10623 has 100+ other `tparam` near-misses that C++ flips.
-- `issue2-minimal1` is 24 kinetic segments vs C++ double 25 (reproduced;
-  another split/flip timing difference).
+- `issue2-minimal1` is 23 kinetic segments; C++ OBJ 25 is 23 arcs plus
+  2 skip-∞ face chords (same family as spoke-1).
 - Additive GraphML `edge-weight-additive` is unsupported (upstream parses
   it and never applies it). Multiplicative `edge-weight` is implemented.
 - Offset contours walk C++-style face cycles and are gated on a unit

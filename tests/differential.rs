@@ -126,12 +126,11 @@ fn oracle_bins_optional_presence() {
 
 #[test]
 fn iso_simple3_and_issue2_counts() {
-    // issue2-minimal1: C++ double (`/tmp/surfer2/build-double/cc/surfer`,
-    // `--component=-1`) emits 25 finite nonzero OBJ segments. Rust 24 is a
-    // real split/flip timing difference, not a forgotten C++ count.
+    // issue2-minimal1: event stream matches C++ double. C++ OBJ 25 =
+    // 23 kinetic arcs + 2 skip-∞ face chords (same family as spoke-1).
     let cases = [
         ("special-cases/iso-simple-3.graphml", 13),
-        ("issue2/issue2-minimal1.graphml", 24),
+        ("issue2/issue2-minimal1.graphml", 23),
         ("special-cases/spoke-2.graphml", 22),
         ("special-cases/spoke-3.graphml", 22),
     ];

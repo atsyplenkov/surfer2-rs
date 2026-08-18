@@ -510,17 +510,26 @@ fn collapse_bounded_constrained_1(
     t: &KineticTriangle,
     time_now: f64,
 ) -> Result<CollapseSpec, PropagationError> {
-    use crate::numeric::{determinant_poly_f64, solve_quadratic_f64};
+    use crate::event::EdgeCollapseType;
+    use crate::numeric::determinant_poly_f64;
+    use crate::wavefront::edge::compute_edge_collapse_f64;
 
     let c_idx = (0..3).find(|&s| t.wavefronts[s].is_some()).unwrap();
-    let edge_collapse = constraint_collapse_time(kt, t, c_idx, time_now).map(|tc| {
-        CollapseSpec::with_edge(
-            t.component,
-            CollapseType::ConstraintCollapse,
-            tc,
-            c_idx as i8,
-        )
-    });
+    let Some(eid) = t.wavefronts[c_idx] else {
+        return Ok(CollapseSpec::never(t.component));
+    };
+    let Some(e) = kt.edges.get(eid) else {
+        return Ok(CollapseSpec::never(t.component));
+    };
+    let (Some(v0), Some(v1)) = (
+        kt.vertices.get(e.endpoints[0]),
+        kt.vertices.get(e.endpoints[1]),
+    ) else {
+        return Ok(CollapseSpec::never(t.component));
+    };
+    // C++ WavefrontEdge::parallel_endpoints: ALWAYS or NEVER (collinear velocities).
+    let edge =
+        compute_edge_collapse_f64(v0.pos_zero, v0.velocity, v1.pos_zero, v1.velocity, time_now);
 
     let mut ps = [[0.0; 2]; 3];
     let mut vs = [[0.0; 2]; 3];
@@ -532,22 +541,85 @@ fn collapse_bounded_constrained_1(
     }
     let det = determinant_poly_f64(ps[0], vs[0], ps[1], vs[1], ps[2], vs[2]);
 
-    if let Some(cand) = edge_collapse {
-        if det.degree() < 2 {
-            return Ok(cand);
+    let parallel = matches!(
+        edge.type_,
+        EdgeCollapseType::Always | EdgeCollapseType::Never
+    );
+    if parallel {
+        if edge.type_ == EdgeCollapseType::Always
+            || leftover_constraint_already_a_point(v0, v1, time_now)
+        {
+            return Ok(CollapseSpec::with_edge(
+                t.component,
+                CollapseType::ConstraintCollapse,
+                time_now,
+                c_idx as i8,
+            ));
         }
-        // accept_collapse_bounded_constrained_1 simplified
-        let a = det.c[2];
-        let b = det.c[1];
-        // derivative 2*a*t + b at collapse
-        let d = 2.0 * a * cand.time + b;
-        if a < 0.0 || d <= 0.0 {
-            return Ok(cand);
+        // NEVER: only a linear area polynomial can still be a split/flip.
+        // Degree 0 (already-flat leftover) or 2 → C++ emits NEVER, not a
+        // now-time SplitOrFlipRefine on the zero-length constraint.
+        if det.degree() == 1 {
+            return split_or_flip_from_det(t, c_idx, det, time_now);
         }
-        // else fall through to split/flip refine
+        return Ok(CollapseSpec::never(t.component));
     }
 
-    // SPLIT_OR_FLIP_REFINE at det root ≥ now
+    let candidate = if edge.type_ == EdgeCollapseType::Future {
+        Some(CollapseSpec::with_edge(
+            t.component,
+            CollapseType::ConstraintCollapse,
+            edge.time,
+            c_idx as i8,
+        ))
+    } else {
+        None
+    };
+
+    if det.degree() == 2 {
+        if let Some(cand) = candidate {
+            let a = det.c[2];
+            let b = det.c[1];
+            let d = 2.0 * a * cand.time + b;
+            if a < 0.0 || d <= 0.0 {
+                return Ok(cand);
+            }
+        }
+        return split_or_flip_from_det(t, c_idx, det, time_now);
+    }
+
+    if let Some(cand) = candidate {
+        return Ok(cand);
+    }
+    split_or_flip_from_det(t, c_idx, det, time_now)
+}
+
+/// Leftover 1-const after a same-time collapse: both endpoints sit on one
+/// point with the same velocity. C++ `compute_collapse` sees matching
+/// `pos_zero` (ALWAYS). Back-projected `pos_zero` can miss that by ULPs,
+/// so the edge looks like NEVER and would otherwise become a now-time
+/// split on a zero-length constraint.
+fn leftover_constraint_already_a_point(
+    v0: &WavefrontVertex,
+    v1: &WavefrontVertex,
+    time_now: f64,
+) -> bool {
+    if v0.velocity != v1.velocity {
+        return false;
+    }
+    let p0 = v0.position_at(time_now);
+    let p1 = v1.position_at(time_now);
+    p0.x == p1.x && p0.y == p1.y
+}
+
+fn split_or_flip_from_det(
+    t: &KineticTriangle,
+    c_idx: usize,
+    det: crate::numeric::Poly2,
+    time_now: f64,
+) -> Result<CollapseSpec, PropagationError> {
+    use crate::numeric::solve_quadratic_f64;
+
     let split_time = match det.degree() {
         0 => {
             if det.c[0] == 0.0 {

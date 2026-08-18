@@ -222,7 +222,7 @@ fn lake9706_matches_cpp_double_interior() {
     );
 }
 
-/// C++ exact `--component=r` is 31330/31130. Fast is three ridges short.
+/// C++ exact `--component=r` is 31330/31130. Fast is one ridge short.
 #[test]
 fn lake10623_load_and_skeleton() {
     let p = gis_root().join("lake10623.json");
@@ -240,10 +240,10 @@ fn lake10623_load_and_skeleton() {
     let nnode = sk.node_count();
     let len = sk.total_finite_length();
     eprintln!("10623 segs={nseg} nodes={nnode} len={len}");
-    assert_eq!(nseg, 31327);
-    assert_eq!(nnode, 31128);
-    assert!((len - 1007632.7250387593).abs() < 1.0);
-    // Remembered C++ 31330/31130 is Euler 0. We are one ridge short.
+    assert_eq!(nseg, 31329);
+    assert_eq!(nnode, 31130);
+    assert!((len - 1007709.3862767041).abs() < 1.0);
+    // C++ exact is 31330/31130 Euler 0. Nodes match; one ridge still missing.
     assert_eq!(cyclomatic(&sk, 201), -1);
 }
 
@@ -281,9 +281,10 @@ fn lake10623_matches_cpp_exact_interior() {
         n_1cm,
         cpp_nodes.len()
     );
-    // Three C++ ridges / two nodes are missing; one C++ node sits 2.33 m off.
+    // Nodes match C++ unique-xy. Residual is centimetre-scale jitter
+    // (exact vs f64), not the old 2.33 m leftover-endpoint miss.
     assert!(
-        max_d <= 3.0,
+        max_d <= 0.15,
         "a C++ node is {max_d} m from every Rust node"
     );
     assert!(

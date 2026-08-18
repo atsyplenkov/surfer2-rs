@@ -21,6 +21,10 @@ use crate::{ComponentMode, Options};
 
 /// f64 stand-in for C++ `pos_stop` equality at UTM scale.
 const JUNCTION_M: f64 = 5e-3;
+/// Unit-weight wavefronts move at ~1 m/s. A just-born split child faster
+/// than this is a nearly-parallel supporting-line blow-up. Local to the
+/// leftover face after `handle_split_event`, not `intersection_velocity`.
+const SPLIT_CHILD_MAX_SPEED: f64 = 1e4;
 
 /// Incremental propagator with step/advance_to/finish.
 pub struct Propagator {
@@ -852,8 +856,8 @@ impl Propagator {
             .edges
             .insert(WavefrontEdge::new([v, ep1], base_sl, face, source, bevel));
 
-        let nva_id = self.make_split_successor(pos, time, Some(nea), ea)?;
-        let nvb_id = self.make_split_successor(pos, time, eb, Some(neb))?;
+        let (nva_id, nva_ill) = self.make_split_successor(pos, time, Some(nea), ea)?;
+        let (nvb_id, nvb_ill) = self.make_split_successor(pos, time, eb, Some(neb))?;
 
         if let Some(e0) = self.kt.vertices.get_mut(ep0) {
             e0.incident_edges[1] = Some(nea);
@@ -889,6 +893,9 @@ impl Propagator {
         if let Some(na) = na_id {
             if let Some(i) = (0..3).find(|&s| self.kt.triangles[na].neighbors[s] == Some(tid)) {
                 self.kt.set_wavefront(na, i, nea);
+                if nva_ill {
+                    self.force_leftover_collapse_now(na, i, nva_id, pos, time);
+                }
                 if self.kt.triangles[na].live() {
                     self.queue.needs_update(self.kt.triangles[na].tidx)?;
                 }
@@ -897,6 +904,9 @@ impl Propagator {
         if let Some(nb) = nb_id {
             if let Some(i) = (0..3).find(|&s| self.kt.triangles[nb].neighbors[s] == Some(tid)) {
                 self.kt.set_wavefront(nb, i, neb);
+                if nvb_ill {
+                    self.force_leftover_collapse_now(nb, i, nvb_id, pos, time);
+                }
                 if self.kt.triangles[nb].live() {
                     self.queue.needs_update(self.kt.triangles[nb].tidx)?;
                 }
@@ -916,11 +926,12 @@ impl Propagator {
         time: f64,
         a: Option<crate::wavefront::edge::EdgeId>,
         b: Option<crate::wavefront::edge::EdgeId>,
-    ) -> Result<VertexId, SkeletonError> {
+    ) -> Result<(VertexId, bool), SkeletonError> {
         let mut vel = Point2::new(0.0, 0.0);
         let mut pos_zero = pos;
         let mut ang = crate::wavefront::vertex::AngleType::Acute;
         let mut inf = InfiniteSpeedType::None;
+        let mut ill = false;
         if let (Some(ea), Some(eb)) = (a, b) {
             let sla = self.kt.edges[ea].supporting_line;
             let slb = self.kt.edges[eb].supporting_line;
@@ -930,13 +941,71 @@ impl Propagator {
                 let (p0, v) = wavefront_vertex_motion(sla, slb, pos, time);
                 pos_zero = p0;
                 vel = v;
+                let speed = vel.x.hypot(vel.y);
+                // Huge or zero velocity: leftover constraint never dies, and
+                // the live endpoint walks past the C++ same-time stop.
+                if !speed.is_finite() || speed == 0.0 || speed > SPLIT_CHILD_MAX_SPEED {
+                    ill = true;
+                }
             }
         }
         let mut nv = WavefrontVertex::new_kinetic(pos_zero, vel, time, inf);
         nv.pos_start = pos;
         nv.angle = ang;
         nv.incident_edges = [a, b];
-        Ok(self.kt.vertices.insert(nv))
+        Ok((self.kt.vertices.insert(nv), ill))
+    }
+
+    /// C++'s second same-time event after a split: the leftover face dies now.
+    fn force_leftover_collapse_now(
+        &mut self,
+        tid: TriangleId,
+        side: usize,
+        child: VertexId,
+        pos: Point2,
+        time: f64,
+    ) {
+        let Some(tr) = self.kt.triangles.get(tid) else {
+            return;
+        };
+        if !tr.live() {
+            return;
+        }
+        let nconst = tr.wavefronts.iter().filter(|w| w.is_some()).count();
+        let component = tr.component;
+        // 3-const leftovers already TriangleCollapse later; forcing one
+        // edge now drops a ridge on lake9706.
+        if nconst >= 3 {
+            return;
+        }
+        let natural = match compute_collapse(&self.kt, tr, time) {
+            Ok(s) => s,
+            Err(_) => return,
+        };
+        let child_speed = self
+            .kt
+            .vertices
+            .get(child)
+            .map(|v| v.velocity.x.hypot(v.velocity.y))
+            .unwrap_or(0.0);
+        // Zero-velocity child: C++ marks the intersection missing / infinitely
+        // fast and kills the leftover now, even if the other constraint later
+        // collapses. Huge-velocity child: only if leftover would otherwise Never.
+        if natural.type_ != CollapseType::Never && child_speed != 0.0 {
+            return;
+        }
+        if let Some(v) = self.kt.vertices.get_mut(child) {
+            v.pos_zero = pos;
+            v.velocity = Point2::new(0.0, 0.0);
+        }
+        if let Some(tr) = self.kt.triangles.get_mut(tid) {
+            tr.collapse_cache = Some(CollapseSpec::with_edge(
+                component,
+                CollapseType::ConstraintCollapse,
+                time,
+                side as i8,
+            ));
+        }
     }
 
     fn scene_gap(&self) -> f64 {

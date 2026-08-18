@@ -167,7 +167,7 @@ fn lake9706_load_and_skeleton() {
 }
 
 /// Frozen C++ double `--component=1` OBJ vs Rust interior skeleton.
-/// Locks the graph we measured: same ridge map, two segs short, junctions overlap.
+/// Locks the graph we measured: same ridge map, one seg short, junctions overlap.
 #[test]
 fn lake9706_matches_cpp_double_interior() {
     let obj_path = gis_root().join("lake9706-cpp-double.obj");
@@ -187,12 +187,12 @@ fn lake9706_matches_cpp_double_interior() {
     let rust_nodes = unique_xy(rust.iter().flat_map(|s| [s.start, s.end]));
 
     assert!(
-        (rust.len() as i64 - 4372).abs() <= 2,
+        (rust.len() as i64 - 4372).abs() <= 1,
         "rust segs {} vs cpp 4372",
         rust.len()
     );
     assert!(
-        (rust_len - 342587.19566660019).abs() < 50.0,
+        (rust_len - 342587.19566660019).abs() < 1.0,
         "rust len {rust_len} vs cpp {cpp_len}"
     );
 

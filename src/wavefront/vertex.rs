@@ -29,6 +29,8 @@ pub enum AngleType {
 #[derive(Debug, Clone)]
 pub struct WavefrontVertex {
     pub pos_zero: Point2,
+    /// Collapse / birth location; DCEL start. May differ from `pos_zero + t * vel`.
+    pub pos_start: Point2,
     pub velocity: Point2,
     pub infinite_speed: InfiniteSpeedType,
     /// Incident wavefront edges [left, right] in wavefront orientation.
@@ -56,6 +58,7 @@ impl WavefrontVertex {
     ) -> Self {
         Self {
             pos_zero,
+            pos_start: pos_zero,
             velocity,
             infinite_speed,
             incident_edges: [None, None],

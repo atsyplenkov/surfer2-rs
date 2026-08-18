@@ -211,31 +211,44 @@ impl KineticTriangulation {
         if self.infinite_vertex == Some(v) {
             return Ok(());
         }
-        let (left_face, right_face, start_t, start_pos) = {
-            let vert = self
-                .vertices
-                .get(v)
-                .ok_or_else(|| PropagationError::TopologyInvariant {
-                    detail: "stop_vertex: missing vertex".into(),
-                })?;
-            if vert.is_stopped() {
-                return Ok(());
-            }
-            let mut faces = [0u32, 0u32];
-            for s in 0..2 {
-                if let Some(eid) = vert.incident_edges[s] {
-                    if let Some(e) = self.edges.get(eid) {
-                        faces[s] = e.skeleton_face;
-                    }
+        let Some(vert) = self.vertices.get(v) else {
+            return Err(PropagationError::TopologyInvariant {
+                detail: "stop_vertex: missing vertex".into(),
+            });
+        };
+        let start_pos = vert.pos_start;
+        let start_t = vert.time_start;
+        let stopped = vert.is_stopped();
+        let amend = stopped
+            && vert
+                .time_stop
+                .is_some_and(|ts| (ts - t).abs() <= 1e-9 * (1.0 + t.abs()))
+            && vert
+                .pos_stop
+                .is_some_and(|p| p.distance_to(start_pos) <= 1e-3)
+            && pos.distance_to(start_pos) > 1e-3;
+        let inc = vert.incident_edges;
+        if stopped {
+            if amend {
+                self.vertices[v].pos_stop = Some(pos);
+                if let Some(arc) = self.arcs.iter_mut().rev().find(|a| {
+                    a.start == start_pos
+                        && a.end.is_some_and(|e| e.distance_to(start_pos) <= 1e-3)
+                }) {
+                    arc.end = Some(pos);
                 }
             }
-            (
-                faces[0],
-                faces[1],
-                vert.time_start,
-                vert.position_at(vert.time_start),
-            )
-        };
+            return Ok(());
+        }
+        let mut faces = [0u32, 0u32];
+        for s in 0..2 {
+            if let Some(eid) = inc[s] {
+                if let Some(e) = self.edges.get(eid) {
+                    faces[s] = e.skeleton_face;
+                }
+            }
+        }
+        let (left_face, right_face) = (faces[0], faces[1]);
         if let Some(vert) = self.vertices.get_mut(v) {
             vert.stop(t, pos);
         }

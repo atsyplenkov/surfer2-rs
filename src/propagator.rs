@@ -337,8 +337,7 @@ impl Propagator {
             let right_sl = t.wavefronts[ccw(edge_idx)].map(|e| self.kt.edges[e].supporting_line);
             (va, vb, left_sl, right_sl)
         };
-        self.kt.stop_vertex(va, spec.time)?;
-        self.kt.stop_vertex(vb, spec.time)?;
+        self.stop_collapse_pair(va, vb, spec.time)?;
         if let Some(tr) = self.kt.triangles.get_mut(tid) {
             tr.set_dying();
         }
@@ -367,8 +366,7 @@ impl Propagator {
                 t.neighbors[edge_idx],
             )
         };
-        self.kt.stop_vertex(va, spec.time)?;
-        self.kt.stop_vertex(vb, spec.time)?;
+        self.stop_collapse_pair(va, vb, spec.time)?;
 
         let Some(nid) = nb else {
             // No neighbor: treat as constraint-style collapse on this triangle alone.
@@ -523,13 +521,7 @@ impl Propagator {
             )
         };
 
-        // Ensure stopped.
-        if !self.kt.vertices[va].is_stopped() {
-            self.kt.stop_vertex(va, time)?;
-        }
-        if !self.kt.vertices[vb].is_stopped() {
-            self.kt.stop_vertex(vb, time)?;
-        }
+        self.stop_collapse_pair(va, vb, time)?;
         let pos = self.kt.vertices[va]
             .pos_stop
             .unwrap_or_else(|| self.kt.vertices[va].position_at(time));
@@ -572,6 +564,7 @@ impl Propagator {
             }
         };
         let mut nv = WavefrontVertex::new_kinetic(pos_zero, velocity, time, inf);
+        nv.pos_start = pos;
         nv.angle = ang;
         nv.incident_edges = [ea_id, eb_id];
         let nvid = self.kt.vertices.insert(nv);
@@ -889,9 +882,45 @@ impl Propagator {
             }
         }
         let mut nv = WavefrontVertex::new_kinetic(pos_zero, vel, time, inf);
+        nv.pos_start = pos;
         nv.angle = ang;
         nv.incident_edges = [a, b];
         Ok(self.kt.vertices.insert(nv))
+    }
+
+    /// C++ `va.pos_stop == vb.pos_stop`. A degenerate newborn otherwise
+    /// dies in place and drops the ridge to its partner (lake 31.7 m).
+    fn stop_collapse_pair(
+        &mut self,
+        va: VertexId,
+        vb: VertexId,
+        time: f64,
+    ) -> Result<(), SkeletonError> {
+        self.kt.stop_vertex(va, time)?;
+        self.kt.stop_vertex(vb, time)?;
+        let (pa, pb, a_deg, b_deg) = {
+            let a = &self.kt.vertices[va];
+            let b = &self.kt.vertices[vb];
+            let pa = a.pos_stop.unwrap_or_else(|| a.position_at(time));
+            let pb = b.pos_stop.unwrap_or_else(|| b.position_at(time));
+            (
+                pa,
+                pb,
+                a.pos_stop
+                    .is_some_and(|p| p.distance_to(a.pos_start) <= 1e-3),
+                b.pos_stop
+                    .is_some_and(|p| p.distance_to(b.pos_start) <= 1e-3),
+            )
+        };
+        if pa.distance_to(pb) <= 1e-6 {
+            return Ok(());
+        }
+        if a_deg && !b_deg {
+            self.kt.stop_vertex_at(va, time, pb)?;
+        } else if b_deg && !a_deg {
+            self.kt.stop_vertex_at(vb, time, pa)?;
+        }
+        Ok(())
     }
 
     fn rewrite_star_side(

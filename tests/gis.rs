@@ -4,6 +4,7 @@ mod support;
 
 use std::path::{Path, PathBuf};
 
+use support::oracle::ObjSkeleton;
 use surfer2::{interior_straight_skeleton, KernelMode, Point2, Polygon, Skeleton};
 
 fn gis_root() -> PathBuf {
@@ -79,9 +80,33 @@ fn cyclomatic(sk: &Skeleton, holes: usize) -> i64 {
     e - v + 1 - holes as i64
 }
 
+fn unique_xy(pts: impl IntoIterator<Item = Point2>) -> Vec<Point2> {
+    let mut out = Vec::new();
+    for p in pts {
+        if !out
+            .iter()
+            .any(|q: &Point2| q.x.to_bits() == p.x.to_bits() && q.y.to_bits() == p.y.to_bits())
+        {
+            out.push(p);
+        }
+    }
+    out
+}
+
+fn nearest_each(from: &[Point2], to: &[Point2]) -> Vec<f64> {
+    from.iter()
+        .map(|p| {
+            to.iter()
+                .map(|q| p.distance_to(*q))
+                .fold(f64::INFINITY, f64::min)
+        })
+        .collect()
+}
+
 #[test]
 fn lake9706_fixture_present() {
     assert!(gis_root().join("lake9706.json").exists());
+    assert!(gis_root().join("lake9706-cpp-double.obj").exists());
 }
 
 #[test]
@@ -139,6 +164,67 @@ fn lake9706_load_and_skeleton() {
         }
         Err(e) => eprintln!("lake9706 WIP: {e}"),
     }
+}
+
+/// Frozen C++ double `--component=1` OBJ vs Rust interior skeleton.
+/// Locks the graph we measured: same ridge map, two segs short, junctions overlap.
+#[test]
+fn lake9706_matches_cpp_double_interior() {
+    let obj_path = gis_root().join("lake9706-cpp-double.obj");
+    let text = std::fs::read_to_string(&obj_path).expect("cpp obj");
+    let obj = ObjSkeleton::parse(&text).expect("parse cpp obj");
+    let cpp = obj.finite_nonzero_segments();
+    let cpp_len: f64 = cpp.iter().map(|s| s.start.distance_to(s.end)).sum();
+    let cpp_nodes = unique_xy(cpp.iter().flat_map(|s| [s.start, s.end]));
+    assert_eq!(cpp.len(), 4372);
+    assert_eq!(cpp_nodes.len(), 4344);
+    assert!((cpp_len - 342587.19566660019).abs() < 1.0);
+
+    let poly = load_geojson_polygon(&gis_root().join("lake9706.json")).expect("load");
+    let sk = interior_straight_skeleton(&poly, KernelMode::Fast).expect("rust sk");
+    let rust: Vec<_> = sk.finite_segments().collect();
+    let rust_len: f64 = rust.iter().map(|s| s.start.distance_to(s.end)).sum();
+    let rust_nodes = unique_xy(rust.iter().flat_map(|s| [s.start, s.end]));
+
+    assert!(
+        (rust.len() as i64 - 4372).abs() <= 2,
+        "rust segs {} vs cpp 4372",
+        rust.len()
+    );
+    assert!(
+        (rust_len - 342587.19566660019).abs() < 50.0,
+        "rust len {rust_len} vs cpp {cpp_len}"
+    );
+
+    let d_cpp = nearest_each(&cpp_nodes, &rust_nodes);
+    let n_1cm = d_cpp.iter().filter(|d| **d <= 0.01).count();
+    let n_1mm = d_cpp.iter().filter(|d| **d <= 0.001).count();
+    let max_d = d_cpp.iter().copied().fold(0.0, f64::max);
+    eprintln!(
+        "lake9706 graph rust_segs={} rust_xy={} cpp_segs={} cpp_xy={} within_1mm={}/{} within_1cm={}/{} max_cpp_to_rust={max_d:.4}",
+        rust.len(),
+        rust_nodes.len(),
+        cpp.len(),
+        cpp_nodes.len(),
+        n_1mm,
+        cpp_nodes.len(),
+        n_1cm,
+        cpp_nodes.len()
+    );
+    assert!(
+        max_d <= 1.0,
+        "a C++ node is {max_d} m from every Rust node"
+    );
+    assert!(
+        n_1cm * 100 >= cpp_nodes.len() * 99,
+        "only {n_1cm}/{} C++ nodes within 1 cm of Rust",
+        cpp_nodes.len()
+    );
+    assert!(
+        n_1mm * 100 >= cpp_nodes.len() * 98,
+        "only {n_1mm}/{} C++ nodes within 1 mm of Rust",
+        cpp_nodes.len()
+    );
 }
 
 #[test]

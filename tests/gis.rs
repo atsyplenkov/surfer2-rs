@@ -446,8 +446,7 @@ fn lake9706_load_and_skeleton() {
     assert_eq!(cyclomatic(&sk, 29), 0);
 }
 
-/// Progress gate: same node set and counts as C++ double interior; one ridge
-/// still differs (south-reflex flip). Exact topology is ignored below.
+/// Progress gate: same node set, counts, and topology as C++ double interior.
 #[test]
 fn lake9706_cpp_double_node_progress() {
     let obj_path = gis_root().join("lake9706-cpp-double.obj");
@@ -513,13 +512,11 @@ fn lake9706_cpp_double_node_progress() {
     let cpp_edges = edges_on_nodes(&cpp, &cpp_nodes, 1e-9).expect("cpp endpoints on unique-xy");
     let report = match_indexed_graphs(&rust_nodes, &rust_edges, &cpp_nodes, &cpp_edges, 0.15);
     eprintln!("lake9706 topology {}", report.detail);
-    assert_eq!(report.edges_only_a, 1, "{}", report.detail);
-    assert_eq!(report.edges_only_b, 1, "{}", report.detail);
+    assert!(report.ok, "{}", report.detail);
 }
 
-/// Exact 9706 topology vs C++ double. Pending the south-reflex flip.
+/// Exact 9706 topology vs C++ double.
 #[test]
-#[ignore = "one ridge still differs (south-reflex flip)"]
 fn lake9706_matches_cpp_double_interior() {
     let obj_path = gis_root().join("lake9706-cpp-double.obj");
     let text = std::fs::read_to_string(&obj_path).expect("cpp obj");
@@ -534,8 +531,8 @@ fn lake9706_matches_cpp_double_interior() {
     assert!(report.ok, "9706 graph topology: {}", report.detail);
 }
 
-/// Progress gate: C++ exact is 31330/31130 Euler 0. Counts and cyclomatic
-/// match; the south-reflex flip is the same 1/1 as lake9706.
+/// Progress gate: C++ exact is 31330/31130 Euler 0. Counts, cyclomatic,
+/// and topology match.
 #[test]
 fn lake10623_load_and_skeleton() {
     let obj_path = gis_root().join("lake10623-cpp-exact.obj");
@@ -610,14 +607,11 @@ fn lake10623_load_and_skeleton() {
     let cpp_edges = edges_on_nodes(&cpp, &cpp_nodes, 1e-9).expect("cpp endpoints on unique-xy");
     let report = match_indexed_graphs(&rust_nodes, &rust_edges, &cpp_nodes, &cpp_edges, 0.15);
     eprintln!("lake10623 topology {}", report.detail);
-    assert_eq!(report.edges_only_a, 1, "{}", report.detail);
-    assert_eq!(report.edges_only_b, 1, "{}", report.detail);
+    assert!(report.ok, "{}", report.detail);
 }
 
 /// Exact conformance: 31330 segments, cyclomatic 0, bidirectional graph match.
-/// Pending the south-reflex flip (same 1/1 as lake9706).
 #[test]
-#[ignore = "one ridge still differs (south-reflex flip)"]
 fn lake10623_matches_cpp_exact_interior() {
     let obj_path = gis_root().join("lake10623-cpp-exact.obj");
     let text = std::fs::read_to_string(&obj_path).expect("cpp exact obj");

@@ -34,10 +34,9 @@ upstream kinetic triangulation / wavefront propagation engine.
 
 Known parity gaps:
 
-- `lake9706` and `lake10623` each differ from the frozen C++ oracle by one
-  south-reflex ridge (same 1/1 topology delta). Segment counts, node counts,
-  and cyclomatic numbers match. A global “near-miss is a split” rule is
-  unsafe: lake10623 has 100+ other `tparam` near-misses that C++ flips.
+- `lake9706` and `lake10623` match the frozen C++ oracles (counts, nodes,
+  cyclomatic 0, topology). A global “near-miss is a split” rule is still
+  unsafe; the remaining catch-up is a 1e-4 s on-segment SOF after a late flip.
 - `issue2-minimal1` is 23 kinetic segments; C++ OBJ 25 is 23 arcs plus
   2 skip-∞ face chords (same family as spoke-1).
 - Additive GraphML `edge-weight-additive` is unsupported (upstream parses

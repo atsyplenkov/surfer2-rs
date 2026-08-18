@@ -9,6 +9,7 @@ use crate::error::PropagationError;
 use crate::event::{CollapseSpec, CollapseType};
 use crate::geometry::Point2;
 use crate::wavefront::edge::{EdgeId, WavefrontEdge};
+use crate::wavefront::supporting_line::SupportingLine;
 use crate::wavefront::vertex::{InfiniteSpeedType, VertexId, WavefrontVertex};
 
 new_key_type! { pub struct TriangleId; }
@@ -527,6 +528,17 @@ fn collapse_bounded_constrained_1(
     ) else {
         return Ok(CollapseSpec::never(t.component));
     };
+    // After a late flip the opposite vertex can already sit on the new
+    // constraint while a later det root hides the split. Catch up only
+    // when the hit is on-segment and at most 1e-4 s in the past.
+    if missed_on_segment_split(kt, t, c_idx, time_now) {
+        return Ok(CollapseSpec::with_edge(
+            t.component,
+            CollapseType::SplitOrFlipRefine,
+            time_now,
+            c_idx as i8,
+        ));
+    }
     // C++ WavefrontEdge::parallel_endpoints: ALWAYS or NEVER (collinear velocities).
     let edge =
         compute_edge_collapse_f64(v0.pos_zero, v0.velocity, v1.pos_zero, v1.velocity, time_now);
@@ -610,6 +622,72 @@ fn leftover_constraint_already_a_point(
     let p0 = v0.position_at(time_now);
     let p1 = v1.position_at(time_now);
     p0.x == p1.x && p0.y == p1.y
+}
+
+/// C++ `get_time_vertex_on_supporting_line`.
+fn time_vertex_on_supporting_line(v: &WavefrontVertex, e: SupportingLine) -> Option<f64> {
+    let nx = -e.direction.y;
+    let ny = e.direction.x;
+    let pqx = v.pos_zero.x - e.point.x;
+    let pqy = v.pos_zero.y - e.point.y;
+    let scaled_distance = pqx * nx + pqy * ny;
+    let scaled_edge_speed = e.weight * nx.hypot(ny);
+    let scaled_vertex_speed = v.velocity.x * nx + v.velocity.y * ny;
+    let approach = scaled_edge_speed - scaled_vertex_speed;
+    if approach == 0.0 {
+        return (scaled_distance == 0.0).then_some(f64::NEG_INFINITY);
+    }
+    Some(scaled_distance / approach)
+}
+
+/// Opposite vertex is on the constraint segment and the supporting-line
+/// hit was only a few microseconds earlier (lake south-reflex after the
+/// long-spoke flip).
+fn missed_on_segment_split(
+    kt: &KineticTriangulation,
+    t: &KineticTriangle,
+    c_idx: usize,
+    time_now: f64,
+) -> bool {
+    const LINE_HIT_SLOP: f64 = 1e-4;
+    let Some(vid) = t.vertices[c_idx] else {
+        return false;
+    };
+    let Some(v) = kt.vertices.get(vid) else {
+        return false;
+    };
+    if !v.is_reflex_or_straight() {
+        return false;
+    }
+    let Some(eid) = t.wavefronts[c_idx] else {
+        return false;
+    };
+    let Some(e) = kt.edges.get(eid) else {
+        return false;
+    };
+    let Some(tc) = time_vertex_on_supporting_line(v, e.supporting_line) else {
+        return false;
+    };
+    if tc.is_finite() && !(tc <= time_now && time_now - tc <= LINE_HIT_SLOP) {
+        return false;
+    }
+    let Some(va) = t.vertices[ccw(c_idx)] else {
+        return false;
+    };
+    let Some(vb) = t.vertices[cw(c_idx)] else {
+        return false;
+    };
+    let pos = v.position_at(time_now);
+    let posa = kt.vertices[va].position_at(time_now);
+    let posb = kt.vertices[vb].position_at(time_now);
+    let abx = posb.x - posa.x;
+    let aby = posb.y - posa.y;
+    let ab2 = abx * abx + aby * aby;
+    if !(ab2 > 0.0) {
+        return false;
+    }
+    let tparam = ((pos.x - posa.x) * abx + (pos.y - posa.y) * aby) / ab2;
+    (0.0..=1.0).contains(&tparam)
 }
 
 fn split_or_flip_from_det(
@@ -1039,5 +1117,38 @@ fn generic_collapse_time_3(
             }
         }
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn south_edge_line_hit_is_6us_before_det_root() {
+        // Input 445 vs south constraint 1386–1387. C++ line-hit is
+        // 23.173298; the triangle det root is 23.173305.
+        let sl = SupportingLine::from_segment(
+            Point2::new(539555.978609, 7037179.372629),
+            Point2::new(539580.372538, 7037179.372523),
+            1.0,
+        )
+        .unwrap();
+        let mut v = WavefrontVertex::new_kinetic(
+            Point2::new(539554.352973, 7037225.719239),
+            Point2::new(-0.08196974587509578, -0.9999999180436134),
+            0.0,
+            InfiniteSpeedType::None,
+        );
+        v.angle = crate::wavefront::vertex::AngleType::Reflex;
+        let tc = time_vertex_on_supporting_line(&v, sl).unwrap();
+        assert!((tc - 23.173298).abs() < 1e-5, "line-hit {tc}");
+        assert!(tc < 23.173305);
+        let pos = v.position_at(23.173305306854);
+        let a = Point2::new(539552.841229, 7037202.545948);
+        let b = Point2::new(539584.573643, 7037202.545810);
+        let ab2 = (b.x - a.x).hypot(b.y - a.y).powi(2);
+        let tparam = ((pos.x - a.x) * (b.x - a.x) + (pos.y - a.y) * (b.y - a.y)) / ab2;
+        assert!(tparam < 0.0, "first event stays off-segment tparam={tparam}");
     }
 }

@@ -1431,7 +1431,7 @@ fn input_edge_between(
         .map(|i| i as u32)
 }
 
-/// One unbounded triangle per CDT hull edge + a shared infinite vertex.
+/// One unbounded triangle per unique CDT hull edge + a shared infinite vertex.
 /// C++ `initialize_tds` copies infinite faces from the CDT.
 fn attach_unbounded_hull(
     kt: &mut KineticTriangulation,
@@ -1441,39 +1441,12 @@ fn attach_unbounded_hull(
 ) {
     use crate::triangulation::kinetic::{ccw, cw};
 
-    // Unconstrained CH edges need a neighbor into the ring; walking that
-    // neighbor merges interior/exterior sectors. Convex closed PSLGs only.
-    let unconstrained_ch = (0..tri_map.len()).any(|ti| {
-        let Some(tid) = tri_map[ti] else {
-            return false;
-        };
-        (0..3).any(|s| {
-            kt.triangles[tid].neighbors[s].is_none() && basic.constraints[ti][s].is_none() && {
-                let t = &kt.triangles[tid];
-                match (t.vertices[ccw(s)], t.vertices[cw(s)]) {
-                    (Some(a), Some(b)) => edge_on_point_set_hull(
-                        &basic.vertices,
-                        kt.vertices[a].pos_zero,
-                        kt.vertices[b].pos_zero,
-                    ),
-                    _ => false,
-                }
-            }
-        })
-    });
-    if unconstrained_ch {
-        return;
-    }
-
-    let mut seen: Vec<(u32, u32, TriangleId, usize, VertexId, VertexId)> = Vec::new();
-    let mut hull = Vec::new();
+    // Colinear CDT twins share endpoints and both lack a neighbor — not hull.
+    let mut seen: Vec<(u32, u32, TriangleId, usize, VertexId, VertexId, bool)> = Vec::new();
     for (ti, tid) in tri_map.iter().enumerate() {
         let Some(tid) = *tid else { continue };
         for s in 0..3 {
             if kt.triangles[tid].neighbors[s].is_some() {
-                continue;
-            }
-            if basic.constraints[ti][s].is_none() {
                 continue;
             }
             let t = &kt.triangles[tid];
@@ -1488,21 +1461,28 @@ fn attach_unbounded_hull(
                 (Some(ia), Some(ib)) => (ia.min(ib), ia.max(ib)),
                 _ => continue,
             };
+            let constrained = basic.constraints[ti][s].is_some();
             if let Some(idx) = seen.iter().position(|e| e.0 == ia && e.1 == ib) {
-                let (_, _, otid, os, _, _) = seen.swap_remove(idx);
-                kt.set_neighbor(tid, s, Some(otid), os);
+                // Two unconstrained sides, same endpoints: colinear CDT twins.
+                // Two constrained sides are interior/exterior of one PSLG edge.
+                if !constrained && !seen[idx].6 {
+                    let (_, _, otid, os, _, _, _) = seen.swap_remove(idx);
+                    kt.set_neighbor(tid, s, Some(otid), os);
+                }
             } else {
-                seen.push((ia, ib, tid, s, a, b));
+                seen.push((ia, ib, tid, s, a, b, constrained));
             }
         }
     }
-    for (_ia, _ib, tid, s, a, b) in seen {
+
+    let mut hull = Vec::new();
+    for (_ia, _ib, tid, s, a, b, constrained) in seen {
         let pa = kt.vertices[a].pos_zero;
         let pb = kt.vertices[b].pos_zero;
         if !edge_on_point_set_hull(&basic.vertices, pa, pb) {
             continue;
         }
-        hull.push((tid, s, a, b, kt.triangles[tid].component));
+        hull.push((tid, s, a, b, constrained, kt.triangles[tid].component));
     }
     if hull.is_empty() {
         return;
@@ -1528,11 +1508,14 @@ fn attach_unbounded_hull(
 
     // U: [∞, b, a] so hull side 0 has ccw=b, cw=a (exterior left of b→a).
     let mut ub = Vec::with_capacity(hull.len());
-    for (_ftid, _fs, a, b, _) in &hull {
-        let uid = kt.alloc_triangle(ub_comp);
+    for (ftid, fs, a, b, constrained, fcomp) in &hull {
+        let uid = kt.alloc_triangle(if *constrained { ub_comp } else { *fcomp });
         kt.set_vertex(uid, 0, inf_id);
         kt.set_vertex(uid, 1, *b);
         kt.set_vertex(uid, 2, *a);
+        if !*constrained {
+            kt.set_neighbor(*ftid, *fs, Some(uid), 0);
+        }
         ub.push(uid);
     }
 
@@ -1548,6 +1531,26 @@ fn attach_unbounded_hull(
             if kt.triangles[ub[j]].vertices[2] == Some(v) {
                 kt.set_neighbor(ub[i], 2, Some(ub[j]), 1);
                 break;
+            }
+        }
+    }
+
+    // C++ flood: unconstrained hull leaks one component around the infinite ring.
+    let mut changed = true;
+    while changed {
+        changed = false;
+        for &uid in &ub {
+            let nbs = kt.triangles[uid].neighbors;
+            let c = kt.triangles[uid].component;
+            if c == ub_comp {
+                continue;
+            }
+            for s in 0..3 {
+                let Some(nid) = nbs[s] else { continue };
+                if kt.triangles[nid].component == ub_comp {
+                    kt.triangles[nid].component = c;
+                    changed = true;
+                }
             }
         }
     }

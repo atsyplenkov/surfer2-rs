@@ -4,6 +4,9 @@ mod support;
 
 use std::path::{Path, PathBuf};
 
+use support::graph_match::{
+    bidirectional_proximity, edges_on_nodes, match_graphs, match_indexed_graphs,
+};
 use support::oracle::ObjSkeleton;
 use surfer2::{interior_straight_skeleton, Point2, Polygon, Skeleton};
 
@@ -136,6 +139,137 @@ fn public_api_surface_smoke() {
     assert_eq!(poly.vertices().len(), 4);
     let sk = interior_straight_skeleton(&poly).unwrap();
     assert_eq!(sk.finite_segments().count(), 4);
+}
+
+#[test]
+fn graph_matcher_permuted_triangle() {
+    let p = |x, y| Point2::new(x, y);
+    let a = [
+        (p(0.0, 0.0), p(1.0, 0.0)),
+        (p(1.0, 0.0), p(0.0, 1.0)),
+        (p(0.0, 1.0), p(0.0, 0.0)),
+    ];
+    let b = [
+        (p(0.0, 1.0), p(0.0, 0.0)),
+        (p(0.0, 0.0), p(1.0, 0.0)),
+        (p(1.0, 0.0), p(0.0, 1.0)),
+    ];
+    let r = match_graphs(&a, &b, 1e-9);
+    assert!(r.ok, "{}", r.detail);
+}
+
+#[test]
+fn graph_matcher_rejects_missing_edge_and_one_sided_proximity() {
+    let p = |x, y| Point2::new(x, y);
+    let a = [(p(0.0, 0.0), p(1.0, 0.0)), (p(1.0, 0.0), p(0.0, 1.0))];
+    let b = [(p(0.0, 0.0), p(1.0, 0.0))];
+    let r = match_graphs(&a, &b, 1e-9);
+    assert!(!r.ok);
+    assert!(r.detail.contains("segment count"));
+
+    let prox = bidirectional_proximity(&[p(0.0, 0.0), p(10.0, 0.0)], &[p(0.0, 0.0)]);
+    assert!(prox.max_a_to_b > 9.0);
+    assert!(prox.max_b_to_a < 1e-12);
+}
+
+#[test]
+fn graph_matcher_finds_nongreedy_bijection() {
+    // Greedy shortest-pair takes 0.11→0.1 and leaves 0 unmatched.
+    // Augmenting paths pair 0→0.1 and 0.11→0.2.
+    let a_nodes = [Point2::new(0.0, 0.0), Point2::new(0.11, 0.0)];
+    let b_nodes = [Point2::new(0.1, 0.0), Point2::new(0.2, 0.0)];
+    let edges = [(0, 1)];
+    let r = match_indexed_graphs(&a_nodes, &edges, &b_nodes, &edges, 0.11);
+    assert!(r.ok, "{}", r.detail);
+}
+
+#[test]
+fn graph_matcher_rejects_ambiguous_unmatchable_and_rewired() {
+    let a_nodes = [Point2::new(0.0, 0.0), Point2::new(1.0, 0.0)];
+    let b_nodes = [Point2::new(0.0, 0.0), Point2::new(10.0, 0.0)];
+    let edges = [(0, 1)];
+    let r = match_indexed_graphs(&a_nodes, &edges, &b_nodes, &edges, 0.11);
+    assert!(!r.ok);
+    assert!(r.detail.contains("correspondence"), "{}", r.detail);
+
+    // Same four nodes and four edges; last ridge is rewired.
+    let nodes = [
+        Point2::new(0.0, 0.0),
+        Point2::new(1.0, 0.0),
+        Point2::new(1.0, 1.0),
+        Point2::new(0.0, 1.0),
+    ];
+    let square = [(0, 1), (1, 2), (2, 3), (3, 0)];
+    let rewired = [(0, 1), (1, 2), (2, 3), (0, 2)];
+    let r = match_indexed_graphs(&nodes, &square, &nodes, &rewired, 1e-9);
+    assert!(!r.ok);
+    assert_eq!(r.edges_only_a, 1);
+    assert_eq!(r.edges_only_b, 1);
+
+    let segs = [(Point2::new(0.0, 0.0), Point2::new(10.0, 0.0))];
+    let near = [Point2::new(0.0, 0.0), Point2::new(0.0, 1.0)];
+    assert!(edges_on_nodes(&segs, &near, 0.1).is_err());
+}
+
+#[test]
+fn graph_matcher_accepts_ambiguous_star_self() {
+    let o = Point2::new(0.0, 0.0);
+    let nodes = [o, o, o];
+    let star = [(0, 1), (0, 2)];
+    let r = match_indexed_graphs(&nodes, &star, &nodes, &star, 0.1);
+    assert!(r.ok, "{}", r.detail);
+}
+
+#[test]
+fn graph_matcher_relabels_equivalent_stars() {
+    let nodes = [
+        Point2::new(0.0, 0.0),
+        Point2::new(1.0, 0.0),
+        Point2::new(2.0, 0.0),
+    ];
+    let star0 = [(0, 1), (0, 2)];
+    let star1 = [(1, 0), (1, 2)];
+    let r = match_indexed_graphs(&nodes, &star0, &nodes, &star1, 1.1);
+    assert!(r.ok, "{}", r.detail);
+}
+
+#[test]
+fn graph_matcher_couples_spatial_components_linked_by_edges() {
+    // Two spatial pairs (tol 0.15). Identity on the first pair makes the
+    // three cross edges disagree; swapping only that pair matches.
+    let nodes = [
+        Point2::new(0.0, 0.0),
+        Point2::new(0.1, 0.0),
+        Point2::new(100.0, 0.0),
+        Point2::new(100.1, 0.0),
+    ];
+    let a = [(0, 2), (0, 3), (1, 2)];
+    let b = [(0, 2), (1, 2), (1, 3)];
+    let r = match_indexed_graphs(&nodes, &a, &nodes, &b, 0.15);
+    assert!(r.ok, "{}", r.detail);
+}
+
+#[test]
+fn graph_matcher_solves_independent_ambiguous_stars() {
+    let mut nodes = Vec::new();
+    let mut edges = Vec::new();
+    for g in 0..3 {
+        let o = Point2::new(g as f64 * 100.0, 0.0);
+        let i = nodes.len();
+        nodes.extend([o, o, o]);
+        edges.push((i, i + 1));
+        edges.push((i, i + 2));
+    }
+    let r = match_indexed_graphs(&nodes, &edges, &nodes, &edges, 0.1);
+    assert!(r.ok, "{}", r.detail);
+}
+
+#[test]
+fn graph_matcher_nearest_is_unbounded() {
+    let far = [Point2::new(10_000.0, 0.0)];
+    let near = [Point2::new(0.0, 0.0), Point2::new(1.0, 0.0)];
+    let prox = bidirectional_proximity(&far, &near);
+    assert!((prox.max_a_to_b - 9999.0).abs() < 1e-6);
 }
 
 #[test]

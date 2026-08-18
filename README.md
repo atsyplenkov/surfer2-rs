@@ -42,8 +42,9 @@ Known parity gaps:
   another split/flip timing difference).
 - Additive GraphML `edge-weight-additive` is unsupported (upstream parses
   it and never applies it). Multiplicative `edge-weight` is implemented.
-- Offset contours are smoke-tested. Face-cycle walks are incomplete, so
-  they are not a C++ behavioral oracle.
+- Offset contours walk C++-style face cycles and are gated on a unit
+  square and a rectangle-with-hole. Broad C++ offset comparison (many
+  times, topology changes) is still open.
 
 The progress and ignored exact-conformance gates are in `tests/gis.rs`.
 Frozen C++ oracle provenance is documented in

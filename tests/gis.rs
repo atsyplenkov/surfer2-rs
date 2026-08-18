@@ -127,7 +127,18 @@ fn unit_square_interior_skeleton_smoke() {
     assert_eq!(sk.segment_count(), 4);
     assert_eq!(sk.node_count(), 5);
     assert_eq!(cyclomatic(&sk, 0), 0);
-    let _ = sk.offset(0.5).unwrap();
+    let offs = sk.offset(0.5).unwrap();
+    let contour = offs
+        .iter()
+        .find(|p| p.closed && p.points.len() >= 4)
+        .expect("unit square offset(0.5) should be a closed inset");
+    for q in &contour.points {
+        assert!(q.is_finite());
+        assert!(
+            q.x >= 0.5 - 1e-9 && q.x <= 1.5 + 1e-9 && q.y >= 0.5 - 1e-9 && q.y <= 1.5 + 1e-9,
+            "offset point {q:?} is not on the 0.5-inset of the 2×2 square"
+        );
+    }
 }
 
 #[test]
@@ -167,7 +178,47 @@ fn rectangle_with_hole_skeleton_and_offset_smoke() {
     let sk = interior_straight_skeleton(&poly).unwrap();
     assert!(sk.segment_count() > 4);
     assert_dcel_contract(&sk);
-    let _ = sk.offset(0.4).unwrap();
+    let offs = sk.offset(0.4).unwrap();
+    let closed: Vec<_> = offs
+        .iter()
+        .filter(|p| p.closed && p.points.len() >= 4)
+        .collect();
+    assert!(
+        !closed.is_empty(),
+        "rectangle-with-hole offset(0.4) should yield a closed contour"
+    );
+    // Wavefronts have not met: outer inset of the 6×6 and hole outset of [2,4]².
+    assert!(
+        closed.len() >= 2,
+        "expected outer inset and hole outset, got {}",
+        closed.len()
+    );
+    let mut saw_outer = false;
+    let mut saw_hole = false;
+    for p in &closed {
+        for q in &p.points {
+            assert!(q.is_finite());
+            assert!(q.x >= 0.0 && q.x <= 6.0 && q.y >= 0.0 && q.y <= 6.0);
+        }
+        let max_c = p
+            .points
+            .iter()
+            .map(|q| q.x.max(q.y))
+            .fold(f64::NEG_INFINITY, f64::max);
+        let min_c = p
+            .points
+            .iter()
+            .map(|q| q.x.min(q.y))
+            .fold(f64::INFINITY, f64::min);
+        if (max_c - 5.6).abs() < 1e-6 && (min_c - 0.4).abs() < 1e-6 {
+            saw_outer = true;
+        }
+        if (max_c - 4.4).abs() < 1e-6 && (min_c - 1.6).abs() < 1e-6 {
+            saw_hole = true;
+        }
+    }
+    assert!(saw_outer, "missing 0.4-inset of the outer 6×6");
+    assert!(saw_hole, "missing 0.4-outset of the 2–4 hole");
 }
 
 fn assert_dcel_contract(sk: &Skeleton) {
@@ -177,7 +228,11 @@ fn assert_dcel_contract(sk: &Skeleton) {
     for (i, he) in sk.halfedges().iter().enumerate() {
         let twin = he.twin.0 as usize;
         assert!(twin < n, "twin out of range at {i}");
-        assert_eq!(sk.halfedges()[twin].twin.0 as usize, i, "twin reciprocity {i}");
+        assert_eq!(
+            sk.halfedges()[twin].twin.0 as usize,
+            i,
+            "twin reciprocity {i}"
+        );
         let next = he.next.0 as usize;
         let prev = he.prev.0 as usize;
         assert!(next < n && prev < n, "next/prev out of range at {i}");

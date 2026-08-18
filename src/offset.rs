@@ -27,7 +27,7 @@ pub fn offset(skeleton: &Skeleton, time: f64) -> Result<Vec<OffsetPolyline>, Ske
         return Ok(vec![]);
     }
 
-    let mut polylines = Vec::new();
+    let mut chains: Vec<(usize, Vec<Point2>)> = Vec::new();
 
     for (fi, face) in skeleton.faces().iter().enumerate() {
         let Some(start_he) = face.halfedge else {
@@ -54,20 +54,76 @@ pub fn offset(skeleton: &Skeleton, time: f64) -> Result<Vec<OffsetPolyline>, Ske
             he_id = next;
         }
         if pts.len() >= 2 {
-            let closed = pts.first() == pts.last() || pts.len() >= 3;
-            if closed && pts.first() != pts.last() {
-                pts.push(pts[0]);
-            }
-            polylines.push(OffsetPolyline {
-                points: pts,
-                closed,
-                face: fi,
-                time,
-            });
+            chains.push((fi, pts));
         }
     }
 
-    Ok(polylines)
+    Ok(stitch_offset_chains(chains, time))
+}
+
+fn stitch_offset_chains(chains: Vec<(usize, Vec<Point2>)>, time: f64) -> Vec<OffsetPolyline> {
+    let n = chains.len();
+    if n == 0 {
+        return Vec::new();
+    }
+    let mut used = vec![false; n];
+    let mut out = Vec::new();
+
+    for i in 0..n {
+        if used[i] {
+            continue;
+        }
+        used[i] = true;
+        let face = chains[i].0;
+        let mut pts = chains[i].1.clone();
+        let mut grew = true;
+        while grew {
+            grew = false;
+            for j in 0..n {
+                if used[j] {
+                    continue;
+                }
+                let c = &chains[j].1;
+                let Some(&head) = pts.first() else { break };
+                let Some(&tail) = pts.last() else { break };
+                if tail == c[0] {
+                    pts.extend(c.iter().copied().skip(1));
+                } else if tail == *c.last().unwrap() {
+                    pts.extend(c.iter().rev().copied().skip(1));
+                } else if head == *c.last().unwrap() {
+                    let mut prefix: Vec<Point2> = c[..c.len() - 1].to_vec();
+                    prefix.append(&mut pts);
+                    pts = prefix;
+                } else if head == c[0] {
+                    let mut prefix: Vec<Point2> = c.iter().skip(1).rev().copied().collect();
+                    prefix.append(&mut pts);
+                    pts = prefix;
+                } else {
+                    continue;
+                }
+                used[j] = true;
+                grew = true;
+            }
+        }
+        if pts.len() < 2 {
+            continue;
+        }
+        if pts.len() >= 3 && pts.first() != pts.last() {
+            if let (Some(&a), Some(&b)) = (pts.first(), pts.last()) {
+                if a == b || a.distance_to(b) <= 1e-12 {
+                    pts.push(pts[0]);
+                }
+            }
+        }
+        let closed = pts.len() >= 3 && pts.first() == pts.last();
+        out.push(OffsetPolyline {
+            points: pts,
+            closed,
+            face,
+            time,
+        });
+    }
+    out
 }
 
 fn intersect_arc_at_time(

@@ -51,7 +51,7 @@ This session:
 | convex03/04/07/19 | 3/5/11/35 | same | locked; AllSequential now has unbounded faces (exterior is rays) |
 | spoke-1 **interior** (`Index(0)`) | **16** | 16 | done |
 | spoke-1 both (`AllSequential`) | **22** | 26 OBJ / 22 kinetic | 4 extra OBJ edges are skip-∞ face chords |
-| spoke-2 / spoke-3 | 22 / 24 | 26 / 26 | same class |
+| spoke-2 / spoke-3 | **22** / **22** | 26 OBJ | leave-CH at `-0.0` was a flip loop; locked |
 | iso-simple-3 | **13** | 13 | locked; old 19 was pre-attach |
 | issue2-minimal1 | **24** | 25 remembered | 1 off; likely OBJ skip-∞. Interior 20 |
 | lake9706 / 10623 | ignored | 4372 / 31330 segs | still incomplete |

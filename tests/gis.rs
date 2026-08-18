@@ -138,7 +138,6 @@ fn public_api_surface_smoke() {
 }
 
 #[test]
-#[ignore = "engine incomplete: lake9706 not yet at acceptance counts"]
 fn lake9706_load_and_skeleton() {
     let p = gis_root().join("lake9706.json");
     let poly = load_geojson_polygon(&p).expect("load 9706");
@@ -150,24 +149,19 @@ fn lake9706_load_and_skeleton() {
     assert_eq!(poly.hole_count(), 29);
     assert!(poly.vertices().len() >= 2144 && poly.vertices().len() <= 2174);
 
-    match interior_straight_skeleton(&poly, KernelMode::Fast) {
-        Ok(sk) => {
-            let nseg = sk.segment_count();
-            let nnode = sk.node_count();
-            let len = sk.total_finite_length();
-            eprintln!("lake9706 segs={nseg} nodes={nnode} len={len}");
-            if nseg == 4372 {
-                assert_eq!(nnode, 4344);
-                assert!((len - 342587.19566660019).abs() < 1.0);
-                assert_eq!(cyclomatic(&sk, 29), 0);
-            }
-        }
-        Err(e) => eprintln!("lake9706 WIP: {e}"),
-    }
+    let sk = interior_straight_skeleton(&poly, KernelMode::Fast).expect("lake9706");
+    let nseg = sk.segment_count();
+    let nnode = sk.node_count();
+    let len = sk.total_finite_length();
+    eprintln!("lake9706 segs={nseg} nodes={nnode} len={len}");
+    assert_eq!(nseg, 4372);
+    assert_eq!(nnode, 4344);
+    assert!((len - 342587.19566660019).abs() < 1.0);
+    assert_eq!(cyclomatic(&sk, 29), 0);
 }
 
 /// Frozen C++ double `--component=1` OBJ vs Rust interior skeleton.
-/// Locks the graph we measured: same ridge map, one seg short, junctions overlap.
+/// Locks the graph we measured: same ridge map as C++ double interior OBJ.
 #[test]
 fn lake9706_matches_cpp_double_interior() {
     let obj_path = gis_root().join("lake9706-cpp-double.obj");
@@ -187,7 +181,7 @@ fn lake9706_matches_cpp_double_interior() {
     let rust_nodes = unique_xy(rust.iter().flat_map(|s| [s.start, s.end]));
 
     assert!(
-        (rust.len() as i64 - 4372).abs() <= 1,
+        rust.len() == 4372,
         "rust segs {} vs cpp 4372",
         rust.len()
     );

@@ -2081,9 +2081,21 @@ fn raw_flip(
         (t.vertices[side].unwrap(), n.vertices[nidx].unwrap())
     };
 
-    // vertices[ccw(idx)] = o; n->vertices[ccw(nidx)] = v
-    kt.set_vertex(tid, ccw(side), o);
-    kt.set_vertex(ntid, ccw(nidx), v);
+    // C++ do_raw_flip_inner assigns vertices[] directly — not set_vertex,
+    // which rewrites wavefront endpoints on sides that are about to move.
+    let inf = kt.infinite_vertex;
+    {
+        let t = kt.triangles.get_mut(tid).unwrap();
+        t.vertices[ccw(side)] = Some(o);
+        t.is_unbounded = inf.is_some() && t.vertices.iter().any(|x| *x == inf);
+        t.invalidate_collapse();
+    }
+    {
+        let n = kt.triangles.get_mut(ntid).unwrap();
+        n.vertices[ccw(nidx)] = Some(v);
+        n.is_unbounded = inf.is_some() && n.vertices.iter().any(|x| *x == inf);
+        n.invalidate_collapse();
+    }
 
     let (t_nb_cw, t_wf_cw, n_nb_cw, n_wf_cw) = {
         let t = &kt.triangles[tid];

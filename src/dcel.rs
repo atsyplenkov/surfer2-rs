@@ -11,6 +11,7 @@ use std::collections::HashMap;
 use crate::error::SkeletonError;
 use crate::geometry::{Point2, Ray2, Segment2};
 use crate::triangulation::kinetic::KineticTriangulation;
+use crate::wavefront::vertex::VertexId;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NodeId(pub u32);
@@ -63,6 +64,8 @@ pub struct SkeletonSegment {
     pub component: usize,
     pub left_face: usize,
     pub right_face: usize,
+    start_node: NodeId,
+    end_node: NodeId,
 }
 
 #[derive(Debug, Clone)]
@@ -128,9 +131,8 @@ impl Skeleton {
     pub fn node_count(&self) -> usize {
         let mut seen = std::collections::HashSet::new();
         for s in self.finite_segments() {
-            for p in [s.start, s.end] {
-                seen.insert(node_grid(p));
-            }
+            seen.insert(s.start_node.0);
+            seen.insert(s.end_node.0);
         }
         seen.len()
     }
@@ -153,8 +155,9 @@ impl Skeleton {
 }
 
 pub fn build_dcel(kt: &KineticTriangulation) -> Result<Skeleton, SkeletonError> {
+    let mut uf = EndpointUf::from_links(kt);
     let mut nodes: Vec<Node> = Vec::new();
-    let mut node_key: HashMap<((u64, u64), u64), u32> = HashMap::new();
+    let mut root_node: HashMap<EndKey, u32> = HashMap::new();
 
     let mut faces: Vec<Face> = kt
         .faces
@@ -186,8 +189,22 @@ pub fn build_dcel(kt: &KineticTriangulation) -> Result<Skeleton, SkeletonError> 
         let v1 = &kt.vertices[e.endpoints[1]];
         let p0 = v0.pos_zero;
         let p1 = v1.pos_zero;
-        let n0 = ensure_node(&mut nodes, &mut node_key, p0, 0.0);
-        let n1 = ensure_node(&mut nodes, &mut node_key, p1, 0.0);
+        let n0 = ensure_node(
+            &mut uf,
+            &mut nodes,
+            &mut root_node,
+            EndKey::start(e.endpoints[0]),
+            p0,
+            0.0,
+        );
+        let n1 = ensure_node(
+            &mut uf,
+            &mut nodes,
+            &mut root_node,
+            EndKey::start(e.endpoints[1]),
+            p1,
+            0.0,
+        );
         let face = FaceId(e.skeleton_face);
         let he = halfedges.len() as u32;
         let twin = he + 1;
@@ -224,8 +241,9 @@ pub fn build_dcel(kt: &KineticTriangulation) -> Result<Skeleton, SkeletonError> 
 
         match (arc.end, arc.end_time) {
             (Some(end), Some(et)) => {
-                let n0 = ensure_node(&mut nodes, &mut node_key, arc.start, arc.start_time);
-                let n1 = ensure_node(&mut nodes, &mut node_key, end, et);
+                let (k0, k1) = arc_keys(arc);
+                let n0 = ensure_node(&mut uf, &mut nodes, &mut root_node, k0, arc.start, arc.start_time);
+                let n1 = ensure_node(&mut uf, &mut nodes, &mut root_node, k1, end, et);
                 let he = halfedges.len() as u32;
                 let twin = he + 1;
                 let seg = Segment2::new(arc.start, end);
@@ -256,11 +274,20 @@ pub fn build_dcel(kt: &KineticTriangulation) -> Result<Skeleton, SkeletonError> 
                         component: arc.component.max(0) as usize,
                         left_face: left.0 as usize,
                         right_face: right.0 as usize,
+                        start_node: n0,
+                        end_node: n1,
                     });
                 }
             }
             (None, _) | (_, None) => {
-                let n0 = ensure_node(&mut nodes, &mut node_key, arc.start, arc.start_time);
+                let n0 = ensure_node(
+                    &mut uf,
+                    &mut nodes,
+                    &mut root_node,
+                    arc_keys(arc).0,
+                    arc.start,
+                    arc.start_time,
+                );
                 let inf_id = NodeId(nodes.len() as u32);
                 nodes.push(Node {
                     point: None,
@@ -315,24 +342,115 @@ pub fn build_dcel(kt: &KineticTriangulation) -> Result<Skeleton, SkeletonError> 
     })
 }
 
-// ponytail: 5 mm grid matches lake cyclomatic; chain-walk if closer junctions must stay split
-fn node_grid(p: Point2) -> (i64, i64) {
-    (
-        (p.x * 200.0).round() as i64,
-        (p.y * 200.0).round() as i64,
-    )
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+struct EndKey {
+    v: u64,
+    end: u8, // 0 start, 1 stop
+}
+
+impl EndKey {
+    fn start(v: VertexId) -> Self {
+        Self {
+            v: slotmap_key(v),
+            end: 0,
+        }
+    }
+    fn stop(v: VertexId) -> Self {
+        Self {
+            v: slotmap_key(v),
+            end: 1,
+        }
+    }
+    fn unique(tag: u64) -> Self {
+        Self { v: tag, end: 2 }
+    }
+}
+
+fn slotmap_key(v: VertexId) -> u64 {
+    use slotmap::Key;
+    v.data().as_ffi()
+}
+
+struct EndpointUf {
+    parent: HashMap<EndKey, EndKey>,
+    uniq: u64,
+}
+
+impl EndpointUf {
+    fn from_links(kt: &KineticTriangulation) -> Self {
+        let mut uf = Self {
+            parent: HashMap::new(),
+            uniq: 0,
+        };
+        for (id, v) in &kt.vertices {
+            for side in 0..2 {
+                if let Some(n) = v.next_vertex[side] {
+                    let nv = &kt.vertices[n];
+                    if nv.prev_vertex[side] == Some(id) || nv.next_vertex[1 - side] != Some(id) {
+                        // head-to-tail (default if reciprocal next is unset)
+                        uf.union(EndKey::stop(id), EndKey::start(n));
+                    }
+                    if nv.next_vertex[1 - side] == Some(id) {
+                        uf.union(EndKey::stop(id), EndKey::stop(n));
+                    }
+                }
+                if let Some(p) = v.prev_vertex[side] {
+                    if kt.vertices[p].prev_vertex[1 - side] == Some(id) {
+                        uf.union(EndKey::start(id), EndKey::start(p));
+                    }
+                }
+            }
+        }
+        uf
+    }
+
+    fn find(&mut self, k: EndKey) -> EndKey {
+        let p = *self.parent.entry(k).or_insert(k);
+        if p != k {
+            let r = self.find(p);
+            self.parent.insert(k, r);
+            r
+        } else {
+            k
+        }
+    }
+
+    fn union(&mut self, a: EndKey, b: EndKey) {
+        let ra = self.find(a);
+        let rb = self.find(b);
+        if ra != rb {
+            self.parent.insert(ra, rb);
+        }
+    }
+
+    fn fresh(&mut self) -> EndKey {
+        self.uniq += 1;
+        EndKey::unique(self.uniq)
+    }
+}
+
+fn arc_keys(arc: &crate::triangulation::kinetic::ArcRecord) -> (EndKey, EndKey) {
+    match arc.vertex {
+        Some(v) => (EndKey::start(v), EndKey::stop(v)),
+        None => (EndKey::unique(0), EndKey::unique(0)),
+    }
 }
 
 fn ensure_node(
+    uf: &mut EndpointUf,
     nodes: &mut Vec<Node>,
-    node_key: &mut HashMap<((u64, u64), u64), u32>,
+    root_node: &mut HashMap<EndKey, u32>,
+    key: EndKey,
     p: Point2,
     time: f64,
 ) -> NodeId {
-    let _ = time;
-    let g = node_grid(p);
-    let key = ((g.0 as u64, g.1 as u64), 0);
-    if let Some(&i) = node_key.get(&key) {
+    let key = if key.end == 2 && key.v == 0 {
+        uf.fresh()
+    } else {
+        key
+    };
+    let r = uf.find(key);
+    if let Some(&i) = root_node.get(&r) {
         return NodeId(i);
     }
     let id = nodes.len() as u32;
@@ -341,7 +459,7 @@ fn ensure_node(
         time,
         is_infinite: false,
     });
-    node_key.insert(key, id);
+    root_node.insert(r, id);
     NodeId(id)
 }
 

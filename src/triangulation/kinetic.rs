@@ -102,6 +102,8 @@ pub struct ArcRecord {
     pub right_face: u32,
     pub component: i32,
     pub from_input_edge: bool,
+    /// Kinetic vertex that traced this arc; DCEL node identity walks its links.
+    pub vertex: Option<VertexId>,
 }
 
 #[derive(Debug, Default)]
@@ -261,6 +263,7 @@ impl KineticTriangulation {
             right_face,
             component: 0,
             from_input_edge: false,
+            vertex: Some(v),
         });
         Ok(())
     }

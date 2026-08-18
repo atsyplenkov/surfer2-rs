@@ -182,7 +182,6 @@ impl Propagator {
         if self.finalized {
             return Ok(());
         }
-        self.stitch_orphan_stops()?;
         let mut used = std::collections::HashSet::new();
         for t in self.kt.triangles.values() {
             for v in t.vertices.into_iter().flatten() {
@@ -223,6 +222,7 @@ impl Propagator {
                     right_face: faces[1],
                     component: 0,
                     from_input_edge: false,
+                    vertex: Some(vid),
                 });
                 let _ = vel;
                 if let Some(vv) = self.kt.vertices.get_mut(vid) {
@@ -281,12 +281,8 @@ impl Propagator {
     ) -> Result<(), SkeletonError> {
         use crate::triangulation::kinetic::{ccw, cw};
 
-        if let Some(tr) = self.kt.triangles.get_mut(tid) {
-            tr.set_dying();
-        }
         let time = spec.time;
-        // Stop all three vertices first.
-        let verts: [_; 3] = {
+        let verts = {
             let t = &self.kt.triangles[tid];
             [
                 t.vertices[0].unwrap(),
@@ -294,24 +290,40 @@ impl Propagator {
                 t.vertices[2].unwrap(),
             ]
         };
+        if let Some(tr) = self.kt.triangles.get_mut(tid) {
+            tr.set_dying();
+        }
         for &v in &verts {
             self.kt.stop_vertex(v, time)?;
         }
 
-        // Per side: constraint dies, or spoke → part2 on neighbor.
+        // Per side: constraint dies (C++ head-to-head next), or spoke → part2.
         for i in 0..3 {
             let (is_const, nb, eid) = {
                 let t = &self.kt.triangles[tid];
                 (t.wavefronts[i].is_some(), t.neighbors[i], t.wavefronts[i])
             };
             if is_const {
+                let a = verts[cw(i)];
+                let b = verts[ccw(i)];
+                let pa = self.kt.vertices[a]
+                    .pos_stop
+                    .unwrap_or_else(|| self.kt.vertices[a].position_at(time));
+                let pb = self.kt.vertices[b]
+                    .pos_stop
+                    .unwrap_or_else(|| self.kt.vertices[b].position_at(time));
+                if pa.distance_to(pb) <= 1e-6 {
+                    self.set_next_vertex(a, 0, b, false);
+                } else {
+                    self.spawn_child_to_neighbor(a, time);
+                    self.spawn_child_to_neighbor(b, time);
+                }
                 if let Some(e) = eid {
                     if let Some(edge) = self.kt.edges.get_mut(e) {
                         edge.dead = true;
                     }
                 }
             } else if let Some(nid) = nb {
-                // Disconnect and run spoke part2 on neighbor.
                 let idx_in_n = (0..3)
                     .find(|&s| self.kt.triangles[nid].neighbors[s] == Some(tid))
                     .ok_or_else(|| crate::error::PropagationError::TopologyInvariant {
@@ -326,7 +338,6 @@ impl Propagator {
                 }
                 self.spoke_collapse_part2(nid, idx_in_n, time)?;
             }
-            let _ = (ccw(i), cw(i));
         }
 
         self.queue.needs_dropping(self.kt.triangles[tid].tidx)?;
@@ -353,6 +364,17 @@ impl Propagator {
             (va, vb, left_sl, right_sl)
         };
         self.stop_collapse_pair(va, vb, spec.time)?;
+        let (pa, pb) = {
+            let a = &self.kt.vertices[va];
+            let b = &self.kt.vertices[vb];
+            (
+                a.pos_stop.unwrap_or_else(|| a.position_at(spec.time)),
+                b.pos_stop.unwrap_or_else(|| b.position_at(spec.time)),
+            )
+        };
+        if pa.distance_to(pb) <= 1e-6 {
+            self.set_next_vertex(va, 1, vb, false);
+        }
         if let Some(tr) = self.kt.triangles.get_mut(tid) {
             tr.set_dying();
         }
@@ -476,6 +498,11 @@ impl Propagator {
                     }
                     self.spoke_collapse_part2(nid, idx_in_n, time)?;
                 } else if let Some(eid) = self.kt.triangles[tid].wavefronts[edge] {
+                    let (a, b) = {
+                        let t = &self.kt.triangles[tid];
+                        (t.vertices[ccw(edge)].unwrap(), t.vertices[cw(edge)].unwrap())
+                    };
+                    self.set_next_vertex(a, 1, b, false);
                     if let Some(e) = self.kt.edges.get_mut(eid) {
                         e.dead = true;
                     }
@@ -903,81 +930,94 @@ impl Propagator {
         Ok(self.kt.vertices.insert(nv))
     }
 
-    /// A reflex that dies with no successor still shares a split wavefront
-    /// with the child born at that instant (lake 0.40 m S1–S0).
-    fn stitch_orphan_stops(&mut self) -> Result<(), SkeletonError> {
-        let mut min_x = f64::INFINITY;
-        let mut min_y = f64::INFINITY;
-        let mut max_x = f64::NEG_INFINITY;
-        let mut max_y = f64::NEG_INFINITY;
-        for v in self.kt.vertices.values() {
-            if !v.is_initial {
-                continue;
+    /// C++ `make_vertex` after a reflex stop: child is born at the parent
+    /// stop and dies at the same-time split neighbour (the 0.40 m ridge).
+    fn spawn_child_to_neighbor(&mut self, vid: VertexId, time: f64) {
+        let (pstop, inc, already) = {
+            let v = &self.kt.vertices[vid];
+            if v.next_vertex != [None, None] {
+                return;
             }
-            min_x = min_x.min(v.pos_zero.x);
-            min_y = min_y.min(v.pos_zero.y);
-            max_x = max_x.max(v.pos_zero.x);
-            max_y = max_y.max(v.pos_zero.y);
-        }
-        let max_gap = (max_x - min_x).hypot(max_y - min_y) * 1e-4;
-        let ids: Vec<_> = self.kt.vertices.keys().collect();
-        for vid in ids {
-            if self.kt.infinite_vertex == Some(vid) {
+            let Some(pstop) = v.pos_stop else { return };
+            (pstop, v.incident_edges, false)
+        };
+        let _ = already;
+        for eid in inc.into_iter().flatten() {
+            let e = &self.kt.edges[eid];
+            let other = if e.endpoints[0] == vid {
+                e.endpoints[1]
+            } else if e.endpoints[1] == vid {
+                e.endpoints[0]
+            } else {
                 continue;
-            }
-            let (tstop, pstop, inc) = {
-                let v = &self.kt.vertices[vid];
-                if !v.is_initial || v.next_vertex != [None, None] {
-                    continue;
-                }
-                let Some(tstop) = v.time_stop else { continue };
-                if !tstop.is_finite() {
-                    continue;
-                }
-                let Some(pstop) = v.pos_stop else { continue };
-                (tstop, pstop, v.incident_edges)
             };
-            for eid in inc.into_iter().flatten() {
-                let e = &self.kt.edges[eid];
-                let other = if e.endpoints[0] == vid {
-                    e.endpoints[1]
-                } else {
-                    e.endpoints[0]
-                };
+            let (w_init, w_t0, w_start) = {
                 let w = &self.kt.vertices[other];
-                if w.is_initial {
+                (w.is_initial, w.time_start, w.pos_start)
+            };
+            if w_init {
+                continue;
+            }
+            if (w_t0 - time).abs() > 1e-9 * (1.0 + time.abs()) {
+                continue;
+            }
+            let d = pstop.distance_to(w_start);
+            if d <= 1e-9 {
+                continue;
+            }
+            let mut min_x = f64::INFINITY;
+            let mut min_y = f64::INFINITY;
+            let mut max_x = f64::NEG_INFINITY;
+            let mut max_y = f64::NEG_INFINITY;
+            for iv in self.kt.vertices.values() {
+                if !iv.is_initial {
                     continue;
                 }
-                if (w.time_start - tstop).abs() > 1e-9 * (1.0 + tstop.abs()) {
-                    continue;
-                }
-                let d = pstop.distance_to(w.pos_start);
-                if d <= 1e-9 || d > max_gap {
-                    continue;
-                }
-                let faces = [
-                    e.skeleton_face,
-                    w.incident_edges[0]
-                        .and_then(|x| self.kt.edges.get(x).map(|ed| ed.skeleton_face))
-                        .unwrap_or(e.skeleton_face),
-                ];
-                self.kt.arcs.push(crate::triangulation::kinetic::ArcRecord {
-                    start: pstop,
-                    end: Some(w.pos_start),
-                    start_time: tstop,
-                    end_time: Some(w.time_start),
-                    left_face: faces[0],
-                    right_face: faces[1],
-                    component: 0,
-                    from_input_edge: false,
-                });
-                if let Some(vv) = self.kt.vertices.get_mut(vid) {
-                    vv.next_vertex[0] = Some(other);
-                }
-                break;
+                min_x = min_x.min(iv.pos_zero.x);
+                min_y = min_y.min(iv.pos_zero.y);
+                max_x = max_x.max(iv.pos_zero.x);
+                max_y = max_y.max(iv.pos_zero.y);
+            }
+            let max_gap = (max_x - min_x).hypot(max_y - min_y) * 1e-4;
+            if d > max_gap {
+                continue;
+            }
+            let ang = self.kt.vertices[vid].angle;
+            let mut nv = WavefrontVertex::new_kinetic(
+                pstop,
+                Point2::new(0.0, 0.0),
+                time,
+                InfiniteSpeedType::None,
+            );
+            nv.pos_start = pstop;
+            nv.angle = ang;
+            nv.incident_edges = inc;
+            let child = self.kt.vertices.insert(nv);
+            let _ = self.kt.stop_vertex_at(child, time, w_start);
+            self.set_next_vertex(vid, 0, child, true);
+            self.set_next_vertex(child, 0, other, true);
+            break;
+        }
+    }
+
+    /// C++ `WavefrontVertex::set_next_vertex`.
+    fn set_next_vertex(&mut self, v: VertexId, side: usize, next: VertexId, head_to_tail: bool) {
+        if let Some(vv) = self.kt.vertices.get_mut(v) {
+            if vv.next_vertex[side].is_none() {
+                vv.next_vertex[side] = Some(next);
             }
         }
-        Ok(())
+        if head_to_tail {
+            if let Some(n) = self.kt.vertices.get_mut(next) {
+                if n.prev_vertex[side].is_none() {
+                    n.prev_vertex[side] = Some(v);
+                }
+            }
+        } else if let Some(n) = self.kt.vertices.get_mut(next) {
+            if n.next_vertex[1 - side].is_none() {
+                n.next_vertex[1 - side] = Some(v);
+            }
+        }
     }
 
     /// C++ `va.pos_stop == vb.pos_stop`. A degenerate newborn otherwise
@@ -1099,6 +1139,11 @@ impl Propagator {
                 }
             }
             for s in 0..3 {
+                let (a, b) = {
+                    let t = &self.kt.triangles[tid];
+                    (t.vertices[s].unwrap(), t.vertices[cw(s)].unwrap())
+                };
+                self.set_next_vertex(a, 0, b, false);
                 if let Some(eid) = self.kt.triangles[tid].wavefronts[s] {
                     if let Some(e) = self.kt.edges.get_mut(eid) {
                         e.dead = true;
@@ -1173,6 +1218,8 @@ impl Propagator {
             self.kt.stop_vertex(v_ccw, time)?;
             let p = self.kt.vertices[v_cw].pos_stop.unwrap_or(pcw);
             self.kt.stop_vertex_at(v, time, p)?;
+            self.set_next_vertex(v, 0, v_cw, false);
+            self.set_next_vertex(v, 1, v_ccw, false);
             for s in [cw(vidx), ccw(vidx)] {
                 if let Some(eid) = self.kt.triangles[tid].wavefronts[s] {
                     if let Some(e) = self.kt.edges.get_mut(eid) {
@@ -1213,6 +1260,7 @@ impl Propagator {
             .pos_stop
             .unwrap_or_else(|| self.kt.vertices[o].position_at(time));
         self.kt.stop_vertex_at(v, time, p)?;
+        self.set_next_vertex(v, if o == v_ccw { 1 } else { 0 }, o, false);
         let (left_sl, right_sl) = {
             let t = &self.kt.triangles[tid];
             (

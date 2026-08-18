@@ -862,7 +862,8 @@ fn vertex_leaves_ch(
         return None;
     }
     let tc = dist / approach;
-    if tc >= time_now {
+    // `-0.0 >= 0.0` is true; already-on-line is not a future leave (C++ NEVER).
+    if tc > time_now {
         Some(tc)
     } else {
         None
@@ -886,11 +887,8 @@ fn generic_collapse_time_3(
     );
     match det.degree() {
         0 => {
-            if det.c[0] == 0.0 {
-                Some(time_now)
-            } else {
-                None
-            }
+            // Always-colinear CH triple: they are not leaving (C++ NEVER).
+            None
         }
         1 => {
             if det.c[1] == 0.0 {

@@ -182,6 +182,7 @@ impl Propagator {
         if self.finalized {
             return Ok(());
         }
+        self.stitch_orphan_stops()?;
         let mut used = std::collections::HashSet::new();
         for t in self.kt.triangles.values() {
             for v in t.vertices.into_iter().flatten() {
@@ -900,6 +901,83 @@ impl Propagator {
         nv.angle = ang;
         nv.incident_edges = [a, b];
         Ok(self.kt.vertices.insert(nv))
+    }
+
+    /// A reflex that dies with no successor still shares a split wavefront
+    /// with the child born at that instant (lake 0.40 m S1–S0).
+    fn stitch_orphan_stops(&mut self) -> Result<(), SkeletonError> {
+        let mut min_x = f64::INFINITY;
+        let mut min_y = f64::INFINITY;
+        let mut max_x = f64::NEG_INFINITY;
+        let mut max_y = f64::NEG_INFINITY;
+        for v in self.kt.vertices.values() {
+            if !v.is_initial {
+                continue;
+            }
+            min_x = min_x.min(v.pos_zero.x);
+            min_y = min_y.min(v.pos_zero.y);
+            max_x = max_x.max(v.pos_zero.x);
+            max_y = max_y.max(v.pos_zero.y);
+        }
+        let max_gap = (max_x - min_x).hypot(max_y - min_y) * 1e-4;
+        let ids: Vec<_> = self.kt.vertices.keys().collect();
+        for vid in ids {
+            if self.kt.infinite_vertex == Some(vid) {
+                continue;
+            }
+            let (tstop, pstop, inc) = {
+                let v = &self.kt.vertices[vid];
+                if !v.is_initial || v.next_vertex != [None, None] {
+                    continue;
+                }
+                let Some(tstop) = v.time_stop else { continue };
+                if !tstop.is_finite() {
+                    continue;
+                }
+                let Some(pstop) = v.pos_stop else { continue };
+                (tstop, pstop, v.incident_edges)
+            };
+            for eid in inc.into_iter().flatten() {
+                let e = &self.kt.edges[eid];
+                let other = if e.endpoints[0] == vid {
+                    e.endpoints[1]
+                } else {
+                    e.endpoints[0]
+                };
+                let w = &self.kt.vertices[other];
+                if w.is_initial {
+                    continue;
+                }
+                if (w.time_start - tstop).abs() > 1e-9 * (1.0 + tstop.abs()) {
+                    continue;
+                }
+                let d = pstop.distance_to(w.pos_start);
+                if d <= 1e-9 || d > max_gap {
+                    continue;
+                }
+                let faces = [
+                    e.skeleton_face,
+                    w.incident_edges[0]
+                        .and_then(|x| self.kt.edges.get(x).map(|ed| ed.skeleton_face))
+                        .unwrap_or(e.skeleton_face),
+                ];
+                self.kt.arcs.push(crate::triangulation::kinetic::ArcRecord {
+                    start: pstop,
+                    end: Some(w.pos_start),
+                    start_time: tstop,
+                    end_time: Some(w.time_start),
+                    left_face: faces[0],
+                    right_face: faces[1],
+                    component: 0,
+                    from_input_edge: false,
+                });
+                if let Some(vv) = self.kt.vertices.get_mut(vid) {
+                    vv.next_vertex[0] = Some(other);
+                }
+                break;
+            }
+        }
+        Ok(())
     }
 
     /// C++ `va.pos_stop == vb.pos_stop`. A degenerate newborn otherwise

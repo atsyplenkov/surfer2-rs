@@ -126,6 +126,31 @@ fn oracle_bins_optional_presence() {
 }
 
 #[test]
+fn iso_simple3_and_issue2_counts() {
+    let cases = [
+        ("special-cases/iso-simple-3.graphml", 13),
+        ("issue2/issue2-minimal1.graphml", 24),
+    ];
+    for (rel, want) in cases {
+        let path = upstream_test_data().join(rel);
+        if !path.exists() {
+            continue;
+        }
+        let g = support::graphml::read_graphml_path(&path).unwrap();
+        let pslg = g.to_pslg().unwrap();
+        let sk = surfer2::straight_skeleton(
+            &pslg,
+            &surfer2::Options {
+                kernel: surfer2::KernelMode::Fast,
+                components: surfer2::ComponentMode::AllSequential,
+            },
+        )
+        .unwrap();
+        assert_eq!(sk.segment_count(), want, "{rel} nodes={}", sk.node_count());
+    }
+}
+
+#[test]
 fn spoke1() {
     let path = upstream_test_data().join("special-cases/spoke-1.graphml");
     if !path.exists() {
@@ -147,13 +172,18 @@ fn spoke1() {
         sk.segment_count(),
         sk.node_count()
     );
-    // C++ -1 is 26 (interior 16 + exterior 10). Interior now matches.
-    assert!(
-        sk.segment_count() >= 22,
-        "spoke-1 regressed: segs={} nodes={}",
-        sk.segment_count(),
-        sk.node_count()
-    );
+    let prop = surfer2::Propagator::from_pslg(
+        &pslg,
+        &surfer2::Options {
+            kernel: surfer2::KernelMode::Fast,
+            components: surfer2::ComponentMode::AllSequential,
+        },
+    )
+    .unwrap();
+    assert!(prop.kt.infinite_vertex.is_some(), "spoke-1 should attach CH");
+    // C++ OBJ lists 26: 16 interior + 6 pocket + 4 face-cycle chords
+    // (CH corner → pocket) created by write_obj skipping the infinite vertex.
+    assert_eq!(sk.segment_count(), 22, "nodes={}", sk.node_count());
 }
 
 #[test]

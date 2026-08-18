@@ -127,15 +127,10 @@ impl Skeleton {
 
     pub fn node_count(&self) -> usize {
         let mut seen = std::collections::HashSet::new();
-        for he in &self.halfedges {
-            if he.is_input {
-                continue;
+        for s in self.finite_segments() {
+            for p in [s.start, s.end] {
+                seen.insert(node_grid(p));
             }
-            let n = &self.nodes[he.origin.0 as usize];
-            if n.is_infinite {
-                continue;
-            }
-            seen.insert(he.origin.0);
         }
         seen.len()
     }
@@ -320,6 +315,14 @@ pub fn build_dcel(kt: &KineticTriangulation) -> Result<Skeleton, SkeletonError> 
     })
 }
 
+// ponytail: 5 mm grid matches lake cyclomatic; chain-walk if closer junctions must stay split
+fn node_grid(p: Point2) -> (i64, i64) {
+    (
+        (p.x * 200.0).round() as i64,
+        (p.y * 200.0).round() as i64,
+    )
+}
+
 fn ensure_node(
     nodes: &mut Vec<Node>,
     node_key: &mut HashMap<((u64, u64), u64), u32>,
@@ -327,14 +330,8 @@ fn ensure_node(
     time: f64,
 ) -> NodeId {
     let _ = time;
-    // ponytail: 1 mm grid; per-junction identity if parent/child bits keep drifting
-    let key = (
-        (
-            (p.x * 1000.0).round() as i64 as u64,
-            (p.y * 1000.0).round() as i64 as u64,
-        ),
-        0,
-    );
+    let g = node_grid(p);
+    let key = ((g.0 as u64, g.1 as u64), 0);
     if let Some(&i) = node_key.get(&key) {
         return NodeId(i);
     }

@@ -420,6 +420,47 @@ impl EndpointUf {
                 }
             }
         }
+        // Leftover dummy spokes have no next_vertex into the live chain.
+        // Join their stop onto a real vertex that died at the same place.
+        let quant = |p: Point2| {
+            (
+                (p.x * 1000.0).round() as i64,
+                (p.y * 1000.0).round() as i64,
+            )
+        };
+        let mut real_at: HashMap<(i64, i64), EndKey> = HashMap::new();
+        for (id, v) in &kt.vertices {
+            if v.incident_edges == [None, None] && !v.is_initial {
+                continue;
+            }
+            if v.pos_start.is_finite() {
+                real_at
+                    .entry(quant(v.pos_start))
+                    .or_insert(EndKey::start(id));
+            }
+            if let Some(p) = v.pos_stop {
+                if v.time_stop.is_some_and(|t| t.is_finite()) {
+                    real_at.entry(quant(p)).or_insert(EndKey::stop(id));
+                }
+            }
+        }
+        for (id, v) in &kt.vertices {
+            if !(v.incident_edges == [None, None] && !v.is_initial) {
+                continue;
+            }
+            if v.pos_start.is_finite() {
+                if let Some(&r) = real_at.get(&quant(v.pos_start)) {
+                    uf.union(EndKey::start(id), r);
+                }
+            }
+            if let Some(p) = v.pos_stop {
+                if v.time_stop.is_some_and(|t| t.is_finite()) {
+                    if let Some(&r) = real_at.get(&quant(p)) {
+                        uf.union(EndKey::stop(id), r);
+                    }
+                }
+            }
+        }
         uf
     }
 

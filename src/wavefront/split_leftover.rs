@@ -95,6 +95,9 @@ fn uncapped_intersection_velocity(a: SupportingLine, b: SupportingLine) -> Optio
 /// Complete first-stage decision: no collapse, collapse now, or compute natural.
 pub fn leftover_schedule(constraint_count: usize, motion: SuccessorMotion) -> LeftoverSchedule {
     match constraint_count {
+        // 3-const stays natural (CollapseNow ate the far endpoint's
+        // outgoing ridge). `schedule_leftover_collapse` still emits a
+        // DCEL spoke when motion is NonIntersecting.
         3 => LeftoverSchedule::LeaveNatural,
         2 => match motion {
             SuccessorMotion::Finite => LeftoverSchedule::LeaveNatural,
@@ -209,6 +212,7 @@ mod tests {
         let cases = [
             (3, Finite, TriangleCollapse, S::LeaveNatural, LeaveNatural),
             (3, Degenerate, Never, S::LeaveNatural, LeaveNatural),
+            (3, NonIntersecting, Never, S::LeaveNatural, LeaveNatural),
             (2, Degenerate, Never, S::ComputeNatural, CollapseNow),
             (
                 2,

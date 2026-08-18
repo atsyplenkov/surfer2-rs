@@ -131,6 +131,101 @@ fn unit_square_interior_skeleton_smoke() {
 }
 
 #[test]
+fn offset_rejects_bad_time_and_does_not_panic() {
+    let poly = Polygon::from_flat(&[[0.0, 0.0], [2.0, 0.0], [2.0, 2.0], [0.0, 2.0]], &[0]).unwrap();
+    let sk = interior_straight_skeleton(&poly).unwrap();
+    assert!(sk.offset(-1.0).is_err());
+    assert!(sk.offset(f64::NAN).is_err());
+    assert!(sk.offset(f64::INFINITY).is_err());
+    for t in [0.0, 0.25, 0.5, 1.0, 2.0] {
+        let offs = sk.offset(t).expect("offset");
+        for p in &offs {
+            assert!(p.time == t);
+            assert!(p.points.len() >= 2);
+            assert!(p.points.iter().all(|q| q.is_finite()));
+        }
+    }
+}
+
+#[test]
+fn rectangle_with_hole_skeleton_and_offset_smoke() {
+    let poly = Polygon::new(
+        vec![
+            Point2::new(0.0, 0.0),
+            Point2::new(6.0, 0.0),
+            Point2::new(6.0, 6.0),
+            Point2::new(0.0, 6.0),
+        ],
+        vec![vec![
+            Point2::new(2.0, 2.0),
+            Point2::new(2.0, 4.0),
+            Point2::new(4.0, 4.0),
+            Point2::new(4.0, 2.0),
+        ]],
+    )
+    .unwrap();
+    let sk = interior_straight_skeleton(&poly).unwrap();
+    assert!(sk.segment_count() > 4);
+    assert_dcel_contract(&sk);
+    let _ = sk.offset(0.4).unwrap();
+}
+
+fn assert_dcel_contract(sk: &Skeleton) {
+    let n = sk.halfedges().len();
+    assert!(n >= 2, "empty DCEL");
+    assert_eq!(n % 2, 0, "halfedges come in twin pairs");
+    for (i, he) in sk.halfedges().iter().enumerate() {
+        let twin = he.twin.0 as usize;
+        assert!(twin < n, "twin out of range at {i}");
+        assert_eq!(sk.halfedges()[twin].twin.0 as usize, i, "twin reciprocity {i}");
+        let next = he.next.0 as usize;
+        let prev = he.prev.0 as usize;
+        assert!(next < n && prev < n, "next/prev out of range at {i}");
+        assert!((he.face.0 as usize) < sk.faces().len(), "face id {i}");
+        assert!((he.origin.0 as usize) < sk.nodes().len(), "origin id {i}");
+    }
+    for (fi, face) in sk.faces().iter().enumerate() {
+        let Some(start) = face.halfedge else { continue };
+        let mut he = start.0 as usize;
+        let mut guard = 0;
+        loop {
+            guard += 1;
+            assert!(guard <= n + 2, "face {fi} cycle");
+            he = sk.halfedges()[he].next.0 as usize;
+            if he == start.0 as usize {
+                break;
+            }
+        }
+    }
+    for s in sk.finite_segments() {
+        assert!(s.start_time <= s.end_time);
+        assert!(s.start.is_finite() && s.end.is_finite());
+    }
+}
+
+#[test]
+fn dcel_contract_unit_square_and_hole() {
+    let sq = Polygon::from_flat(&[[0.0, 0.0], [2.0, 0.0], [2.0, 2.0], [0.0, 2.0]], &[0]).unwrap();
+    assert_dcel_contract(&interior_straight_skeleton(&sq).unwrap());
+    let hole = Polygon::new(
+        vec![
+            Point2::new(0.0, 0.0),
+            Point2::new(5.0, 0.0),
+            Point2::new(5.0, 5.0),
+            Point2::new(0.0, 5.0),
+        ],
+        vec![vec![
+            Point2::new(2.0, 2.0),
+            Point2::new(2.0, 3.0),
+            Point2::new(3.0, 3.0),
+            Point2::new(3.0, 2.0),
+        ]],
+    )
+    .unwrap();
+    assert_dcel_contract(&interior_straight_skeleton(&hole).unwrap());
+}
+
+#[test]
 fn public_api_surface_smoke() {
     let poly = Polygon::from_flat(
         &[[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0], [0.0, 0.0]],
@@ -384,8 +479,8 @@ fn lake9706_matches_cpp_double_interior() {
     assert!(report.ok, "9706 graph topology: {}", report.detail);
 }
 
-/// Progress gate: C++ exact is 31330/31130 Euler 0. Fast is one ridge short.
-/// One skeleton construction; indexed bidirectional node proximity.
+/// Progress gate: C++ exact is 31330/31130 Euler 0. Counts and cyclomatic
+/// match; the south-reflex flip is the same 1/1 as lake9706.
 #[test]
 fn lake10623_load_and_skeleton() {
     let obj_path = gis_root().join("lake10623-cpp-exact.obj");
@@ -413,10 +508,13 @@ fn lake10623_load_and_skeleton() {
         rust_edges.len(),
         rust_nodes.len()
     );
-    assert_eq!(rust_edges.len(), 31329);
+    assert_eq!(rust_edges.len(), 31330);
     assert_eq!(rust_nodes.len(), 31130);
-    assert!((rust_len - 1007709.3862767041).abs() < 1.0);
-    assert_eq!(cyclomatic(&sk, 201), -1);
+    assert!(
+        (rust_len - 1007737.3828873356).abs() < 1.0,
+        "rust len {rust_len} vs cpp {cpp_len}"
+    );
+    assert_eq!(cyclomatic(&sk, 201), 0);
 
     let prox = bidirectional_proximity(&cpp_nodes, &rust_nodes);
     eprintln!(
@@ -454,12 +552,17 @@ fn lake10623_load_and_skeleton() {
         prox.a_within_1mm,
         cpp_nodes.len()
     );
+    let cpp_edges = edges_on_nodes(&cpp, &cpp_nodes, 1e-9).expect("cpp endpoints on unique-xy");
+    let report = match_indexed_graphs(&rust_nodes, &rust_edges, &cpp_nodes, &cpp_edges, 0.15);
+    eprintln!("lake10623 topology {}", report.detail);
+    assert_eq!(report.edges_only_a, 1, "{}", report.detail);
+    assert_eq!(report.edges_only_b, 1, "{}", report.detail);
 }
 
 /// Exact conformance: 31330 segments, cyclomatic 0, bidirectional graph match.
-/// Pending until the remaining ridge is emitted.
+/// Pending the south-reflex flip (same 1/1 as lake9706).
 #[test]
-#[ignore = "one ridge / cyclomatic −1 still open"]
+#[ignore = "one ridge still differs (south-reflex flip)"]
 fn lake10623_matches_cpp_exact_interior() {
     let obj_path = gis_root().join("lake10623-cpp-exact.obj");
     let text = std::fs::read_to_string(&obj_path).expect("cpp exact obj");

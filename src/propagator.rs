@@ -959,7 +959,7 @@ impl Propagator {
         pos: Point2,
         time: f64,
     ) -> Result<(), SkeletonError> {
-        let component = {
+        let (nconst, component) = {
             let tr = self.kt.triangles.get(tid).ok_or_else(|| {
                 crate::error::PropagationError::TopologyInvariant {
                     detail: format!("leftover collapse: missing face {tid:?}"),
@@ -975,21 +975,31 @@ impl Propagator {
                 return Ok(());
             }
             let nconst = tr.wavefronts.iter().filter(|w| w.is_some()).count();
-            match leftover_schedule(nconst, motion) {
-                LeftoverSchedule::LeaveNatural | LeftoverSchedule::Unsupported => {
+            (nconst, tr.component)
+        };
+        match leftover_schedule(nconst, motion) {
+            LeftoverSchedule::LeaveNatural | LeftoverSchedule::Unsupported => {
+                if nconst == 3 && motion == SuccessorMotion::NonIntersecting {
+                    // Face stays natural (3-const CollapseNow ate the
+                    // far endpoint's outgoing ridge). Still emit the
+                    // leftover spoke C++ walks off the stuck child.
+                    self.emit_leftover_spoke(tid, side, child, time)?;
+                }
+                return Ok(());
+            }
+            LeftoverSchedule::CollapseNow => {}
+            LeftoverSchedule::ComputeNatural => {
+                let tr = self.kt.triangles.get(tid).ok_or_else(|| {
+                    crate::error::PropagationError::TopologyInvariant {
+                        detail: format!("leftover collapse: missing face {tid:?}"),
+                    }
+                })?;
+                let natural = compute_collapse(&self.kt, tr, time)?;
+                if leftover_action(nconst, motion, natural.type_) != LeftoverAction::CollapseNow {
                     return Ok(());
                 }
-                LeftoverSchedule::CollapseNow => {}
-                LeftoverSchedule::ComputeNatural => {
-                    let natural = compute_collapse(&self.kt, tr, time)?;
-                    if leftover_action(nconst, motion, natural.type_) != LeftoverAction::CollapseNow
-                    {
-                        return Ok(());
-                    }
-                }
             }
-            tr.component
-        };
+        }
         let v = self.kt.vertices.get_mut(child).ok_or_else(|| {
             crate::error::PropagationError::TopologyInvariant {
                 detail: format!("leftover collapse: missing split child {child:?}"),
@@ -1008,6 +1018,69 @@ impl Propagator {
             time,
             side as i8,
         ));
+        Ok(())
+    }
+
+    /// DCEL spoke from a stuck 3-const leftover child to the far leftover
+    /// endpoint. Does not stop the far vertex or cache a collapse.
+    fn emit_leftover_spoke(
+        &mut self,
+        tid: TriangleId,
+        side: usize,
+        child: VertexId,
+        time: f64,
+    ) -> Result<(), SkeletonError> {
+        let Some(eid) = self.kt.triangles.get(tid).and_then(|t| t.wavefronts[side]) else {
+            return Ok(());
+        };
+        let e = &self.kt.edges[eid];
+        let far = if e.endpoints[0] == child {
+            e.endpoints[1]
+        } else if e.endpoints[1] == child {
+            e.endpoints[0]
+        } else {
+            return Ok(());
+        };
+        let start = self.kt.vertices[child].pos_start;
+        let end = self.kt.vertices[far].position_at(time);
+        let d = start.distance_to(end);
+        if !(d > JUNCTION_M) {
+            return Ok(());
+        }
+        let mut dummy = WavefrontVertex::new_kinetic(
+            start,
+            Point2::new(0.0, 0.0),
+            time,
+            InfiniteSpeedType::None,
+        );
+        dummy.pos_start = start;
+        let dummy_id = self.kt.vertices.insert(dummy);
+        self.kt.stop_vertex_at(dummy_id, time, end)?;
+        // Zero-length cap so fill_missing_next does not copy next[1] onto
+        // next[0] (that would union this stop with the far vertex's start).
+        let mut cap = WavefrontVertex::new_kinetic(
+            end,
+            Point2::new(0.0, 0.0),
+            time,
+            InfiniteSpeedType::None,
+        );
+        cap.pos_start = end;
+        let cap_id = self.kt.vertices.insert(cap);
+        self.kt.stop_vertex_at(cap_id, time, end)?;
+        if let Some(d) = self.kt.vertices.get_mut(dummy_id) {
+            d.prev_vertex[0] = Some(child);
+            d.next_vertex = [Some(cap_id), Some(cap_id)];
+        }
+        if let Some(c) = self.kt.vertices.get_mut(child) {
+            if c.prev_vertex[1].is_none() {
+                c.prev_vertex[1] = Some(dummy_id);
+            }
+        }
+        if let Some(k) = self.kt.vertices.get_mut(cap_id) {
+            k.prev_vertex = [Some(dummy_id), Some(dummy_id)];
+            k.next_vertex = [Some(cap_id), Some(cap_id)];
+        }
+        let _ = far;
         Ok(())
     }
 

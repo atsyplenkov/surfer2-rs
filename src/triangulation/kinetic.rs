@@ -233,11 +233,29 @@ impl KineticTriangulation {
         if stopped {
             if amend {
                 self.vertices[v].pos_stop = Some(pos);
-                if let Some(arc) = self.arcs.iter_mut().rev().find(|a| {
-                    a.start == start_pos
-                        && a.end.is_some_and(|e| e.distance_to(start_pos) <= 1e-3)
-                }) {
+                if let Some(arc) = self.arcs.iter_mut().rev().find(|a| a.vertex == Some(v)) {
                     arc.end = Some(pos);
+                    arc.end_time = Some(t);
+                } else {
+                    let mut faces = [0u32, 0u32];
+                    for s in 0..2 {
+                        if let Some(eid) = inc[s] {
+                            if let Some(e) = self.edges.get(eid) {
+                                faces[s] = e.skeleton_face;
+                            }
+                        }
+                    }
+                    self.arcs.push(ArcRecord {
+                        start: start_pos,
+                        end: Some(pos),
+                        start_time: start_t,
+                        end_time: Some(t),
+                        left_face: faces[0],
+                        right_face: faces[1],
+                        component: 0,
+                        from_input_edge: false,
+                        vertex: Some(v),
+                    });
                 }
             }
             return Ok(());

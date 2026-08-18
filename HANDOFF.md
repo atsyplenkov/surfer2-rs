@@ -1,9 +1,9 @@
 # Handoff: surfer2 Rust port (headless)
 
 Date: 2026-08-18
-Repo: `/home/ats/Development/surfer2` — git `master`
+Repo: `/home/ats/Development/surfer2` — git `master` @ `23e9ce0`
 Upstream: `cgalab/surfer2` @ `c42f9a7f969cd661d060481cd3b8bac2bdfb8dfa`
-Ponytail **full** is the user rule; this work ran **ultra**. Off only: `stop ponytail` / `normal mode`.
+Ponytail **full** is the user rule; this session ran **lite**. Off only: `stop ponytail` / `normal mode`.
 
 Plan file `local://surfer2-rust-port-plan.md` is **not on disk**. Do not invent it.
 
@@ -13,7 +13,7 @@ Native Rust crate `surfer2` (GPL-3.0-or-later): headless computational semantics
 
 ## Oracle
 
-C++ double bin **is built** (this session): `/tmp/surfer2/build-double/cc/surfer` (`-DNT_USE_DOUBLE=ON`, Release, `REFINE_TRIANGULATION=ON`). Exact bin still missing.
+C++ double bin **is built**: `/tmp/surfer2/build-double/cc/surfer` (`-DNT_USE_DOUBLE=ON`, Release, `REFINE_TRIANGULATION=ON`). Exact bin still missing.
 
 C++ **source** is `/tmp/surfer2-src` (not `/tmp/surfer2/surf`). `KineticTriangulation.cpp` → `/tmp/surfer2-src/surf/src/KineticTriangulation.cpp`. Test-data: `/tmp/surfer2-src/test-data` (symlink `/tmp/surfer2/test-data` if needed).
 
@@ -32,11 +32,15 @@ Frozen interior C++ double OBJ (high precision): `fixtures/gis/lake9706-cpp-doub
 | `104b64c` | leave-CH: `tc > time_now` (not `>=`); degree-0 det → Never. Spoke-3 t=0 flip loop was `-0.0 >= 0` |
 | `42800b8` | `raw_flip` writes `vertices[]` directly — `set_vertex` rewrote wavefront endpoints on sides about to move |
 | `40fb804` | 3-const always `TriangleCollapse` (C++ never leaves them Never); inverted 2-const with no future edge dies at now |
-| `8081d75` | DCEL `ensure_node` + `connect_face_cycles` are HashMaps — lake DCEL ~467ms → ~4.5ms |
+| `8081d75` | DCEL `ensure_node` / face cycles HashMaps — lake DCEL ~467ms → ~4.5ms |
 | `5473f86` | `lake9706_matches_cpp_double_interior` vs frozen OBJ |
 | `bb26b52` | snap degenerate collapse endpoint onto partner (31.7 m ridge; C++ `pos_stop` invariant) |
 | `9022586` | skip dummy finish rays; skeleton-incident nodes |
 | `93b1d7b` | docs: length closed, 0.40 m stub left |
+| `5697966` | **delete** `stitch_orphan_stops` + 5 mm `node_grid`. Spawn short child when a reflex dies into a same-time split neighbour. DCEL nodes by `next_vertex`/`prev_vertex` union-find |
+| `740718a` | C++ stop invariant: every finite stop has `next_vertex` on both sides (`seal_stops` + `fill_missing_next`). Debug assert `unlinked_stops() == 0` |
+| `e04ee3f` | first triangulation linear time: O(n) neighbor map, skip second PSLG validate on `as_pslg`, `tid_to_ti` / interior keep-bit |
+| `23e9ce0` | Robust kernel **wired** for bounded collapses: interval-filtered `ExactValue` (algebraics if interval straddles 0). Fast unchanged |
 
 Hull attach does **not** affect lakes. Lakes use `from_polygon` / `interior_straight_skeleton` (interior component only, no U).
 
@@ -57,24 +61,25 @@ C++ lake interior is `--component=1` (not `-1`). `-1` is interior+exterior.
 | spoke-2 / spoke-3 | 22 / 22 | 26 OBJ | locked |
 | iso-simple-3 | 13 | 13 | locked; **1-const collapse-now broke this — do not retry blindly** |
 | issue2-minimal1 | 24 | 25 remembered | do not chase +1 without a double bin |
-| lake9706 | **4372** segs / **4344** nodes / len **342587.671** | **4372** / **4344** / **342587.196** | **gate green**; length within 0.5 m |
+| lake9706 Fast | **4372** segs / **4344** nodes / len **342587.671** | **4372** / **4344** / **342587.196** | **gate green**; cyclomatic 0; graph max 0.13 m |
+| lake9706 Robust | not run | — | do not start unless asked |
 | lake10623 | ignored | 31330 | do not run yet |
 
-Both `lake9706_load_and_skeleton` and `lake9706_matches_cpp_double_interior` are live. Cyclomatic 0.
+Both `lake9706_load_and_skeleton` and `lake9706_matches_cpp_double_interior` are live (Fast). `robust_matches_fast_convex03` and unit-square Robust lock Fast≡Robust on those small cases.
 
-Speed (same machine): C++ e2e GraphML+OBJ logs off **~61 ms** median; earlier Rust engine split **~89 ms** (init/CDT ~83, events ~1.6, DCEL ~4.5). Event loop is not the bottleneck.
+Speed (same machine, release): C++ e2e GraphML+OBJ logs off **~61 ms** median. Rust lake criterion `lake9706_fast` **~47 ms** median after `e04ee3f` (−88% vs stale ~409 ms bench). Split init (one run): `as_pslg` ~8 µs, CDT+neighbors **~2.7 ms**, kinetic setup **~1.4 ms**, seed ~0.2 ms. Event loop is not the bottleneck.
 
-## Honest status of the two lake closers
+## Honest algorithm status
 
-The kinetic loop is the same idea as C++ and almost the same events (2482 vs 2470). Two local disagreements were closed differently:
+Kinetic loop is the same idea as C++ and almost the same events (2482 vs 2470). Closers:
 
-1. **31.7 m ridge (`stop_collapse_pair`)** — real bug. C++ requires the two ends of a collapsing edge to stop at the **same point**. We stopped a newborn at birth 32 m from its partner. Fix: if one end barely moved (≤1 mm), snap it onto the partner and emit the ridge. That is their invariant, not a drawing patch.
+1. **31.7 m ridge (`stop_collapse_pair`)** — real. C++ `pos_stop` equal. If one end barely moved (≤1 mm), snap onto the partner. Keep.
 
-2. **0.40 m ridge (`stitch_orphan_stops`)** — bandage. C++ stops the south reflex ~0.05 s earlier and **spawns a short child** into the split. We stop the parent later with `next_vertex = [None, None]` and never create that child. At `finish` we look for an initial vertex that stopped with no successor, a non-initial neighbour born at that instant on a shared wavefront, gap ≤ 10⁻⁴ of the scene diagonal, and **draw the missing segment**. Uncapped, this added chords on spoke-1 and iso-simple-3. We did **not** fix the event time or spawn the child.
+2. **0.40 m ridge (`spawn_child_to_neighbor`)** — real child vertex, not a finish-time stitch. Parent dies later than C++ (~0.05 s): we still flip at `tparam ≈ -0.012` then spawn at the later triangle-collapse. Do **not** hunt that earlier split/flip unless asked (reclassify ate ~230 m of ridges once).
 
-3. **4344 nodes** — also a snap, not C++ identity. C++ shares one DCEL vertex through `next_vertex` / `prev_vertex`. We rematerialize arc endpoints and merge on a **5 mm grid** (`node_grid`) so cyclomatic is 0. 1 mm was 4352; 5 mm is 4344. Two real junctions closer than 5 mm would be wrongly fused.
+3. **4344 nodes** — chain-walk identity + stop invariant (`JUNCTION_M` 5 mm is only “same collapse” for linking, not a grid on all endpoints). `node_count` walks UF roots on finite segments.
 
-To make the algorithm match C++ instead of the drawing: spawn the child when that reflex stops (delete `stitch_orphan_stops`), and walk kinetic chains for DCEL nodes (delete the 5 mm grid).
+4. **Robust** — bounded triangles only (`compute_collapse_robust`). Unbounded hull and infinitely-fast faces still call Fast. Default `Options.kernel` is Robust; locked lake/spoke tests pass **Fast** explicitly.
 
 ## What was tried and failed (do not repeat blindly)
 
@@ -84,30 +89,35 @@ Hull era (still valid):
 2. **Constrained-CH unbounded only, no bail-out**: spoke-1 18 segs (regression from 22).
 3. Processing unbounded triangles first so interior overwrites shared corners: not the leak.
 
-Lake era (this session):
+Lake era:
 
 4. **Per-event refine** (C++ `REFINE_TRIANGULATION` after every event): same-time flip loop → `NonAdvancingLoop` at t≈52. Do not scan-all-and-flip after each event.
 5. **End-only refine with C++ wavefront-chain guards**: leftover 1-reflex faces failed those guards; zero flips; no change.
 6. **1-const “split/collapse at now” when hunt returns Never**: `NonAdvancingLoop` + iso-simple-3 13→9. Reverted.
 7. **2-const Never → TriangleCollapse always** (even positive area): iso-simple-3 broke; lake segs/len got worse. Only kill when **signed area < 0**.
+8. **Degrade non-meeting 2-const TriangleCollapse to ConstraintCollapse of the short edge**: rewired the just-born split child; lake length −230 m. Reverted. Spawn the DCEL child; do not `part2` that edge.
+9. **Leave isolated triangle-collapse verts live** (do not stop the far reflex): leftover 2-const re-queued → `NonAdvancingLoop` at t≈23.226. Reverted.
 
 ## Next session
 
-Lake9706 interior gate is green. Do **not** start 10623 unless asked. Do **not** add U faces, skip-∞ chords, 1-const collapse-now, or per-event refine.
+Lake9706 Fast interior gate is green. Init is no longer the 83 ms hole.
 
-Only if asked: replace the stitch + 5 mm grid with C++ spawn + chain-walk, or attack CDT/init (~83 of 89 ms).
+**Do not do first unless asked:** lake 10623, lake-on-Robust, chase the 0.05 s earlier south-reflex flip, U faces, skip-∞ chords, 1-const collapse-now, per-event refine, additive weights.
 
-**Do not do first:** Robust kernel, lake 10623, benches, additive weights.
+Reasonable next cuts if asked: run Robust on lake9706 (expect slower; compare graph), or leave it.
 
 ## Critical files
 
-- `src/propagator.rs` — `stop_collapse_pair` (real); `stitch_orphan_stops` (bandage, called from `finish`); dummy unused input verts skip rays. Hull: `attach_unbounded_hull` (not on lake path).
-- `src/dcel.rs` — `ensure_node` / `node_count` via 5 mm `node_grid`.
-- Tests: `tests/differential.rs` locks; `tests/gis.rs` both lake9706 tests live.
+- `src/propagator.rs` — `stop_collapse_pair`; `spawn_child_to_neighbor`; `set_next_vertex` / `seal_stops` / `fill_missing_next`; dummy unused input verts skip rays. Hull: `attach_unbounded_hull` (not on lake path). `seed_queue` / `recompute_collapse` take `KernelMode`.
+- `src/dcel.rs` — `EndpointUf` from `next_vertex`/`prev_vertex`; no `node_grid`.
+- `src/triangulation/kinetic.rs` — `compute_collapse` dispatches Fast vs Robust; `compute_collapse_robust` + exact constraint times / det roots.
+- `src/triangulation/basic.rs` — O(n) directed-edge neighbor map.
+- `src/numeric/` — `ExactValue`, `Interval`, `determinant_poly_exact`.
+- Tests: `tests/differential.rs` locks + `robust_matches_fast_convex03`; `tests/gis.rs` both lake9706 tests Fast.
 
 ## Constraints (unchanged)
 
-Single crate, GPL-3.0-or-later, `Point2` f64, FFI-friendly, deps: slotmap 1.1.1, spade 2.15.1, robust 1.2.0, algebraics 0.3.0. IEEE bits stay; no origin shift. `CollapseType` source order is priority. No triangle-ID tiebreak. DCEL from arc records. Additive weights omitted.
+Single crate, GPL-3.0-or-later, `Point2` f64, FFI-friendly, deps: slotmap 1.1.1, spade 2.15.1, robust 1.2.0, algebraics 0.3.0. IEEE bits stay; no origin shift. `CollapseType` source order is priority. No triangle-ID tiebreak. DCEL from arc records + chain identity. Additive weights omitted.
 
 ## Commands
 
@@ -116,7 +126,7 @@ cd /home/ats/Development/surfer2
 cargo test
 cargo test --release --test gis -- --nocapture
 cargo test --release --test gis lake9706_load_and_skeleton -- --nocapture
-cargo test --test differential spoke1 convex iso -- --nocapture
+cargo test --release --test differential -- --nocapture
 SURFER2_DOUBLE_BIN=/tmp/surfer2/build-double/cc/surfer \
   cargo test --test differential -- --ignored --nocapture
 ```
@@ -142,4 +152,4 @@ cmake --build /tmp/surfer2/build-double --target surfer
 
 ## Voice for the next agent
 
-Lake9706 interior gate is green. The 0.40 m closer is a finish-time stitch, not a spawned child. The 5 mm node grid is not chain-walk identity. Replace those only if asked. Do not start 10623 unless asked.
+Lake9706 Fast interior gate is green (4372 / 4344 / cyclomatic 0). Stitch and 5 mm grid are gone; child is spawned; nodes are chain-walk; stop invariant holds. Init is ~4 ms, e2e ~47 ms. Robust is live on bounded collapses only. Do not start 10623 or lake-Robust unless asked. Do not hunt the 0.05 s earlier reflex stop unless asked.

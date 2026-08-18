@@ -68,6 +68,16 @@ pub struct SkeletonSegment {
     end_node: NodeId,
 }
 
+impl SkeletonSegment {
+    pub fn start_node(self) -> NodeId {
+        self.start_node
+    }
+
+    pub fn end_node(self) -> NodeId {
+        self.end_node
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Skeleton {
     pub nodes: Vec<Node>,
@@ -142,7 +152,9 @@ impl Skeleton {
     }
 
     pub fn total_finite_length(&self) -> f64 {
-        self.finite_segments().map(|s| s.start.distance_to(s.end)).sum()
+        self.finite_segments()
+            .map(|s| s.start.distance_to(s.end))
+            .sum()
     }
 
     /// Offset contours at wavefront time `t`.
@@ -242,7 +254,14 @@ pub fn build_dcel(kt: &KineticTriangulation) -> Result<Skeleton, SkeletonError> 
         match (arc.end, arc.end_time) {
             (Some(end), Some(et)) => {
                 let (k0, k1) = arc_keys(arc);
-                let n0 = ensure_node(&mut uf, &mut nodes, &mut root_node, k0, arc.start, arc.start_time);
+                let n0 = ensure_node(
+                    &mut uf,
+                    &mut nodes,
+                    &mut root_node,
+                    k0,
+                    arc.start,
+                    arc.start_time,
+                );
                 let n1 = ensure_node(&mut uf, &mut nodes, &mut root_node, k1, end, et);
                 let he = halfedges.len() as u32;
                 let twin = he + 1;

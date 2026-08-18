@@ -6,6 +6,8 @@
 //! Unlike upstream's late pointer walk, halfedges are emitted from arc
 //! records and validated before return.
 
+use std::collections::HashMap;
+
 use crate::error::SkeletonError;
 use crate::geometry::{Point2, Ray2, Segment2};
 use crate::triangulation::kinetic::KineticTriangulation;
@@ -146,7 +148,7 @@ impl Skeleton {
 
 pub fn build_dcel(kt: &KineticTriangulation) -> Result<Skeleton, SkeletonError> {
     let mut nodes: Vec<Node> = Vec::new();
-    let mut node_key: Vec<((u64, u64), u64)> = Vec::new();
+    let mut node_key: HashMap<((u64, u64), u64), u32> = HashMap::new();
 
     let mut faces: Vec<Face> = kt
         .faces
@@ -309,22 +311,22 @@ pub fn build_dcel(kt: &KineticTriangulation) -> Result<Skeleton, SkeletonError> 
 
 fn ensure_node(
     nodes: &mut Vec<Node>,
-    node_key: &mut Vec<((u64, u64), u64)>,
+    node_key: &mut HashMap<((u64, u64), u64), u32>,
     p: Point2,
     time: f64,
 ) -> NodeId {
     let key = ((p.x.to_bits(), p.y.to_bits()), time.to_bits());
-    if let Some(i) = node_key.iter().position(|k| *k == key) {
-        return NodeId(i as u32);
+    if let Some(&i) = node_key.get(&key) {
+        return NodeId(i);
     }
-    let id = NodeId(nodes.len() as u32);
+    let id = nodes.len() as u32;
     nodes.push(Node {
         point: Some(p),
         time,
         is_infinite: false,
     });
-    node_key.push(key);
-    id
+    node_key.insert(key, id);
+    NodeId(id)
 }
 
 fn connect_face_cycles(halfedges: &mut [HalfEdge]) -> Result<(), SkeletonError> {
@@ -332,38 +334,32 @@ fn connect_face_cycles(halfedges: &mut [HalfEdge]) -> Result<(), SkeletonError> 
     if n == 0 {
         return Ok(());
     }
-    // Group halfedges by (face, origin node) → candidates leaving that node on face
-    // For each he, next should be the unique he' with origin = destination(he) and same face.
     let dest: Vec<NodeId> = halfedges
         .iter()
         .map(|he| halfedges[he.twin.0 as usize].origin)
         .collect();
 
+    let mut by_face_origin: HashMap<(u32, u32), Vec<usize>> = HashMap::new();
+    for (j, he) in halfedges.iter().enumerate() {
+        by_face_origin
+            .entry((he.face.0, he.origin.0))
+            .or_default()
+            .push(j);
+    }
+
     for i in 0..n {
-        let face = halfedges[i].face;
-        let target_origin = dest[i];
-        let mut candidates = Vec::new();
-        for (j, he) in halfedges.iter().enumerate() {
-            if j != i && he.face == face && he.origin == target_origin {
-                candidates.push(j);
-            }
-        }
-        match candidates.len() {
-            1 => {
-                let j = candidates[0];
+        let key = (halfedges[i].face.0, dest[i].0);
+        let j = by_face_origin
+            .get(&key)
+            .and_then(|c| c.iter().copied().filter(|&j| j != i).min());
+        match j {
+            Some(j) => {
                 halfedges[i].next = HalfEdgeId(j as u32);
                 halfedges[j].prev = HalfEdgeId(i as u32);
             }
-            0 => {
-                // Self-loop fallback for incomplete skeletons during early milestones
+            None => {
                 halfedges[i].next = HalfEdgeId(i as u32);
                 halfedges[i].prev = HalfEdgeId(i as u32);
-            }
-            _ => {
-                // Ambiguous — pick lowest id deterministically
-                let j = *candidates.iter().min().unwrap();
-                halfedges[i].next = HalfEdgeId(j as u32);
-                halfedges[j].prev = HalfEdgeId(i as u32);
             }
         }
     }

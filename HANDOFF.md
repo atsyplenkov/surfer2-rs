@@ -37,13 +37,10 @@ Prior commits (still current):
 
 This session:
 
-- `step_around` returns `None` when circulating around `kt.infinite_vertex` (the unbounded ring is a cycle).
-- `most_around` / `rewrite_star_side` / `create_kinetic_vertices` stop if the walk returns to start.
-- `compute_unbounded_fast` ports C++ unbounded collapse: hull-edge constraint collapse, one-sided CH-leave (`vertex_leaves_ch`), unconstrained triple determinant (`generic_collapse_time_3`).
-- `set_vertex` keeps `is_unbounded` in sync with the infinite vertex; `stop_vertex` ignores it.
-- `attach_unbounded_hull` (AllSequential / AllSimultaneous only): one unbounded triangle per unique **constrained** convex-hull edge, vertices `[∞, b, a]`, linked around `∞`. No neighbor to the finite triangle (each side has its own wavefront).
-- **Bail-out:** if any **unconstrained** point-set hull edge exists, attach does nothing. Walking finite ↔ unbounded on those edges merges interior and exterior sectors (spoke-1 AllSequential dropped to 5 segs).
-- Tests: `convex_frozen_segment_counts` includes convex19 = 35; `convex_allseq_has_unbounded_hull` asserts `infinite_vertex` + at least one unbounded triangle.
+- `attach_unbounded_hull` now emits one U per unique **point-set hull** edge (constrained and unconstrained). Unconstrained hull: neighbor finite ↔ U. Constrained hull: no neighbor (two wavefronts).
+- Pair missing-neighbor sides only when **both unconstrained** (colinear CDT twins). Pairing two constrained sides glues interior/exterior across a PSLG edge → spoke-1 5 segs. That was the “sector leak,” not `step_around`.
+- Unconstrained U inherit the finite triangle’s component; that component floods around the infinite ring (C++ `tag_components`).
+- Spoke-1 AllSequential **attaches**. **22** kinetic segs (16 interior + 6 pocket). C++ OBJ 26 includes 4 face-cycle chords: `write_obj` skips the infinite vertex, so CH-corner rays sit next to the pocket in the cycle (`v0/v4→(96,608)`, `v5/v9→(320,608)`). Not real arcs. Do not emit them.
 
 `C++ split_vertex` (360–416) is still **bevel-only**. Split *events* are `handle_split_event`.
 
@@ -53,28 +50,27 @@ This session:
 |---|---|---|---|
 | convex03/04/07/19 | 3/5/11/35 | same | locked; AllSequential now has unbounded faces (exterior is rays) |
 | spoke-1 **interior** (`Index(0)`) | **16** | 16 | done |
-| spoke-1 both (`AllSequential`) | **22** | 26 | attach skipped (unconstrained CH); still missing exterior 4 segs |
+| spoke-1 both (`AllSequential`) | **22** | 26 OBJ / 22 kinetic | 4 extra OBJ edges are skip-∞ face chords |
 | spoke-2 / spoke-3 | 22 / 24 | 26 / 26 | same class |
-| corpus soft | **4/33** OK | — | floor ≥4; lost `issue2-minimal1` (33 vs 25) and `iso-simple-3` (19 vs 13) after opposing handler |
+| iso-simple-3 | **13** | 13 | locked; old 19 was pre-attach |
+| issue2-minimal1 | **24** | 25 remembered | 1 off; likely OBJ skip-∞. Interior 20 |
 | lake9706 / 10623 | ignored | 4372 / 31330 segs | still incomplete |
 
-C++ spoke-1 split: interior 16 (7 events) + exterior 10 (2 events @ 32) = 26.
+C++ spoke-1 OBJ: 16 interior + 6 pocket + 4 skip-∞ chords = 26.
 
 ## What was tried and failed (do not repeat blindly)
 
-1. **Full CH ring including unconstrained hull edges**, neighbor finite ↔ unbounded: init topology can be fixed by pairing duplicate missing-neighbor sides (colinear CDT faces), but `create_kinetic_vertices` then walks interior triangle `1-2-3` through spoke `1-3` into the unbounded ring and pairs an **interior** wavefront with an **exterior** one. Result: 5 finite segs.
+1. **Pairing any same-endpoint missing neighbors**, including two constrained sides: glues interior to exterior across 1-2 / 2-3. 5 segs. Only pair **unconstrained** twins.
 2. **Constrained-CH unbounded only, no bail-out** (spoke-1 still attached 6 U's, fragmented ring): 18 segs (regression from 22). Dummy endpoints remain on incomplete exterior fans; extra constraint/opposing events eat segs.
-3. Processing unbounded triangles first so interior overwrites shared corners: not enough; the leak is the unconstrained spoke around a CH vertex, not just last-writer.
+3. Processing unbounded triangles first so interior overwrites shared corners: not the leak. The 5-seg failure was pairing constrained twins.
 
 ## Next implementation (already decided)
 
-**1. Unconstrained-CH unbounded neighbors, sector-bounded walk**
+**1. Lakes / remaining corpus**
 
-- Need one unbounded triangle per *unique CDT hull edge* (constrained **and** unconstrained) so exterior KVs at vertices like spoke-1 `1` connect exterior `0-1` to exterior `1-2`.
-- Must **not** let `create_kinetic_vertices` / `step_around` cross from an interior wavefront to an exterior wavefront around the same input point.
-- Pair missed finite neighbors (same canonical endpoints, two sides, no neighbor) — those are colinear CDT faces, not hull.
-- Prove convex 3/5/11/35 still hold, then spoke-1 AllSequential **26**.
-- After that: recover issue2-minimal1 / iso-simple-3 if opposing over-emits; then lakes.
+Opposing over-emit is gone after unconstrained-CH attach. iso-simple-3 = 13. issue2-minimal1 = 24 (remembered C++ OBJ 25). Do not chase the 1 without a double bin.
+
+Then lakes. Do not emit OBJ skip-∞ chords.
 
 **2. Do not do first:** Robust kernel wiring, lake 10623, benches, additive weights.
 
@@ -83,7 +79,7 @@ C++ spoke-1 split: interior 16 (7 events) + exterior 10 (2 events @ 32) = 26.
 - `src/propagator.rs` — `attach_unbounded_hull`, `initialize_kinetic` (wavefronts over all triangles, skip orientation swap when opposite vertex is `∞`), `create_kinetic_vertices`, `handle_split_or_flip` (unbounded → `handle_ccw_leaves`), `rewrite_star_side`, `handle_inf_opposing`
 - `src/triangulation/around_vertex.rs` — infinite-vertex guard; cycle stop in `most_around`
 - `src/triangulation/kinetic.rs` — `set_vertex` `is_unbounded`; `compute_unbounded_fast`; `vertex_leaves_ch`; `generic_collapse_time_3`
-- Tests: `tests/differential.rs` (`spoke1` ≥22, `spoke1_interior_count` =16, `convex_frozen_segment_counts`, `convex_allseq_has_unbounded_hull`)
+- Tests: `tests/differential.rs` (`spoke1` =22, interior 16, convex 3/5/11/35, iso-simple-3 =13, issue2-minimal1 =24)
 
 ## Constraints (unchanged)
 
@@ -111,4 +107,4 @@ Env: `SURFER2_TEST_DATA` default `/tmp/surfer2/test-data`; `SURFER2_GIS_DATA` de
 
 ## Voice for the next agent
 
-User wants implementation, not more architecture. Default next cut: sector-bounded walk so unconstrained-CH unbounded neighbors are safe. Prove convex03–19 still 3/5/11/35, then spoke-1 26.
+User wants implementation. Next: lakes / rest of corpus. Spoke-1 22, iso-simple-3 13, issue2 24 locked.

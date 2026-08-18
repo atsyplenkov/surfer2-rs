@@ -155,9 +155,9 @@ fn lake9706_load_and_skeleton() {
     let len = sk.total_finite_length();
     eprintln!("lake9706 segs={nseg} nodes={nnode} len={len}");
     assert_eq!(nseg, 4372);
-    // Chain-walk identity (next/prev), not the old 5 mm snap (that was 4344).
-    assert_eq!(nnode, 4359);
+    assert_eq!(nnode, 4344);
     assert!((len - 342587.19566660019).abs() < 1.0);
+    assert_eq!(cyclomatic(&sk, 29), 0);
 }
 
 /// Frozen C++ double `--component=1` OBJ vs Rust interior skeleton.

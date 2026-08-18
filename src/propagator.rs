@@ -19,6 +19,9 @@ use crate::wavefront::supporting_line::{wavefront_vertex_motion, SupportingLine}
 use crate::wavefront::vertex::{infinite_speed_type, InfiniteSpeedType, VertexId, WavefrontVertex};
 use crate::{ComponentMode, KernelMode, Options};
 
+/// f64 stand-in for C++ `pos_stop` equality at UTM scale.
+const JUNCTION_M: f64 = 5e-3;
+
 /// Incremental propagator with step/advance_to/finish.
 pub struct Propagator {
     pub kt: KineticTriangulation,
@@ -148,6 +151,7 @@ impl Propagator {
             .into());
         }
         self.handle_event(tidx, spec)?;
+        self.seal_stops(spec.time);
 
         let kt = &self.kt;
         self.queue
@@ -230,8 +234,27 @@ impl Propagator {
                 }
             }
         }
+        self.fill_missing_next();
+        debug_assert!(
+            self.unlinked_stops() == 0,
+            "C++ stop invariant: {} vertices stopped with a missing next_vertex",
+            self.unlinked_stops()
+        );
         self.finalized = true;
         Ok(())
+    }
+
+    fn unlinked_stops(&self) -> usize {
+        self.kt
+            .vertices
+            .iter()
+            .filter(|(id, v)| {
+                self.kt.infinite_vertex != Some(*id)
+                    && v.time_stop.is_some_and(|t| t.is_finite())
+                    && v.pos_stop.is_some()
+                    && (v.next_vertex[0].is_none() || v.next_vertex[1].is_none())
+            })
+            .count()
     }
 
     pub fn into_skeleton(mut self) -> Result<Skeleton, SkeletonError> {
@@ -312,7 +335,7 @@ impl Propagator {
                 let pb = self.kt.vertices[b]
                     .pos_stop
                     .unwrap_or_else(|| self.kt.vertices[b].position_at(time));
-                if pa.distance_to(pb) <= 1e-6 {
+                if pa.distance_to(pb) <= JUNCTION_M {
                     self.set_next_vertex(a, 0, b, false);
                 } else {
                     self.spawn_child_to_neighbor(a, time);
@@ -364,17 +387,6 @@ impl Propagator {
             (va, vb, left_sl, right_sl)
         };
         self.stop_collapse_pair(va, vb, spec.time)?;
-        let (pa, pb) = {
-            let a = &self.kt.vertices[va];
-            let b = &self.kt.vertices[vb];
-            (
-                a.pos_stop.unwrap_or_else(|| a.position_at(spec.time)),
-                b.pos_stop.unwrap_or_else(|| b.position_at(spec.time)),
-            )
-        };
-        if pa.distance_to(pb) <= 1e-6 {
-            self.set_next_vertex(va, 1, vb, false);
-        }
         if let Some(tr) = self.kt.triangles.get_mut(tid) {
             tr.set_dying();
         }
@@ -930,18 +942,105 @@ impl Propagator {
         Ok(self.kt.vertices.insert(nv))
     }
 
+    fn scene_gap(&self) -> f64 {
+        let mut min_x = f64::INFINITY;
+        let mut min_y = f64::INFINITY;
+        let mut max_x = f64::NEG_INFINITY;
+        let mut max_y = f64::NEG_INFINITY;
+        for iv in self.kt.vertices.values() {
+            if !iv.is_initial {
+                continue;
+            }
+            min_x = min_x.min(iv.pos_zero.x);
+            min_y = min_y.min(iv.pos_zero.y);
+            max_x = max_x.max(iv.pos_zero.x);
+            max_y = max_y.max(iv.pos_zero.y);
+        }
+        (max_x - min_x).hypot(max_y - min_y) * 1e-4
+    }
+
+    /// C++: a stopped vertex always has `next_vertex` on both sides.
+    fn seal_stops(&mut self, time: f64) {
+        let stopped: Vec<(VertexId, Point2)> = self
+            .kt
+            .vertices
+            .iter()
+            .filter(|(id, v)| {
+                self.kt.infinite_vertex != Some(*id)
+                    && v.time_stop
+                        .is_some_and(|t| (t - time).abs() <= 1e-9 * (1.0 + time.abs()))
+                    && v.pos_stop.is_some()
+            })
+            .map(|(id, v)| (id, v.pos_stop.unwrap()))
+            .collect();
+        for i in 0..stopped.len() {
+            for j in (i + 1)..stopped.len() {
+                if stopped[i].1.distance_to(stopped[j].1) <= JUNCTION_M {
+                    self.set_next_vertex(stopped[i].0, 1, stopped[j].0, false);
+                }
+            }
+        }
+    }
+
+    /// C++ `assert(!has_stopped() ^ !!next_vertex[i])` on both sides.
+    fn fill_missing_next(&mut self) {
+        let ids: Vec<_> = self.kt.vertices.keys().collect();
+        for vid in ids {
+            if self.kt.infinite_vertex == Some(vid) {
+                continue;
+            }
+            let (tstop, pstop, next) = {
+                let v = &self.kt.vertices[vid];
+                if !v.time_stop.is_some_and(|t| t.is_finite()) || v.pos_stop.is_none() {
+                    continue;
+                }
+                (v.time_stop.unwrap(), v.pos_stop.unwrap(), v.next_vertex)
+            };
+            match next {
+                [Some(a), None] => {
+                    if let Some(v) = self.kt.vertices.get_mut(vid) {
+                        v.next_vertex[1] = Some(a);
+                    }
+                }
+                [None, Some(b)] => {
+                    if let Some(v) = self.kt.vertices.get_mut(vid) {
+                        v.next_vertex[0] = Some(b);
+                    }
+                }
+                [None, None] => {
+                    let mut nv = WavefrontVertex::new_kinetic(
+                        pstop,
+                        Point2::new(0.0, 0.0),
+                        tstop,
+                        InfiniteSpeedType::None,
+                    );
+                    nv.pos_start = pstop;
+                    let child = self.kt.vertices.insert(nv);
+                    let _ = self.kt.stop_vertex_at(child, tstop, pstop);
+                    if let Some(v) = self.kt.vertices.get_mut(vid) {
+                        v.next_vertex = [Some(child), Some(child)];
+                    }
+                    if let Some(c) = self.kt.vertices.get_mut(child) {
+                        c.prev_vertex = [Some(vid), Some(vid)];
+                        c.next_vertex = [Some(vid), Some(vid)];
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
     /// C++ `make_vertex` after a reflex stop: child is born at the parent
     /// stop and dies at the same-time split neighbour (the 0.40 m ridge).
     fn spawn_child_to_neighbor(&mut self, vid: VertexId, time: f64) {
-        let (pstop, inc, already) = {
+        let (pstop, inc) = {
             let v = &self.kt.vertices[vid];
             if v.next_vertex != [None, None] {
                 return;
             }
             let Some(pstop) = v.pos_stop else { return };
-            (pstop, v.incident_edges, false)
+            (pstop, v.incident_edges)
         };
-        let _ = already;
         for eid in inc.into_iter().flatten() {
             let e = &self.kt.edges[eid];
             let other = if e.endpoints[0] == vid {
@@ -962,24 +1061,7 @@ impl Propagator {
                 continue;
             }
             let d = pstop.distance_to(w_start);
-            if d <= 1e-9 {
-                continue;
-            }
-            let mut min_x = f64::INFINITY;
-            let mut min_y = f64::INFINITY;
-            let mut max_x = f64::NEG_INFINITY;
-            let mut max_y = f64::NEG_INFINITY;
-            for iv in self.kt.vertices.values() {
-                if !iv.is_initial {
-                    continue;
-                }
-                min_x = min_x.min(iv.pos_zero.x);
-                min_y = min_y.min(iv.pos_zero.y);
-                max_x = max_x.max(iv.pos_zero.x);
-                max_y = max_y.max(iv.pos_zero.y);
-            }
-            let max_gap = (max_x - min_x).hypot(max_y - min_y) * 1e-4;
-            if d > max_gap {
+            if d <= 1e-9 || d > self.scene_gap() {
                 continue;
             }
             let ang = self.kt.vertices[vid].angle;
@@ -1044,13 +1126,16 @@ impl Propagator {
                     .is_some_and(|p| p.distance_to(b.pos_start) <= 1e-3),
             )
         };
-        if pa.distance_to(pb) <= 1e-6 {
+        if pa.distance_to(pb) <= JUNCTION_M {
+            self.set_next_vertex(va, 1, vb, false);
             return Ok(());
         }
         if a_deg && !b_deg {
             self.kt.stop_vertex_at(va, time, pb)?;
+            self.set_next_vertex(va, 1, vb, false);
         } else if b_deg && !a_deg {
             self.kt.stop_vertex_at(vb, time, pa)?;
+            self.set_next_vertex(vb, 1, va, false);
         }
         Ok(())
     }

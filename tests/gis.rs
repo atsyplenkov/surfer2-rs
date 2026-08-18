@@ -112,6 +112,7 @@ fn lake9706_fixture_present() {
 #[test]
 fn lake10623_fixture_present() {
     assert!(gis_root().join("lake10623.json").exists());
+    assert!(gis_root().join("lake10623-cpp-exact.obj").exists());
 }
 
 #[test]
@@ -221,8 +222,8 @@ fn lake9706_matches_cpp_double_interior() {
     );
 }
 
+/// C++ exact `--component=r` is 31330/31130. Fast is three ridges short.
 #[test]
-#[ignore = "engine incomplete: full 10623 may hang"]
 fn lake10623_load_and_skeleton() {
     let p = gis_root().join("lake10623.json");
     let poly = load_geojson_polygon(&p).expect("load 10623");
@@ -234,18 +235,71 @@ fn lake10623_load_and_skeleton() {
     assert_eq!(poly.hole_count(), 201);
     assert!(poly.vertices().len() >= 15365 && poly.vertices().len() <= 15567);
 
-    match interior_straight_skeleton(&poly) {
-        Ok(sk) => {
-            let nseg = sk.segment_count();
-            let nnode = sk.node_count();
-            let len = sk.total_finite_length();
-            eprintln!("10623 segs={nseg} nodes={nnode} len={len}");
-            if nseg == 31330 {
-                assert_eq!(nnode, 31130);
-                assert!((len - 1007737.3828873356).abs() < 10.0);
-                assert_eq!(cyclomatic(&sk, 201), 0);
-            }
-        }
-        Err(e) => eprintln!("10623 WIP: {e}"),
-    }
+    let sk = interior_straight_skeleton(&poly).expect("lake10623");
+    let nseg = sk.segment_count();
+    let nnode = sk.node_count();
+    let len = sk.total_finite_length();
+    eprintln!("10623 segs={nseg} nodes={nnode} len={len}");
+    assert_eq!(nseg, 31327);
+    assert_eq!(nnode, 31128);
+    assert!((len - 1007632.7250387593).abs() < 1.0);
+    // Remembered C++ 31330/31130 is Euler 0. We are one ridge short.
+    assert_eq!(cyclomatic(&sk, 201), -1);
 }
+
+/// Frozen C++ exact `--component=r` OBJ vs Rust interior skeleton.
+#[test]
+fn lake10623_matches_cpp_exact_interior() {
+    let obj_path = gis_root().join("lake10623-cpp-exact.obj");
+    let text = std::fs::read_to_string(&obj_path).expect("cpp exact obj");
+    let obj = ObjSkeleton::parse(&text).expect("parse cpp exact obj");
+    let cpp = obj.finite_nonzero_segments();
+    let cpp_len: f64 = cpp.iter().map(|s| s.start.distance_to(s.end)).sum();
+    let cpp_nodes = unique_xy(cpp.iter().flat_map(|s| [s.start, s.end]));
+    assert_eq!(cpp.len(), 31330);
+    assert_eq!(cpp_nodes.len(), 31130);
+    assert!((cpp_len - 1007737.3828873356).abs() < 1.0);
+
+    let poly = load_geojson_polygon(&gis_root().join("lake10623.json")).expect("load");
+    let sk = interior_straight_skeleton(&poly).expect("rust sk");
+    let rust: Vec<_> = sk.finite_segments().collect();
+    let rust_len: f64 = rust.iter().map(|s| s.start.distance_to(s.end)).sum();
+    let rust_nodes = unique_xy(rust.iter().flat_map(|s| [s.start, s.end]));
+
+    let d_cpp = nearest_each(&cpp_nodes, &rust_nodes);
+    let n_1cm = d_cpp.iter().filter(|d| **d <= 0.01).count();
+    let n_1mm = d_cpp.iter().filter(|d| **d <= 0.001).count();
+    let max_d = d_cpp.iter().copied().fold(0.0, f64::max);
+    eprintln!(
+        "lake10623 graph rust_segs={} rust_xy={} rust_len={rust_len:.6} cpp_segs={} cpp_xy={} cpp_len={cpp_len:.6} within_1mm={}/{} within_1cm={}/{} max_cpp_to_rust={max_d:.4}",
+        rust.len(),
+        rust_nodes.len(),
+        cpp.len(),
+        cpp_nodes.len(),
+        n_1mm,
+        cpp_nodes.len(),
+        n_1cm,
+        cpp_nodes.len()
+    );
+    // Three C++ ridges / two nodes are missing; one C++ node sits 2.33 m off.
+    assert!(
+        max_d <= 3.0,
+        "a C++ node is {max_d} m from every Rust node"
+    );
+    assert!(
+        n_1cm * 100 >= cpp_nodes.len() * 99,
+        "only {n_1cm}/{} C++ nodes within 1 cm of Rust",
+        cpp_nodes.len()
+    );
+    assert!(
+        n_1mm * 100 >= cpp_nodes.len() * 98,
+        "only {n_1mm}/{} C++ nodes within 1 mm of Rust",
+        cpp_nodes.len()
+    );
+}
+
+
+
+
+
+

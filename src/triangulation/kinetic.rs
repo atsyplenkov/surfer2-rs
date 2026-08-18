@@ -395,32 +395,19 @@ pub fn compute_collapse_fast(
 
     match n_const {
         3 => {
+            // C++ compute_collapse_bounded_constrained_3: 3-const is always
+            // a triangle collapse (asserts all three edges collapse together).
             let mut tmin = f64::INFINITY;
             for s in 0..3 {
                 if let Some(tc) = constraint_collapse_time(kt, t, s, time_now) {
                     tmin = tmin.min(tc);
                 }
             }
-            if tmin.is_finite() {
-                Ok(CollapseSpec::new(
-                    t.component,
-                    CollapseType::TriangleCollapse,
-                    tmin,
-                ))
-            } else if t
-                .vertices
-                .iter()
-                .flatten()
-                .all(|v| kt.vertices.get(*v).map(|x| x.is_stopped()).unwrap_or(false))
-            {
-                Ok(CollapseSpec::new(
-                    t.component,
-                    CollapseType::TriangleCollapse,
-                    time_now,
-                ))
-            } else {
-                generic_collapse_fast(kt, t, time_now)
-            }
+            Ok(CollapseSpec::new(
+                t.component,
+                CollapseType::TriangleCollapse,
+                if tmin.is_finite() { tmin } else { time_now },
+            ))
         }
         2 => collapse_bounded_constrained_2(kt, t, time_now),
         1 => collapse_bounded_constrained_1(kt, t, time_now),
@@ -449,7 +436,17 @@ fn collapse_bounded_constrained_2(
         }
     }
     match specs.len() {
-        0 => Ok(CollapseSpec::never(t.component)),
+        0 => {
+            if signed_area_at(kt, t, time_now) < 0.0 {
+                Ok(CollapseSpec::new(
+                    t.component,
+                    CollapseType::TriangleCollapse,
+                    time_now,
+                ))
+            } else {
+                Ok(CollapseSpec::never(t.component))
+            }
+        }
         1 => Ok(specs[0]),
         _ => {
             if (specs[0].time - specs[1].time).abs() <= 1e-15 * (1.0 + specs[0].time.abs()) {
@@ -550,6 +547,16 @@ fn collapse_bounded_constrained_1(
         split_time,
         c_idx as i8,
     ))
+}
+
+fn signed_area_at(kt: &KineticTriangulation, t: &KineticTriangle, time: f64) -> f64 {
+    let [Some(a), Some(b), Some(c)] = t.vertices else {
+        return 0.0;
+    };
+    let pa = kt.vertices[a].position_at(time);
+    let pb = kt.vertices[b].position_at(time);
+    let pc = kt.vertices[c].position_at(time);
+    (pb.x - pa.x) * (pc.y - pa.y) - (pb.y - pa.y) * (pc.x - pa.x)
 }
 
 fn constraint_collapse_time(

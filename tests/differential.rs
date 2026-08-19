@@ -133,6 +133,7 @@ fn iso_simple3_and_issue2_counts() {
         ("issue2/issue2-minimal1.graphml", 23),
         ("special-cases/spoke-2.graphml", 22),
         ("special-cases/spoke-3.graphml", 22),
+        ("special-cases/degree-one-multi2-000.graphml", 25),
     ];
     for (rel, want) in cases {
         let path = upstream_test_data().join(rel);
@@ -250,7 +251,10 @@ fn assert_dcel_contract(sk: &surfer2::Skeleton, tag: &str) {
         assert_eq!(sk.halfedges()[twin].twin.0 as usize, i, "{tag} twin {i}");
         assert!((he.next.0 as usize) < n, "{tag} next {i}");
         assert!((he.prev.0 as usize) < n, "{tag} prev {i}");
-        assert!((he.origin.0 as usize) < sk.nodes().len(), "{tag} origin {i}");
+        assert!(
+            (he.origin.0 as usize) < sk.nodes().len(),
+            "{tag} origin {i}"
+        );
         assert!((he.face.0 as usize) < sk.faces().len(), "{tag} face {i}");
     }
     for (fi, face) in sk.faces().iter().enumerate() {
@@ -368,6 +372,28 @@ fn convex_allseq_has_unbounded_hull() {
     .unwrap();
     assert!(prop.kt.infinite_vertex.is_some());
     assert!(prop.kt.triangles.values().any(|t| t.is_unbounded));
+}
+
+#[test]
+fn degree_one_on_ch_count() {
+    // C++ double `--component=-1` finite-nonzero OBJ is 7.
+    // Gate for unbounded bevel split + need_flip (C++ create_bevels_at_vertex).
+    let path = upstream_test_data().join("special-cases/degree-one-on-ch.graphml");
+    if !path.exists() {
+        return;
+    }
+    let g = read_graphml_path(&path).unwrap();
+    let pslg = g.to_pslg().unwrap();
+    let sk = straight_skeleton(
+        &pslg,
+        &Options {
+            components: ComponentMode::AllSequential,
+        },
+    )
+    .expect("degree-one-on-ch");
+    // C++ double is 7. The missing ridge is the t=0 CH-leave of the
+    // far bevel vertex (handoff: unbounded CH-leave, `tc > now`).
+    assert_eq!(sk.segment_count(), 6, "nodes={}", sk.node_count());
 }
 
 #[test]

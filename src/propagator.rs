@@ -1815,7 +1815,7 @@ fn initialize_kinetic(
         }
     }
 
-    create_kinetic_vertices(&mut kt)?;
+    create_kinetic_vertices(&mut kt, input)?;
     create_bevels(&mut kt, input)?;
     refine_triangulation_initial(&mut kt)?;
 
@@ -1990,8 +1990,19 @@ fn attach_unbounded_hull(
 
 /// C++ `create_kinetic_vertices`: one kinetic vertex per wavefront sector,
 /// not one per input point (interior and exterior must not share a vertex).
-fn create_kinetic_vertices(kt: &mut KineticTriangulation) -> Result<(), SkeletonError> {
+fn create_kinetic_vertices(
+    kt: &mut KineticTriangulation,
+    input: &Pslg,
+) -> Result<(), SkeletonError> {
     use crate::triangulation::kinetic::{ccw, cw};
+
+    // C++ skips degree-1: they always need a bevel cap between the two
+    // sides of the dangling edge.
+    let mut deg = vec![0u32; input.vertex_count()];
+    for e in input.edges() {
+        deg[e.vertices[0]] += 1;
+        deg[e.vertices[1]] += 1;
+    }
 
     let tids: Vec<_> = kt.triangles.keys().collect();
     for tid in tids {
@@ -2009,6 +2020,12 @@ fn create_kinetic_vertices(kt: &mut KineticTriangulation) -> Result<(), Skeleton
             };
             if kt.infinite_vertex == Some(start_v)
                 || kt.vertices[start_v].source_input_vertex.is_none()
+            {
+                continue;
+            }
+            if kt.vertices[start_v]
+                .source_input_vertex
+                .is_some_and(|s| deg.get(s as usize) == Some(&1))
             {
                 continue;
             }
@@ -2173,24 +2190,45 @@ fn create_bevels_at_vertex(
         }
         kt.set_vertex(t_it.0, t_it.1, new_v);
         let next_cw = step_around(kt, t_it.0, t_it.1, true);
-        let split_this = if last {
-            false
+        let ccw_vid = kt.triangles[t_it.0].vertices[ccw(t_it.1)];
+        let infinite_ccw = ccw_vid.is_some() && ccw_vid == kt.infinite_vertex;
+        let (split_this, need_flip) = if last {
+            (false, false)
         } else if next_cw.is_none() {
-            true
+            (true, false)
+        } else if infinite_ccw {
+            // C++ unbounded: split if next-cw's ccw is not strictly left of
+            // the current supporting line; flip if this triangle's cw is.
+            let next_t = next_cw.unwrap();
+            let next_ccw = kt.triangles[next_t.0].vertices[ccw(next_t.1)];
+            if let Some(nv) = next_ccw.filter(|v| Some(*v) != kt.infinite_vertex) {
+                let sl = kt.edges[current_edge].supporting_line;
+                let split = sl.orientation_point(kt.vertices[nv].pos_zero) <= 0.0;
+                let flip = split
+                    && kt.triangles[t_it.0].vertices[cw(t_it.1)]
+                        .filter(|v| Some(*v) != kt.infinite_vertex)
+                        .is_some_and(|v| sl.orientation_point(kt.vertices[v].pos_zero) > 0.0);
+                (split, flip)
+            } else {
+                (true, false)
+            }
         } else {
-            // Finite ccw corner: split if that point is left of bevel direction from pos.
-            let ccw_vid = kt.triangles[t_it.0].vertices[ccw(t_it.1)];
             match ccw_vid {
                 Some(cv) => {
                     let p = kt.vertices[cv].pos_zero;
                     let cross = bevel_dir.x * (p.y - pos.y) - bevel_dir.y * (p.x - pos.x);
-                    cross > 0.0
+                    (cross > 0.0, false)
                 }
-                None => true,
+                None => (true, false),
             }
         };
         if split_this && !last {
             let new_t = split_vertex_bevel(kt, t_it.0, t_it.1, current_edge, v1)?;
+            if need_flip {
+                if let Some(nid) = kt.triangles[new_t].neighbors[0] {
+                    raw_flip(kt, new_t, 0, nid)?;
+                }
+            }
             last = true;
             new_v = v1;
             current_edge = r;

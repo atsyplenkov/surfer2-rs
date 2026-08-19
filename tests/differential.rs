@@ -10,7 +10,7 @@ use std::path::PathBuf;
 use support::graph_match::{differential_tol, match_segments};
 use support::graphml::read_graphml_path;
 use support::oracle::{double_bin, exact_bin, run_surfer};
-use surfer2::{straight_skeleton, ComponentMode, Options, Point2};
+use surfer2::{straight_skeleton, ComponentMode, Options, Point2, Propagator};
 
 fn upstream_test_data() -> PathBuf {
     std::env::var_os("SURFER2_TEST_DATA")
@@ -141,6 +141,11 @@ fn iso_simple3_and_issue2_counts() {
         ("srpg0000025.graphml", 73),
         ("srpg0000028.graphml", 87),
         ("special-cases/same-speed-convex-hull-000.graphml", 9),
+        // C++ OBJ extras are skip-∞ chords (dangling-edge sides share a component).
+        ("special-cases/degree-one-simple-000.graphml", 15),
+        ("special-cases/degree-one-interior-1.graphml", 17),
+        ("special-cases/degree-one-interior-2.graphml", 17),
+        ("special-cases/degree-one-interior-3.graphml", 15),
     ];
     for (rel, want) in cases {
         let path = upstream_test_data().join(rel);
@@ -232,6 +237,10 @@ fn corpus_strict_count_gates() {
         ("srpg0000025.graphml", 73),
         ("srpg0000028.graphml", 87),
         ("special-cases/same-speed-convex-hull-000.graphml", 9),
+        ("special-cases/degree-one-simple-000.graphml", 15),
+        ("special-cases/degree-one-interior-1.graphml", 17),
+        ("special-cases/degree-one-interior-2.graphml", 17),
+        ("special-cases/degree-one-interior-3.graphml", 15),
         ("weighted/srpg_octo0000035-random-2.graphml", 131),
     ];
     for (rel, want) in cases {
@@ -387,8 +396,7 @@ fn convex_allseq_has_unbounded_hull() {
 
 #[test]
 fn degree_one_on_ch_count() {
-    // C++ double `--component=-1` finite-nonzero OBJ is 7.
-    // Gate for unbounded bevel split + need_flip (C++ create_bevels_at_vertex).
+    // C++ OBJ 7 = 6 kinetic + 1 skip-∞ chord.
     let path = upstream_test_data().join("special-cases/degree-one-on-ch.graphml");
     if !path.exists() {
         return;
@@ -402,9 +410,47 @@ fn degree_one_on_ch_count() {
         },
     )
     .expect("degree-one-on-ch");
-    // C++ double is 7. The missing ridge is the t=0 CH-leave of the
-    // far bevel vertex (handoff: unbounded CH-leave, `tc > now`).
     assert_eq!(sk.segment_count(), 6, "nodes={}", sk.node_count());
+}
+
+#[test]
+fn degree_one_interior2_events() {
+    // C++ double: t=9.37 collapse, then t=12 SOF on the degree-1 bevel.
+    let path = upstream_test_data().join("special-cases/degree-one-interior-2.graphml");
+    if !path.exists() {
+        return;
+    }
+    let g = read_graphml_path(&path).unwrap();
+    let pslg = g.to_pslg().unwrap();
+    let mut prop = Propagator::from_pslg(
+        &pslg,
+        &Options {
+            components: ComponentMode::AllSequential,
+        },
+    )
+    .unwrap();
+    let mut times = Vec::new();
+    let mut saw_t12_sof = false;
+    while let Some(spec) = prop.queue.peak().unwrap().copied() {
+        if spec.type_ == surfer2::event::CollapseType::Never {
+            break;
+        }
+        times.push((spec.time, spec.type_));
+        if spec.type_ == surfer2::event::CollapseType::SplitOrFlipRefine
+            && (spec.time - 12.0).abs() < 1e-9
+        {
+            saw_t12_sof = true;
+        }
+        if !prop.step().unwrap() {
+            break;
+        }
+    }
+    assert!(
+        saw_t12_sof,
+        "missing C++ t=12 bevel split; events={times:?}"
+    );
+    let sk = prop.into_skeleton().unwrap();
+    assert_eq!(sk.segment_count(), 17);
 }
 
 #[test]

@@ -52,8 +52,13 @@ Known parity gaps:
 - `same-speed-convex-hull-000` is 9 kinetic; C++ OBJ 13 is 9 plus 4
   skip-∞ chords. Do not force `tc ≥ now` CH-leave to chase the OBJ
   extras (`spoke-3` NonAdvancingLoop).
-- Still open vs the GraphML corpus: weighted inf-fast handler (stub
-  still calls opposing); several degree-one under-counts.
+- Degree-1 interiors `1/2/3` are 17/17/15 kinetic (C++ OBJ 19/19/19 =
+  kinetic plus skip-∞). Both sides of a dangling edge share a component
+  (C++ floods around the free tip before seeding the opposite half-edge).
+  `degree-one-simple-000` is 15 kinetic (OBJ 19). Remaining degree-one
+  gaps: simple-001/002/003, bevels-causing-splits, multi-3/4.
+- Still open: weighted inf-fast handler (stub still calls opposing;
+  random-1 117 vs OBJ 128 is not skip-∞ — kinetic geometry differs).
 
 The progress and ignored exact-conformance gates are in `tests/gis.rs`.
 Frozen C++ oracle provenance is documented in

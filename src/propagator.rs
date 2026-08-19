@@ -2121,29 +2121,30 @@ fn create_bevels(kt: &mut KineticTriangulation, input: &Pslg) -> Result<(), Skel
         deg[e.vertices[1]] += 1;
     }
 
-    let starts: Vec<(TriangleId, usize)> = kt
+    // C++ walks triangles in id order and bevels the first NULL slot at
+    // each degree-1 vertex; later incidents already have a kinetic vertex.
+    let mut starts: Vec<(i32, u32, TriangleId, usize, u32)> = kt
         .triangles
         .iter()
         .filter(|(_, t)| t.live())
-        .flat_map(|(tid, t)| (0..3).map(move |i| (tid, i, t.vertices[i])))
-        .filter_map(|(tid, i, vid)| {
+        .flat_map(|(tid, t)| (0..3).map(move |i| (tid, t.component, t.tidx, i, t.vertices[i])))
+        .filter_map(|(tid, component, tidx, i, vid)| {
             let vid = vid?;
             let src = kt.vertices[vid].source_input_vertex?;
             if deg[src as usize] == 1 {
-                Some((tid, i))
+                Some((component, tidx, tid, i, src))
             } else {
                 None
             }
         })
         .collect();
-
-    for (tid, i) in starts {
-        let Some(vid) = kt.triangles.get(tid).and_then(|t| t.vertices[i]) else {
-            continue;
-        };
-        if kt.vertices[vid].source_input_vertex.is_none() {
+    starts.sort_unstable_by_key(|s| (s.0, s.1));
+    let mut seen = vec![false; input.vertex_count()];
+    for (_, _, tid, i, src) in starts {
+        if seen[src as usize] {
             continue;
         }
+        seen[src as usize] = true;
         create_bevels_at_vertex(kt, tid, i)?;
     }
     let _ = (ccw(0), cw(0));

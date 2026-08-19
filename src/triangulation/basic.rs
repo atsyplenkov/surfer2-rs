@@ -135,20 +135,18 @@ pub fn build_basic_triangulation(pslg: &Pslg) -> Result<BasicTriangulation, Tria
     let u = first.vertices[0];
     let v = first.vertices[1];
     let left = directed.get(&(u, v)).copied();
-    let right = directed.get(&(v, u)).copied();
 
     let mut assigned = vec![None; n];
     let mut next_id = 0u32;
     let mut max_component = None;
 
+    // C++ `tag_components`: seed only the face left of the first input
+    // edge. The right face is discovered across that constraint; if the
+    // flood already reached it around a degree-1 tip, both sides share a
+    // component (dangling spur). Seeding both immediately splits a spur.
     let mut seed_order: Vec<usize> = Vec::new();
     if let Some(t) = left {
         seed_order.push(t);
-    }
-    if let Some(t) = right {
-        if left != right {
-            seed_order.push(t);
-        }
     }
     // Also collect any unvisited later
 

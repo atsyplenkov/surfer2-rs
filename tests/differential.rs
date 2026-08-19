@@ -134,6 +134,7 @@ fn iso_simple3_and_issue2_counts() {
         ("special-cases/spoke-2.graphml", 22),
         ("special-cases/spoke-3.graphml", 22),
         ("special-cases/degree-one-multi2-000.graphml", 25),
+        ("convex10.graphml", 17),
     ];
     for (rel, want) in cases {
         let path = upstream_test_data().join(rel);

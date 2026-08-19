@@ -37,6 +37,8 @@ Known parity gaps:
 - `lake9706` and `lake10623` match the frozen C++ oracles (counts, nodes,
   cyclomatic 0, topology). A global “near-miss is a split” rule is still
   unsafe; the remaining catch-up is a 1e-4 s on-segment SOF after a late flip.
+- `convex10` is 17 (C++ double hub chords ~1e-11). Junction snap is 5 mm
+  on metre-scale input and near-exact on unit GraphML.
 - `issue2-minimal1` is 23 kinetic segments; C++ OBJ 25 is 23 arcs plus
   2 skip-∞ face chords (same family as spoke-1).
 - Additive GraphML `edge-weight-additive` is unsupported (upstream parses
@@ -44,6 +46,10 @@ Known parity gaps:
 - Offset contours walk C++-style face cycles and are gated on a unit
   square and a rectangle-with-hole. Broad C++ offset comparison (many
   times, topology changes) is still open.
+- Still open vs the GraphML corpus: `collinear-split-event` 17 vs 19;
+  `same-speed-convex-hull-000` 9 vs 13 (`tc ≥ now` CH-leave loops
+  `spoke-3`); weighted inf-fast handler (stub still calls opposing);
+  several degree-one under-counts.
 
 The progress and ignored exact-conformance gates are in `tests/gis.rs`.
 Frozen C++ oracle provenance is documented in

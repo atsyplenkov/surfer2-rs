@@ -130,7 +130,7 @@ impl Skeleton {
                 return false;
             }
             let len = s.start.distance_to(s.end);
-            len > 1e-9 && len <= max_len
+            len > 1e-15 && len <= max_len
         })
     }
 

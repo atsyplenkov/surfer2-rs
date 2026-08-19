@@ -23,8 +23,11 @@ use crate::wavefront::supporting_line::{wavefront_vertex_motion, SupportingLine}
 use crate::wavefront::vertex::{infinite_speed_type, InfiniteSpeedType, VertexId, WavefrontVertex};
 use crate::{ComponentMode, Options};
 
-/// f64 stand-in for C++ `pos_stop` equality at UTM scale.
-const JUNCTION_M: f64 = 5e-3;
+/// UTM / metre-valued inputs: 5 mm snap. Unit GraphML uses near-exact
+/// equality so C++ double's ~1e-11 hub chords are not merged.
+const JUNCTION_EPS_METRE: f64 = 5e-3;
+const JUNCTION_EPS_UNIT: f64 = 1e-15;
+const JUNCTION_METRE_SCALE: f64 = 1e3;
 
 /// Incremental propagator with step/advance_to/finish.
 pub struct Propagator {
@@ -37,6 +40,8 @@ pub struct Propagator {
     pub check_invariants_each_step: bool,
     simultaneous_streak: u32,
     last_event_time: f64,
+    /// Scale-aware stand-in for C++ exact `pos_stop` equality.
+    junction_eps: f64,
 }
 
 impl Propagator {
@@ -69,6 +74,7 @@ impl Propagator {
             check_invariants_each_step: cfg!(debug_assertions),
             simultaneous_streak: 0,
             last_event_time: f64::NEG_INFINITY,
+            junction_eps: junction_eps_from_coords(input.vertices().iter().copied()),
         })
     }
 
@@ -90,7 +96,12 @@ impl Propagator {
             check_invariants_each_step: cfg!(debug_assertions),
             simultaneous_streak: 0,
             last_event_time: f64::NEG_INFINITY,
+            junction_eps: junction_eps_from_coords(pslg.vertices().iter().copied()),
         })
+    }
+
+    fn same_stop(&self, a: Point2, b: Point2) -> bool {
+        a.distance_to(b) <= self.junction_eps
     }
 
     pub fn current_time(&self) -> f64 {
@@ -368,7 +379,7 @@ impl Propagator {
                 let pb = self.kt.vertices[b]
                     .pos_stop
                     .unwrap_or_else(|| self.kt.vertices[b].position_at(time));
-                if pa.distance_to(pb) <= JUNCTION_M {
+                if self.same_stop(pa, pb) {
                     self.set_next_vertex(a, 0, b, false);
                 } else {
                     self.spawn_child_to_neighbor(a, time);
@@ -1077,7 +1088,7 @@ impl Propagator {
         let start = self.kt.vertices[child].pos_start;
         let end = self.kt.vertices[far].position_at(time);
         let d = start.distance_to(end);
-        if !(d > JUNCTION_M) {
+        if !(d > self.junction_eps) {
             return Ok(());
         }
         let mut dummy = WavefrontVertex::new_kinetic(
@@ -1146,7 +1157,7 @@ impl Propagator {
             .collect();
         for i in 0..stopped.len() {
             for j in (i + 1)..stopped.len() {
-                if stopped[i].1.distance_to(stopped[j].1) <= JUNCTION_M {
+                if self.same_stop(stopped[i].1, stopped[j].1) {
                     self.set_next_vertex(stopped[i].0, 1, stopped[j].0, false);
                 }
             }
@@ -1297,7 +1308,7 @@ impl Propagator {
                     .is_some_and(|p| p.distance_to(b.pos_start) <= 1e-3),
             )
         };
-        if pa.distance_to(pb) <= JUNCTION_M {
+        if self.same_stop(pa, pb) {
             self.set_next_vertex(va, 1, vb, false);
             return Ok(());
         }
@@ -1610,6 +1621,22 @@ impl Propagator {
             self.queue.needs_update(t.tidx)?;
         }
         Ok(())
+    }
+}
+
+/// f64 stand-in for C++ exact `pos_stop` equality.
+///
+/// Geographic (metre) coordinates need a millimetre snap; unit-scale
+/// GraphML must not, or convex10's 7 hub chords (~1e-11) disappear.
+fn junction_eps_from_coords(pts: impl Iterator<Item = Point2>) -> f64 {
+    let mut m = 0.0_f64;
+    for p in pts {
+        m = m.max(p.x.abs()).max(p.y.abs());
+    }
+    if m.is_finite() && m >= JUNCTION_METRE_SCALE {
+        JUNCTION_EPS_METRE
+    } else {
+        JUNCTION_EPS_UNIT
     }
 }
 
@@ -2868,4 +2895,19 @@ fn raw_flip(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn junction_eps_caps_utm_and_shrinks_on_unit_coords() {
+        let utm = [Point2::new(539_555.0, 7_037_179.0)];
+        let unit = [Point2::new(-1.5, -0.95)];
+        let e_utm = junction_eps_from_coords(utm.into_iter());
+        let e_unit = junction_eps_from_coords(unit.into_iter());
+        assert_eq!(e_utm, JUNCTION_EPS_METRE);
+        assert_eq!(e_unit, JUNCTION_EPS_UNIT);
+    }
 }

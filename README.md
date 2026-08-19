@@ -46,10 +46,14 @@ Known parity gaps:
 - Offset contours walk C++-style face cycles and are gated on a unit
   square and a rectangle-with-hole. Broad C++ offset comparison (many
   times, topology changes) is still open.
-- Still open vs the GraphML corpus: `collinear-split-event` 17 vs 19;
-  `same-speed-convex-hull-000` 9 vs 13 (`tc ≥ now` CH-leave loops
-  `spoke-3`); weighted inf-fast handler (stub still calls opposing);
-  several degree-one under-counts.
+- `collinear-split-event` is 17 kinetic; C++ OBJ 19 is 17 plus 2 skip-∞
+  face chords (same family as spoke-1). `srpg0000025`/`srpg0000028` are
+  73/87 kinetic (C++ OBJ 81/97 = kinetic plus skip-∞).
+- `same-speed-convex-hull-000` is 9 kinetic; C++ OBJ 13 is 9 plus 4
+  skip-∞ chords. Do not force `tc ≥ now` CH-leave to chase the OBJ
+  extras (`spoke-3` NonAdvancingLoop).
+- Still open vs the GraphML corpus: weighted inf-fast handler (stub
+  still calls opposing); several degree-one under-counts.
 
 The progress and ignored exact-conformance gates are in `tests/gis.rs`.
 Frozen C++ oracle provenance is documented in

@@ -135,6 +135,12 @@ fn iso_simple3_and_issue2_counts() {
         ("special-cases/spoke-3.graphml", 22),
         ("special-cases/degree-one-multi2-000.graphml", 25),
         ("convex10.graphml", 17),
+        // C++ OBJ 19 = 17 kinetic + 2 skip-∞ chords (v4–peak, peak–v0).
+        ("special-cases/collinear-split-event.graphml", 17),
+        // Event stream matches C++ double; OBJ extras are skip-∞ chords.
+        ("srpg0000025.graphml", 73),
+        ("srpg0000028.graphml", 87),
+        ("special-cases/same-speed-convex-hull-000.graphml", 9),
     ];
     for (rel, want) in cases {
         let path = upstream_test_data().join(rel);
@@ -222,6 +228,10 @@ fn corpus_strict_count_gates() {
         ("special-cases/iso-simple-2.graphml", 16),
         ("special-cases/iso-simple-3.graphml", 13),
         ("special-cases/spoke-1.graphml", 22),
+        ("special-cases/collinear-split-event.graphml", 17),
+        ("srpg0000025.graphml", 73),
+        ("srpg0000028.graphml", 87),
+        ("special-cases/same-speed-convex-hull-000.graphml", 9),
         ("weighted/srpg_octo0000035-random-2.graphml", 131),
     ];
     for (rel, want) in cases {

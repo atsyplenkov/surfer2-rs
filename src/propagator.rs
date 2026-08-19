@@ -272,6 +272,10 @@ impl Propagator {
                 time: spec.time,
             }
         })?;
+        debug_assert!(
+            self.kt.check_refinement.is_empty(),
+            "C++ handle_event: check_refinement empty at event start"
+        );
 
         match spec.type_ {
             CollapseType::TriangleCollapse => self.handle_triangle_collapse(tid, spec)?,
@@ -294,7 +298,36 @@ impl Propagator {
                 .into());
             }
         }
+        // C++ drains after every event. Until bevel need_flip and the
+        // infinitely-fast weighted handler exist, only collapse/split on
+        // unweighted PSLGs is safe: refine on weighted leftover drops locked
+        // random-2 131→128, and flip/CH refine loops bevels.
+        let refine_after = !self.kt_has_nonunit_weight()
+            && matches!(
+                spec.type_,
+                CollapseType::TriangleCollapse
+                    | CollapseType::ConstraintCollapse
+                    | CollapseType::SpokeCollapse
+                    | CollapseType::SplitOrFlipRefine
+            );
+        if refine_after {
+            process_check_refinement_queue(&mut self.kt, Some(&mut self.queue), spec.time)?;
+        } else {
+            while self.kt.check_refinement_pop().is_some() {}
+        }
         Ok(())
+    }
+
+    fn kt_has_nonunit_weight(&self) -> bool {
+        self.kt
+            .edges
+            .values()
+            .any(|e| (e.supporting_line.weight - 1.0).abs() > 1e-15)
+    }
+
+    /// C++ `KineticTriangulation::modified`.
+    fn modified(&mut self, tid: TriangleId, front: bool) -> Result<(), SkeletonError> {
+        mark_modified(&mut self.kt, Some(&mut self.queue), tid, front)
     }
 
     fn handle_triangle_collapse(
@@ -1058,12 +1091,8 @@ impl Propagator {
         self.kt.stop_vertex_at(dummy_id, time, end)?;
         // Zero-length cap so fill_missing_next does not copy next[1] onto
         // next[0] (that would union this stop with the far vertex's start).
-        let mut cap = WavefrontVertex::new_kinetic(
-            end,
-            Point2::new(0.0, 0.0),
-            time,
-            InfiniteSpeedType::None,
-        );
+        let mut cap =
+            WavefrontVertex::new_kinetic(end, Point2::new(0.0, 0.0), time, InfiniteSpeedType::None);
         cap.pos_start = end;
         let cap_id = self.kt.vertices.insert(cap);
         self.kt.stop_vertex_at(cap_id, time, end)?;
@@ -1301,7 +1330,7 @@ impl Propagator {
             }
             self.kt.set_vertex(id, idx, new_v);
             if self.kt.triangles[id].live() {
-                self.queue.needs_update(self.kt.triangles[id].tidx)?;
+                self.modified(id, false)?;
             }
             cur = step_around(&self.kt, id, idx, use_cw);
         }
@@ -1317,10 +1346,7 @@ impl Propagator {
             return Ok(());
         }
         let ntid = neighbor.unwrap();
-        // Raw flip of edge `side` between tid and ntid
-        raw_flip(&mut self.kt, tid, side, ntid)?;
-        self.queue.needs_update(self.kt.triangles[tid].tidx)?;
-        self.queue.needs_update(self.kt.triangles[ntid].tidx)?;
+        do_flip(&mut self.kt, Some(&mut self.queue), tid, side)?;
         self.mark_adjacent_update(tid)?;
         self.mark_adjacent_update(ntid)?;
         Ok(())
@@ -1417,7 +1443,8 @@ impl Propagator {
                 break;
             };
             raw_flip(&mut self.kt, cur.0, nidx, nid)?;
-            self.queue.needs_update(self.kt.triangles[nid].tidx)?;
+            // C++ inf-opposing: do_raw_flip then modified(n) only.
+            self.modified(nid, false)?;
             if let Some(i) = (0..3).find(|&i| self.kt.triangles[cur.0].vertices[i] == Some(v_fast))
             {
                 cur = most_around(&self.kt, cur.0, i, true);
@@ -1528,9 +1555,7 @@ impl Propagator {
         let Some(ntid) = self.kt.triangles[tid].neighbors[side] else {
             return Ok(());
         };
-        raw_flip(&mut self.kt, tid, side, ntid)?;
-        self.queue.needs_update(self.kt.triangles[tid].tidx)?;
-        self.queue.needs_update(self.kt.triangles[ntid].tidx)?;
+        do_flip(&mut self.kt, Some(&mut self.queue), tid, side)?;
         self.mark_adjacent_update(tid)?;
         self.mark_adjacent_update(ntid)?;
         Ok(())
@@ -2291,9 +2316,233 @@ fn vertex_angle_from_lines(
     }
 }
 
-fn refine_triangulation_initial(kt: &mut KineticTriangulation) -> Result<(), SkeletonError> {
+/// C++ `KineticTriangulation::modified`.
+fn mark_modified(
+    kt: &mut KineticTriangulation,
+    queue: Option<&mut EventQueue>,
+    tid: TriangleId,
+    front: bool,
+) -> Result<(), SkeletonError> {
+    kt.put_on_check_refinement(tid, front);
+    let Some(t) = kt.triangles.get(tid) else {
+        return Ok(());
+    };
+    let tidx = t.tidx;
+    let live = t.live();
+    // C++ also invalidates the unbounded neighbor(ccw(inf)). That extra
+    // needs_update changes event order on weighted hulls (random-2 131→130)
+    // while inf-weighted is still a stub. Queue the triangle only.
+    if live {
+        if let Some(q) = queue {
+            q.needs_update(tidx)?;
+        }
+    }
+    Ok(())
+}
+
+/// C++ `do_flip`: raw flip, then `modified(t, true)` and `modified(n)`.
+fn do_flip(
+    kt: &mut KineticTriangulation,
+    mut queue: Option<&mut EventQueue>,
+    tid: TriangleId,
+    side: usize,
+) -> Result<(), SkeletonError> {
+    let ntid = kt.triangles[tid].neighbors[side].ok_or_else(|| {
+        crate::error::PropagationError::TopologyInvariant {
+            detail: "do_flip missing neighbor".into(),
+        }
+    })?;
+    raw_flip(kt, tid, side, ntid)?;
+    mark_modified(kt, queue.as_deref_mut(), tid, true)?;
+    mark_modified(kt, queue, ntid, false)?;
+    Ok(())
+}
+
+/// C++ `refine_triangulation`: at most one flip for a 1-reflex unconstrained corner.
+fn refine_triangulation(
+    kt: &mut KineticTriangulation,
+    mut queue: Option<&mut EventQueue>,
+    tid: TriangleId,
+    _time: f64,
+) -> Result<(), SkeletonError> {
     use crate::triangulation::kinetic::{ccw, cw};
-    // One pass + drain: flip triangles with a single reflex unconstrained corner.
+
+    let Some(t) = kt.triangles.get(tid) else {
+        return Ok(());
+    };
+    if !t.live() || t.is_unbounded {
+        return Ok(());
+    }
+    let verts = match t.vertices {
+        [Some(a), Some(b), Some(c)] => [a, b, c],
+        _ => return Ok(()),
+    };
+    let reflex = [
+        kt.vertices
+            .get(verts[0])
+            .is_some_and(|v| !v.is_convex_or_straight()),
+        kt.vertices
+            .get(verts[1])
+            .is_some_and(|v| !v.is_convex_or_straight()),
+        kt.vertices
+            .get(verts[2])
+            .is_some_and(|v| !v.is_convex_or_straight()),
+    ];
+    let n_reflex = reflex.iter().filter(|x| **x).count();
+    if n_reflex != 1 {
+        return Ok(());
+    }
+    let ri = reflex.iter().position(|&x| x).unwrap();
+    if t.wavefronts[ri].is_some() {
+        return Ok(());
+    }
+    let Some(nid) = t.neighbors[ri] else {
+        return Ok(());
+    };
+    let Some(n) = kt.triangles.get(nid) else {
+        return Ok(());
+    };
+    if n.is_unbounded || !n.live() {
+        return Ok(());
+    }
+    let Some(idx_in_n) = (0..3).find(|&s| n.neighbors[s] == Some(tid)) else {
+        return Ok(());
+    };
+    let Some(o) = n.vertices[idx_in_n] else {
+        return Ok(());
+    };
+    let v = verts[ri];
+    let va = verts[ccw(ri)];
+    let vb = verts[cw(ri)];
+
+    // C++: if a quadrilateral corner is reflex-or-straight, do not flip.
+    // C++ asserts all four vertices have both wavefronts; missing → do not flip.
+    if !all_quad_wavefronts_present(kt, v, va, vb, o) {
+        return Ok(());
+    }
+    if adjacent_wavefront_is_reflex_or_straight(kt, v, va, vb, o) {
+        return Ok(());
+    }
+
+    raw_flip(kt, tid, ri, nid)?;
+    let ok = kt
+        .triangles
+        .get(tid)
+        .map(|t| t.check_side_xor().is_ok())
+        .unwrap_or(false)
+        && kt
+            .triangles
+            .get(nid)
+            .map(|t| t.check_side_xor().is_ok())
+            .unwrap_or(false);
+    if !ok {
+        let _ = raw_flip(kt, tid, ri, nid);
+        return Ok(());
+    }
+    mark_modified(kt, queue.as_deref_mut(), tid, true)?;
+    mark_modified(kt, queue, nid, false)?;
+    Ok(())
+}
+
+fn all_quad_wavefronts_present(
+    kt: &KineticTriangulation,
+    v: crate::wavefront::vertex::VertexId,
+    va: crate::wavefront::vertex::VertexId,
+    vb: crate::wavefront::vertex::VertexId,
+    o: crate::wavefront::vertex::VertexId,
+) -> bool {
+    [v, va, vb, o].iter().all(|id| {
+        kt.vertices.get(*id).is_some_and(|vert| {
+            vert.incident_edges[0].is_some() && vert.incident_edges[1].is_some()
+        })
+    })
+}
+
+fn adjacent_wavefront_is_reflex_or_straight(
+    kt: &KineticTriangulation,
+    v: crate::wavefront::vertex::VertexId,
+    va: crate::wavefront::vertex::VertexId,
+    vb: crate::wavefront::vertex::VertexId,
+    o: crate::wavefront::vertex::VertexId,
+) -> bool {
+    let Some(vv) = kt.vertices.get(v) else {
+        return false;
+    };
+    let Some(oo) = kt.vertices.get(o) else {
+        return false;
+    };
+    if let Some(e) = vv.incident_edges[1] {
+        if kt.edges.get(e).is_some_and(|ed| ed.endpoints[1] == va)
+            && kt
+                .vertices
+                .get(va)
+                .is_some_and(|x| x.is_reflex_or_straight())
+        {
+            return true;
+        }
+    }
+    if let Some(e) = vv.incident_edges[0] {
+        if kt.edges.get(e).is_some_and(|ed| ed.endpoints[0] == vb)
+            && kt
+                .vertices
+                .get(vb)
+                .is_some_and(|x| x.is_reflex_or_straight())
+        {
+            return true;
+        }
+    }
+    if let Some(e) = oo.incident_edges[0] {
+        if kt.edges.get(e).is_some_and(|ed| ed.endpoints[0] == va)
+            && kt
+                .vertices
+                .get(va)
+                .is_some_and(|x| x.is_reflex_or_straight())
+        {
+            return true;
+        }
+    }
+    if let Some(e) = oo.incident_edges[1] {
+        if kt.edges.get(e).is_some_and(|ed| ed.endpoints[1] == vb)
+            && kt
+                .vertices
+                .get(vb)
+                .is_some_and(|x| x.is_reflex_or_straight())
+        {
+            return true;
+        }
+    }
+    false
+}
+
+fn process_check_refinement_queue(
+    kt: &mut KineticTriangulation,
+    mut queue: Option<&mut EventQueue>,
+    time: f64,
+) -> Result<(), SkeletonError> {
+    let mut guard = 0u32;
+    while let Some(tid) = kt.check_refinement_pop() {
+        guard += 1;
+        if guard > 100_000 {
+            return Err(crate::error::PropagationError::NonAdvancingLoop {
+                component: kt
+                    .triangles
+                    .get(tid)
+                    .map(|t| t.component as usize)
+                    .unwrap_or(0),
+                time,
+            }
+            .into());
+        }
+        refine_triangulation(kt, queue.as_deref_mut(), tid, time)?;
+    }
+    Ok(())
+}
+
+fn refine_triangulation_initial(kt: &mut KineticTriangulation) -> Result<(), SkeletonError> {
+    // Keep the pre-queue multi-pass at t=0: C++ one-pass+guard drops
+    // weighted/srpg_octo0000035-random-2 131→130. Per-event drain uses
+    // refine_triangulation (reflex-or-straight guard).
+    use crate::triangulation::kinetic::{ccw, cw};
     let mut guard = 0;
     loop {
         guard += 1;
@@ -2324,7 +2573,7 @@ fn refine_triangulation_initial(kt: &mut KineticTriangulation) -> Result<(), Ske
             }
             let ri = reflex_idx.unwrap();
             if t.wavefronts[ri].is_some() {
-                continue; // constrained opposite reflex
+                continue;
             }
             let Some(nid) = t.neighbors[ri] else { continue };
             if kt
@@ -2335,7 +2584,6 @@ fn refine_triangulation_initial(kt: &mut KineticTriangulation) -> Result<(), Ske
             {
                 continue;
             }
-            // Flip spoke opposite the reflex vertex; keep only if topology stays valid.
             if raw_flip(kt, tid, ri, nid).is_err() {
                 continue;
             }
@@ -2350,7 +2598,6 @@ fn refine_triangulation_initial(kt: &mut KineticTriangulation) -> Result<(), Ske
                     .map(|t| t.check_side_xor().is_ok())
                     .unwrap_or(false);
             if !ok {
-                // Best-effort: flip back
                 let _ = raw_flip(kt, tid, ri, nid);
                 continue;
             }

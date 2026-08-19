@@ -3,6 +3,8 @@
 //! Upstream: `surf/src/KineticTriangle.*`, `KineticTriangulation.*` (rev c42f9a7).
 //! Copyright 2018, 2019 Peter Palfrader — GPL-3.0-or-later.
 
+use std::collections::VecDeque;
+
 use slotmap::{new_key_type, SlotMap};
 
 use crate::error::PropagationError;
@@ -119,6 +121,9 @@ pub struct KineticTriangulation {
     pub arcs: Vec<ArcRecord>,
     pub faces: Vec<SkeletonFaceMeta>,
     pub restrict_component: i32, // -1 seq, -2 sim, >=0 index
+    /// C++ `check_refinement` / `tidx_in_check_refinement`.
+    pub check_refinement: VecDeque<TriangleId>,
+    pub tidx_in_check_refinement: Vec<bool>,
 }
 
 #[derive(Debug, Clone)]
@@ -140,8 +145,44 @@ impl KineticTriangulation {
         if self.tidx_map.len() <= tidx as usize {
             self.tidx_map.resize(tidx as usize + 1, None);
         }
+        if self.tidx_in_check_refinement.len() <= tidx as usize {
+            self.tidx_in_check_refinement
+                .resize(tidx as usize + 1, false);
+        }
         self.tidx_map[tidx as usize] = Some(id);
         id
+    }
+
+    /// C++ `put_on_check_refinement`. No-op if already queued.
+    pub fn put_on_check_refinement(&mut self, tid: TriangleId, front: bool) {
+        let Some(t) = self.triangles.get(tid) else {
+            return;
+        };
+        let i = t.tidx as usize;
+        if self.tidx_in_check_refinement.len() <= i {
+            self.tidx_in_check_refinement.resize(i + 1, false);
+        }
+        if self.tidx_in_check_refinement[i] {
+            return;
+        }
+        self.tidx_in_check_refinement[i] = true;
+        if front {
+            self.check_refinement.push_front(tid);
+        } else {
+            self.check_refinement.push_back(tid);
+        }
+    }
+
+    /// C++ `check_refinement_pop`.
+    pub fn check_refinement_pop(&mut self) -> Option<TriangleId> {
+        let tid = self.check_refinement.pop_front()?;
+        if let Some(t) = self.triangles.get(tid) {
+            let i = t.tidx as usize;
+            if i < self.tidx_in_check_refinement.len() {
+                self.tidx_in_check_refinement[i] = false;
+            }
+        }
+        Some(tid)
     }
 
     pub fn triangle_by_tidx(&self, tidx: u32) -> Option<TriangleId> {
@@ -1149,6 +1190,9 @@ mod tests {
         let b = Point2::new(539584.573643, 7037202.545810);
         let ab2 = (b.x - a.x).hypot(b.y - a.y).powi(2);
         let tparam = ((pos.x - a.x) * (b.x - a.x) + (pos.y - a.y) * (b.y - a.y)) / ab2;
-        assert!(tparam < 0.0, "first event stays off-segment tparam={tparam}");
+        assert!(
+            tparam < 0.0,
+            "first event stays off-segment tparam={tparam}"
+        );
     }
 }

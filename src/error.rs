@@ -95,6 +95,9 @@ pub enum SkeletonError {
     #[error("non-manifold topology while building DCEL: {detail}")]
     NonManifoldTopology { detail: String },
 
+    #[error("incomplete DCEL face cycle: {detail}")]
+    IncompleteFaceCycle { detail: String },
+
     #[error("offset construction failed at time {time}: {detail}")]
     Offset { time: f64, detail: String },
 

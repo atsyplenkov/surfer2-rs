@@ -232,6 +232,55 @@ pub fn match_segments(
     match_graphs(&aa, &bb, tol)
 }
 
+/// Distance from `p` to the interior of `a--b`. `None` if the nearest
+/// point on the line is an endpoint.
+pub fn interior_segment_distance(a: Point2, b: Point2, p: Point2) -> Option<f64> {
+    let abx = b.x - a.x;
+    let aby = b.y - a.y;
+    let ab2 = abx * abx + aby * aby;
+    if !(ab2 > 0.0) {
+        return None;
+    }
+    let t = ((p.x - a.x) * abx + (p.y - a.y) * aby) / ab2;
+    if t <= 0.0 || t >= 1.0 {
+        return None;
+    }
+    let q = Point2::new(a.x + t * abx, a.y + t * aby);
+    Some(p.distance_to(q))
+}
+
+/// Split the unique oracle edge whose interior contains `p`.
+pub fn split_one_interior_edge(
+    nodes: &mut Vec<Point2>,
+    edges: &mut Vec<(usize, usize)>,
+    p: Point2,
+    tol: f64,
+) -> Result<(), String> {
+    let mut hits = Vec::new();
+    for (k, &(i, j)) in edges.iter().enumerate() {
+        if i >= nodes.len() || j >= nodes.len() {
+            continue;
+        }
+        if let Some(d) = interior_segment_distance(nodes[i], nodes[j], p) {
+            if d <= tol {
+                hits.push(k);
+            }
+        }
+    }
+    if hits.len() != 1 {
+        return Err(format!(
+            "expected 1 oracle edge containing the Steiner point, got {}",
+            hits.len()
+        ));
+    }
+    let (i, j) = edges.swap_remove(hits[0]);
+    let s = nodes.len();
+    nodes.push(p);
+    edges.push(if i <= s { (i, s) } else { (s, i) });
+    edges.push(if j <= s { (j, s) } else { (s, j) });
+    Ok(())
+}
+
 /// Locate segment endpoints onto `nodes` and return undirected index pairs.
 /// Fails if any endpoint is farther than `tol` from every node.
 pub fn edges_on_nodes(

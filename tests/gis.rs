@@ -9,20 +9,10 @@ use support::graph_match::{
     match_indexed_graphs, split_one_interior_edge, unique_points_bits,
 };
 use support::oracle::ObjSkeleton;
-use surfer2::{
-    dcel, interior_straight_skeleton, NodeId, Point2, Polygon, Propagator, Skeleton, SkeletonError,
-};
+use surfer2::{interior_straight_skeleton, NodeId, Point2, Polygon, Skeleton};
 
 fn skeleton_graph(poly: &Polygon) -> Skeleton {
-    match interior_straight_skeleton(poly) {
-        Ok(sk) => sk,
-        Err(SkeletonError::IncompleteFaceCycle { .. }) => {
-            let mut prop = Propagator::from_polygon(poly).expect("propagator");
-            while prop.step().expect("step") {}
-            dcel::emit_skeleton(&prop.kt).expect("emit skeleton")
-        }
-        Err(e) => panic!("{e}"),
-    }
+    interior_straight_skeleton(poly).expect("skeleton")
 }
 
 fn gis_root() -> PathBuf {
@@ -325,6 +315,7 @@ fn assert_dcel_contract(sk: &Skeleton) {
             guard += 1;
             assert!(guard <= n + 2, "face {fi} cycle");
             assert_eq!(sk.halfedges()[he].face.0 as usize, fi, "face {fi} at {he}");
+            assert!(!claimed[he], "bounded halfedge {he} reached twice");
             claimed[he] = true;
             he = sk.halfedges()[he].next.0 as usize;
             if he == start.0 as usize {
@@ -509,62 +500,6 @@ fn graph_matcher_nearest_is_unbounded() {
     assert!((prox.max_a_to_b - 9999.0).abs() < 1e-6);
 }
 
-fn assert_actionable_bounded_cycle(error: SkeletonError) {
-    let SkeletonError::IncompleteFaceCycle { detail } = error else {
-        panic!("unexpected error: {error}");
-    };
-    assert!(
-        detail.contains("stage="),
-        "missing construction stage: {detail}"
-    );
-    assert!(
-        detail.contains("face=") || detail.contains("halfedge=") || detail.contains("endpoint="),
-        "missing topology location: {detail}"
-    );
-}
-
-#[test]
-fn bounded_cycle_failure_is_actionable_through_public_and_builder_apis() {
-    let poly = load_geojson_polygon(&gis_root().join("lake9706.json")).expect("load 9706");
-
-    assert_actionable_bounded_cycle(interior_straight_skeleton(&poly).unwrap_err());
-
-    let mut prop = Propagator::from_polygon(&poly).expect("propagator");
-    while prop.step().expect("step") {}
-    assert_actionable_bounded_cycle(dcel::build_dcel(&prop.kt).unwrap_err());
-}
-
-#[test]
-fn bounded_cycle_diagnostic_retains_face_walk_failure() {
-    let poly = load_geojson_polygon(&gis_root().join("lake9706.json")).expect("load 9706");
-    let mut prop = Propagator::from_polygon(&poly).expect("propagator");
-    while prop.step().expect("step") {}
-
-    let mut seeds = prop
-        .kt
-        .vertices
-        .iter()
-        .filter(|(_, vertex)| {
-            vertex.is_initial
-                && !vertex.is_degenerate
-                && vertex.source_input_vertex.is_none()
-                && vertex.incident_edges[0].is_some()
-        })
-        .map(|(id, _)| id);
-    let start = seeds.next().expect("start vertex");
-    let stuck = seeds.next().expect("stuck vertex");
-    prop.kt.vertices[start].next_vertex[0] = Some(stuck);
-    prop.kt.vertices[stuck].next_vertex = [Some(stuck); 2];
-    prop.kt.vertices[stuck].prev_vertex = [Some(stuck); 2];
-
-    let SkeletonError::IncompleteFaceCycle { detail } = dcel::build_dcel(&prop.kt).unwrap_err()
-    else {
-        panic!("expected incomplete face cycle");
-    };
-    assert!(detail.contains("face-walk failures:"), "{detail}");
-    assert!(detail.contains("endpoint="), "{detail}");
-}
-
 #[test]
 fn lake9706_load_and_skeleton() {
     let p = gis_root().join("lake9706.json");
@@ -578,6 +513,7 @@ fn lake9706_load_and_skeleton() {
     assert!(poly.vertices().len() >= 2144 && poly.vertices().len() <= 2174);
 
     let sk = skeleton_graph(&poly);
+    assert_dcel_contract(&sk);
     let nseg = sk.segment_count();
     let nnode = sk.node_count();
     let len = sk.total_finite_length();

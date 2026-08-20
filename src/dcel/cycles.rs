@@ -345,47 +345,41 @@ fn next_on_face(
     })
 }
 
-/// Insert leftover self-loops into an existing same-face cycle when
-/// `dest(pred) == origin(he)` and `dest(he) == origin(succ)`.
+/// Insert leftover chains into an existing same-face cycle when their
+/// endpoint nodes match an existing link.
 fn splice_remaining_into_cycles(halfedges: &mut [HalfEdge], unbounded: FaceId) {
     let n = halfedges.len();
     let dest = |he: usize, hes: &[HalfEdge]| hes[hes[he].twin.0 as usize].origin.0;
-    let mut guard = 0;
-    loop {
-        guard += 1;
-        if guard > n + 2 {
-            break;
+    for start in 0..n {
+        if halfedges[start].face == unbounded || halfedges[start].prev.0 != start as u32 {
+            continue;
         }
-        let mut did = false;
-        for i in 0..n {
-            if halfedges[i].face == unbounded || halfedges[i].next.0 != i as u32 {
-                continue;
-            }
-            let origin_i = halfedges[i].origin.0;
-            let dest_i = dest(i, halfedges);
-            for k in 0..n {
-                if k == i || halfedges[k].face != halfedges[i].face {
-                    continue;
-                }
-                if halfedges[k].next.0 == k as u32 {
-                    continue;
-                }
-                if dest(k, halfedges) != origin_i {
-                    continue;
-                }
-                let m = halfedges[k].next.0 as usize;
-                if dest_i != halfedges[m].origin.0 {
-                    continue;
-                }
-                halfedges[k].next = HalfEdgeId(i as u32);
-                halfedges[i].prev = HalfEdgeId(k as u32);
-                halfedges[i].next = HalfEdgeId(m as u32);
-                halfedges[m].prev = HalfEdgeId(i as u32);
-                did = true;
+        let mut end = start;
+        for _ in 0..n {
+            let next = halfedges[end].next.0 as usize;
+            if next == end {
                 break;
             }
+            end = next;
         }
-        if !did {
+        if halfedges[end].next.0 != end as u32 {
+            continue;
+        }
+        for pred in 0..n {
+            if halfedges[pred].face != halfedges[start].face
+                || halfedges[pred].next.0 == pred as u32
+                || dest(pred, halfedges) != halfedges[start].origin.0
+            {
+                continue;
+            }
+            let succ = halfedges[pred].next.0 as usize;
+            if dest(end, halfedges) != halfedges[succ].origin.0 {
+                continue;
+            }
+            halfedges[pred].next = HalfEdgeId(start as u32);
+            halfedges[start].prev = HalfEdgeId(pred as u32);
+            halfedges[end].next = HalfEdgeId(succ as u32);
+            halfedges[succ].prev = HalfEdgeId(end as u32);
             break;
         }
     }

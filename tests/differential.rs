@@ -51,16 +51,6 @@ fn finite_kinetic_count(kt: &surfer2::triangulation::KineticTriangulation) -> us
         .count()
 }
 
-fn finished_count(
-    pslg: &surfer2::Pslg,
-    opts: &Options,
-) -> (usize, Result<surfer2::Skeleton, surfer2::SkeletonError>) {
-    let mut prop = Propagator::from_pslg(pslg, opts).unwrap();
-    while prop.step().unwrap() {}
-    let n = finite_kinetic_count(&prop.kt);
-    (n, prop.into_skeleton())
-}
-
 fn upstream_test_data() -> PathBuf {
     std::env::var_os("SURFER2_TEST_DATA")
         .map(PathBuf::from)
@@ -203,14 +193,14 @@ fn iso_simple3_and_issue2_counts() {
         }
         let g = support::graphml::read_graphml_path(&path).unwrap();
         let pslg = g.to_pslg().unwrap();
-        let opts = surfer2::Options {
-            components: surfer2::ComponentMode::AllSequential,
-        };
-        let (n, sk) = finished_count(&pslg, &opts);
-        assert_eq!(n, want, "{rel}");
-        if let Ok(sk) = sk {
-            assert_eq!(sk.segment_count(), want, "{rel} dcel");
-        }
+        let sk = straight_skeleton(
+            &pslg,
+            &Options {
+                components: ComponentMode::AllSequential,
+            },
+        )
+        .unwrap_or_else(|e| panic!("{rel}: {e}"));
+        assert_eq!(sk.segment_count(), want, "{rel}");
     }
 }
 
@@ -223,18 +213,18 @@ fn spoke1() {
     }
     let g = support::graphml::read_graphml_path(&path).unwrap();
     let pslg = g.to_pslg().unwrap();
-    let opts = surfer2::Options {
-        components: surfer2::ComponentMode::AllSequential,
+    let opts = Options {
+        components: ComponentMode::AllSequential,
     };
-    let (n, _) = finished_count(&pslg, &opts);
-    let prop = surfer2::Propagator::from_pslg(&pslg, &opts).unwrap();
+    let sk = straight_skeleton(&pslg, &opts).expect("spoke-1");
+    let prop = Propagator::from_pslg(&pslg, &opts).unwrap();
     assert!(
         prop.kt.infinite_vertex.is_some(),
         "spoke-1 should attach CH"
     );
     // C++ OBJ lists 26: 16 interior + 6 pocket + 4 face-cycle chords
     // (CH corner → pocket) created by write_obj skipping the infinite vertex.
-    assert_eq!(n, 22);
+    assert_eq!(sk.segment_count(), 22, "nodes={}", sk.node_count());
 }
 
 #[test]
@@ -245,13 +235,14 @@ fn spoke1_interior_count() {
     }
     let g = support::graphml::read_graphml_path(&path).unwrap();
     let pslg = g.to_pslg().unwrap();
-    let (n, _) = finished_count(
+    let sk = straight_skeleton(
         &pslg,
-        &surfer2::Options {
-            components: surfer2::ComponentMode::Index(0),
+        &Options {
+            components: ComponentMode::Index(0),
         },
-    );
-    assert_eq!(n, 16);
+    )
+    .expect("spoke-1 interior");
+    assert_eq!(sk.segment_count(), 16, "nodes={}", sk.node_count());
 }
 
 #[test]
@@ -284,15 +275,15 @@ fn corpus_strict_count_gates() {
         }
         let g = read_graphml_path(&path).unwrap();
         let pslg = g.to_pslg().unwrap();
-        let opts = Options {
-            components: ComponentMode::AllSequential,
-        };
-        let (n, sk) = finished_count(&pslg, &opts);
-        assert_eq!(n, want, "{rel}");
-        if let Ok(sk) = sk {
-            assert_eq!(sk.segment_count(), want, "{rel} dcel");
-            assert_dcel_contract(&sk, rel);
-        }
+        let sk = straight_skeleton(
+            &pslg,
+            &Options {
+                components: ComponentMode::AllSequential,
+            },
+        )
+        .unwrap_or_else(|e| panic!("{rel}: {e}"));
+        assert_eq!(sk.segment_count(), want, "{rel}");
+        assert_dcel_contract(&sk, rel);
     }
 }
 
@@ -402,13 +393,14 @@ fn convex_frozen_segment_counts() {
         }
         let g = read_graphml_path(&gpath).unwrap();
         let pslg = g.to_pslg().unwrap();
-        let (n, _) = finished_count(
+        let sk = straight_skeleton(
             &pslg,
             &Options {
                 components: ComponentMode::AllSequential,
             },
-        );
-        assert_eq!(n, want, "{graph}");
+        )
+        .unwrap_or_else(|e| panic!("{graph}: {e}"));
+        assert_eq!(sk.segment_count(), want, "{graph}");
         if !obj.is_empty() {
             let op = root.join(obj);
             if op.exists() {
@@ -447,13 +439,14 @@ fn degree_one_on_ch_count() {
     }
     let g = read_graphml_path(&path).unwrap();
     let pslg = g.to_pslg().unwrap();
-    let (n, _) = finished_count(
+    let sk = straight_skeleton(
         &pslg,
         &Options {
             components: ComponentMode::AllSequential,
         },
-    );
-    assert_eq!(n, 6);
+    )
+    .expect("degree-one-on-ch");
+    assert_eq!(sk.segment_count(), 6, "nodes={}", sk.node_count());
 }
 
 #[test]
@@ -504,13 +497,14 @@ fn degree_one_simple_no_panic() {
     }
     let g = support::graphml::read_graphml_path(&path).unwrap();
     let pslg = g.to_pslg().unwrap();
-    let (n, _) = finished_count(
+    let sk = straight_skeleton(
         &pslg,
-        &surfer2::Options {
-            components: surfer2::ComponentMode::AllSequential,
+        &Options {
+            components: ComponentMode::AllSequential,
         },
-    );
-    assert_eq!(n, 15);
+    )
+    .unwrap_or_else(|e| panic!("degree-one: {e}"));
+    assert_eq!(sk.segment_count(), 15, "nodes={}", sk.node_count());
 }
 
 #[test]

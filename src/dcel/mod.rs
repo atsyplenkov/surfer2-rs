@@ -48,6 +48,8 @@ pub struct HalfEdge {
 pub enum ArcGeometry {
     Segment(Segment2),
     Ray(Ray2),
+    /// Topological closure where C++ skips the infinite vertex.
+    InfinityChord,
     /// Input edge at time 0.
     Input(Segment2),
 }
@@ -242,6 +244,7 @@ fn emit_skeleton_with_diagnostics(
     let mut face_base: HashMap<u32, u32> = HashMap::new();
     let mut vertex_left_he: HashMap<VertexId, u32> = HashMap::new();
     let mut ridge_pieces: HashMap<VertexId, Vec<(u64, u32)>> = HashMap::new();
+    let mut infinite_node = None;
 
     // One emanating input HE per input face, from the two *initial*
     // kinetic vertices of that edge. Current WavefrontEdge::endpoints are
@@ -403,11 +406,14 @@ fn emit_skeleton_with_diagnostics(
                     arc.start,
                     arc.start_time,
                 );
-                let inf_id = NodeId(nodes.len() as u32);
-                nodes.push(Node {
-                    point: None,
-                    time: f64::INFINITY,
-                    is_infinite: true,
+                let inf_id = *infinite_node.get_or_insert_with(|| {
+                    let id = NodeId(nodes.len() as u32);
+                    nodes.push(Node {
+                        point: None,
+                        time: f64::INFINITY,
+                        is_infinite: true,
+                    });
+                    id
                 });
                 let dir = Point2::new(1.0, 0.0);
                 let he = halfedges.len() as u32;

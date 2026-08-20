@@ -72,6 +72,49 @@ impl EndpointUf {
                 }
             }
         }
+
+        let mut min = Point2::new(f64::INFINITY, f64::INFINITY);
+        let mut max = Point2::new(f64::NEG_INFINITY, f64::NEG_INFINITY);
+        for point in kt
+            .vertices
+            .values()
+            .flat_map(|v| [Some(v.pos_start), v.pos_stop])
+            .flatten()
+        {
+            min.x = min.x.min(point.x);
+            min.y = min.y.min(point.y);
+            max.x = max.x.max(point.x);
+            max.y = max.y.max(point.y);
+        }
+        let extent = (max.x - min.x).hypot(max.y - min.y).max(1.0);
+        let tolerance = extent * f64::EPSILON * 256.0;
+        let mut event_ends: HashMap<u64, Vec<(EndKey, Point2)>> = HashMap::new();
+        for (id, v) in &kt.vertices {
+            if v.time_start.is_finite() && v.pos_start.is_finite() {
+                event_ends
+                    .entry(v.time_start.to_bits())
+                    .or_default()
+                    .push((EndKey::start(id), v.pos_start));
+            }
+            if let (Some(time), Some(point)) = (v.time_stop, v.pos_stop) {
+                if time.is_finite() && point.is_finite() {
+                    event_ends
+                        .entry(time.to_bits())
+                        .or_default()
+                        .push((EndKey::stop(id), point));
+                }
+            }
+        }
+        for ends in event_ends.values() {
+            // ponytail: event-local quadratic scan; use spatial buckets for huge simultaneous events.
+            for i in 0..ends.len() {
+                for j in i + 1..ends.len() {
+                    if ends[i].1.distance_to(ends[j].1) <= tolerance {
+                        uf.union(ends[i].0, ends[j].0);
+                    }
+                }
+            }
+        }
         uf
     }
 

@@ -2,14 +2,14 @@
 
 use std::collections::HashMap;
 
-use crate::dcel::{Face, FaceId, HalfEdge, HalfEdgeId, Node};
+use crate::dcel::{ArcGeometry, Face, FaceId, HalfEdge, HalfEdgeId, Node, NodeId};
 use crate::error::SkeletonError;
 use crate::triangulation::KineticTriangulation;
 use crate::wavefront::vertex::VertexId;
 
 pub(super) fn connect_face_cycles(
     kt: &KineticTriangulation,
-    halfedges: &mut [HalfEdge],
+    halfedges: &mut Vec<HalfEdge>,
     faces: &mut [Face],
     vertex_left_he: &HashMap<VertexId, u32>,
     face_base: &HashMap<u32, u32>,
@@ -97,6 +97,8 @@ pub(super) fn connect_face_cycles(
     pair_remaining_by_dest(halfedges, nodes);
     splice_remaining_into_cycles(halfedges, unbounded);
     attach_free_ends(halfedges, unbounded);
+    rebuild_incomplete_faces(halfedges, nodes, faces, unbounded);
+    close_infinity_gaps(halfedges, faces, unbounded);
     repair_face_halfedges(halfedges, faces, unbounded);
     Ok(walk_failures)
 }
@@ -456,6 +458,150 @@ fn attach_free_ends(halfedges: &mut [HalfEdge], unbounded: FaceId) {
             }
         }
     }
+}
+
+fn rebuild_incomplete_faces(
+    halfedges: &mut [HalfEdge],
+    nodes: &[Node],
+    faces: &mut [Face],
+    unbounded: FaceId,
+) {
+    let dest: Vec<u32> = halfedges
+        .iter()
+        .map(|he| halfedges[he.twin.0 as usize].origin.0)
+        .collect();
+    let mut by_face = vec![Vec::new(); faces.len()];
+    for (i, he) in halfedges.iter().enumerate() {
+        if he.face != unbounded {
+            by_face[he.face.0 as usize].push(i);
+        }
+    }
+    for (face_id, face_halfedges) in by_face.into_iter().enumerate() {
+        let face = &mut faces[face_id];
+        if face_halfedges.is_empty()
+            || face.halfedge.is_some_and(|root| {
+                cycle_covers_face(
+                    halfedges,
+                    root.0 as usize,
+                    face_id as u32,
+                    face_halfedges.len(),
+                )
+            })
+        {
+            continue;
+        }
+
+        for &i in &face_halfedges {
+            halfedges[i].next = HalfEdgeId(i as u32);
+            halfedges[i].prev = HalfEdgeId(i as u32);
+        }
+        let mut outgoing: HashMap<u32, Vec<usize>> = HashMap::new();
+        let mut incoming: HashMap<u32, Vec<usize>> = HashMap::new();
+        for &i in &face_halfedges {
+            outgoing.entry(halfedges[i].origin.0).or_default().push(i);
+            incoming.entry(dest[i]).or_default().push(i);
+        }
+        for (node, ins) in incoming {
+            let Some(outs) = outgoing.get(&node) else {
+                continue;
+            };
+            for (from, to) in pair_at_vertex(halfedges, nodes, &dest, node, &ins, outs) {
+                halfedges[from].next = HalfEdgeId(to as u32);
+                halfedges[to].prev = HalfEdgeId(from as u32);
+            }
+        }
+        face.halfedge = face_halfedges.first().map(|&i| HalfEdgeId(i as u32));
+    }
+}
+
+fn close_infinity_gaps(halfedges: &mut Vec<HalfEdge>, faces: &[Face], unbounded: FaceId) {
+    let dest: Vec<u32> = halfedges
+        .iter()
+        .map(|he| halfedges[he.twin.0 as usize].origin.0)
+        .collect();
+    let mut ends = vec![Vec::new(); faces.len()];
+    let mut starts = vec![Vec::new(); faces.len()];
+    for (i, he) in halfedges.iter().enumerate() {
+        if he.face == unbounded {
+            continue;
+        }
+        if he.next.0 == i as u32 {
+            ends[he.face.0 as usize].push(i);
+        }
+        if he.prev.0 == i as u32 {
+            starts[he.face.0 as usize].push(i);
+        }
+    }
+    let mut gaps = Vec::new();
+    for face in 0..faces.len() {
+        if let ([end], [start]) = (ends[face].as_slice(), starts[face].as_slice()) {
+            gaps.push((
+                face as u32,
+                *end,
+                *start,
+                dest[*end],
+                halfedges[*start].origin.0,
+            ));
+        }
+    }
+
+    let mut closed = vec![false; gaps.len()];
+    for i in 0..gaps.len() {
+        if closed[i] {
+            continue;
+        }
+        let Some(j) = (i + 1..gaps.len())
+            .find(|&j| !closed[j] && gaps[i].3 == gaps[j].4 && gaps[i].4 == gaps[j].3)
+        else {
+            continue;
+        };
+        let (face_a, end_a, start_a, from, to) = gaps[i];
+        let (face_b, end_b, start_b, _, _) = gaps[j];
+        let a = halfedges.len() as u32;
+        let b = a + 1;
+        halfedges.push(HalfEdge {
+            twin: HalfEdgeId(b),
+            next: HalfEdgeId(start_a as u32),
+            prev: HalfEdgeId(end_a as u32),
+            face: FaceId(face_a),
+            origin: NodeId(from),
+            geometry: ArcGeometry::InfinityChord,
+            is_input: false,
+        });
+        halfedges.push(HalfEdge {
+            twin: HalfEdgeId(a),
+            next: HalfEdgeId(start_b as u32),
+            prev: HalfEdgeId(end_b as u32),
+            face: FaceId(face_b),
+            origin: NodeId(to),
+            geometry: ArcGeometry::InfinityChord,
+            is_input: false,
+        });
+        halfedges[end_a].next = HalfEdgeId(a);
+        halfedges[start_a].prev = HalfEdgeId(a);
+        halfedges[end_b].next = HalfEdgeId(b);
+        halfedges[start_b].prev = HalfEdgeId(b);
+        closed[i] = true;
+        closed[j] = true;
+    }
+}
+
+fn cycle_covers_face(halfedges: &[HalfEdge], start: usize, face: u32, expected: usize) -> bool {
+    let mut he = start;
+    for count in 1..=expected {
+        if he >= halfedges.len() || halfedges[he].face.0 != face {
+            return false;
+        }
+        let next = halfedges[he].next.0 as usize;
+        if next >= halfedges.len() || halfedges[next].prev.0 != he as u32 {
+            return false;
+        }
+        he = next;
+        if he == start {
+            return count == expected;
+        }
+    }
+    false
 }
 
 fn repair_face_halfedges(halfedges: &[HalfEdge], faces: &mut [Face], unbounded: FaceId) {

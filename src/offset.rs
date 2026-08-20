@@ -248,5 +248,6 @@ fn intersect_arc_at_time(
                 ray.origin.y + dt * ray.direction.y,
             ))
         }
+        ArcGeometry::InfinityChord => None,
     }
 }

@@ -77,22 +77,6 @@ impl Poly2 {
     }
 }
 
-/// Linear polynomial a0 + a1 t.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Poly1 {
-    pub c: [f64; 2],
-}
-
-impl Poly1 {
-    pub fn new(a0: f64, a1: f64) -> Self {
-        Self { c: [a0, a1] }
-    }
-
-    pub fn eval(self, t: f64) -> f64 {
-        self.c[0] + t * self.c[1]
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct QuadraticRoots {
     pub count: u8,

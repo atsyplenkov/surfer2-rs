@@ -103,10 +103,97 @@ pub(super) fn connect_face_cycles(
     pair_remaining_by_dest(halfedges, nodes, &dest);
     splice_remaining_into_cycles(halfedges, unbounded, &dest);
     attach_free_ends(halfedges, unbounded, &dest);
-    rebuild_incomplete_faces(halfedges, nodes, faces, unbounded, &dest);
-    close_infinity_gaps(halfedges, faces, unbounded, &mut dest);
+    // Skip rebuild / ∞-gap when the linear walk already closed every bounded
+    // face with no dangling ends; otherwise keep today's repair constructors.
+    if !bounded_cycles_look_complete(halfedges, faces, unbounded) {
+        rebuild_incomplete_faces(halfedges, nodes, faces, unbounded, &dest);
+        close_infinity_gaps(halfedges, faces, unbounded, &mut dest);
+    }
     repair_face_halfedges(halfedges, faces, unbounded);
     Ok(walk_failures)
+}
+
+/// Cheap O(E) filter: no dangling bounded ends, and each bounded face root
+/// starts a fully reciprocal next/prev cycle that covers every halfedge on
+/// that face. When true, incomplete-face rebuild and infinity-gap closure are
+/// no-ops for the current halfedge set.
+fn bounded_cycles_look_complete(
+    halfedges: &[HalfEdge],
+    faces: &[Face],
+    unbounded: FaceId,
+) -> bool {
+    let n = halfedges.len();
+    if n == 0 {
+        return true;
+    }
+
+    let mut owned = vec![0usize; faces.len()];
+    let mut dangling = 0usize;
+    for (i, he) in halfedges.iter().enumerate() {
+        if he.face == unbounded {
+            continue;
+        }
+        let f = he.face.0 as usize;
+        if f < owned.len() {
+            owned[f] += 1;
+        }
+        if he.next.0 == i as u32 || he.prev.0 == i as u32 {
+            dangling += 1;
+        }
+    }
+    if dangling > 0 {
+        return false;
+    }
+
+    let mut claimed = vec![false; n];
+    for (fi, face) in faces.iter().enumerate() {
+        if fi as u32 == unbounded.0 {
+            continue;
+        }
+        let expect = owned.get(fi).copied().unwrap_or(0);
+        if expect == 0 {
+            continue;
+        }
+        let Some(start) = face.halfedge else {
+            return false;
+        };
+        let start = start.0 as usize;
+        if start >= n || halfedges[start].face.0 != fi as u32 {
+            return false;
+        }
+        let mut he = start;
+        for count in 1..=expect {
+            let cur = &halfedges[he];
+            let next = cur.next.0 as usize;
+            let prev = cur.prev.0 as usize;
+            if next >= n || prev >= n || next == he {
+                return false;
+            }
+            if halfedges[next].prev.0 != he as u32 || halfedges[prev].next.0 != he as u32 {
+                return false;
+            }
+            if halfedges[next].face.0 != fi as u32 || claimed[he] {
+                return false;
+            }
+            claimed[he] = true;
+            he = next;
+            if he == start {
+                if count != expect {
+                    return false;
+                }
+                break;
+            }
+            if count == expect {
+                return false;
+            }
+        }
+    }
+    for (i, he) in halfedges.iter().enumerate() {
+        if he.face != unbounded && !claimed[i] {
+            return false;
+        }
+    }
+    true
 }
 
 /// Chain TraceAt-split ridge pieces in time order on both sides of the arc.

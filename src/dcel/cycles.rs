@@ -70,11 +70,13 @@ pub(super) fn connect_face_cycles(
         ) {
             match e {
                 FaceWalkError::MissingVertex { vertex } => {
-                    return Err(SkeletonError::IncompleteFaceCycle {
-                        detail: format!(
-                            "stage=face-walk face={face} endpoint={vertex:?}: missing vertex"
-                        ),
-                    });
+                    let mut detail =
+                        format!("stage=face-walk face={face} endpoint={vertex:?}: missing vertex");
+                    if !walk_failures.is_empty() {
+                        detail.push_str("; face-walk failures: ");
+                        detail.push_str(&walk_failures.join("; "));
+                    }
+                    return Err(SkeletonError::IncompleteFaceCycle { detail });
                 }
                 FaceWalkError::GuardExhausted {
                     face,
@@ -870,4 +872,103 @@ fn ccw_delta(from: f64, to: f64) -> f64 {
         d -= two_pi;
     }
     d
+}
+
+#[cfg(test)]
+mod tests {
+    use super::validate_bounded_face_cycles;
+    use crate::dcel::{ArcGeometry, Face, FaceId, HalfEdge, HalfEdgeId, NodeId};
+    use crate::error::SkeletonError;
+    use crate::geometry::{Point2, Segment2};
+
+    fn he(twin: u32, next: u32, prev: u32, face: u32, origin: u32) -> HalfEdge {
+        HalfEdge {
+            twin: HalfEdgeId(twin),
+            next: HalfEdgeId(next),
+            prev: HalfEdgeId(prev),
+            face: FaceId(face),
+            origin: NodeId(origin),
+            geometry: ArcGeometry::Segment(Segment2::new(
+                Point2::new(0.0, 0.0),
+                Point2::new(1.0, 0.0),
+            )),
+            is_input: false,
+        }
+    }
+
+    fn face(halfedge: Option<u32>) -> Face {
+        Face {
+            source_input_edge: None,
+            is_beveling: false,
+            component: 0,
+            halfedge: halfedge.map(HalfEdgeId),
+        }
+    }
+
+    #[test]
+    fn bounded_validation_names_face_without_root() {
+        let halfedges = vec![
+            he(1, 0, 0, 0, 0),
+            he(0, 1, 1, 1, 1), // unbounded twin placeholder
+        ];
+        let faces = vec![face(None), face(None)];
+        let err = validate_bounded_face_cycles(&halfedges, &faces, FaceId(1)).unwrap_err();
+        match err {
+            SkeletonError::IncompleteFaceCycle { detail } => {
+                assert!(
+                    detail.contains("stage=bounded-validation"),
+                    "missing stage: {detail}"
+                );
+                assert!(detail.contains("face=0"), "missing face: {detail}");
+                assert!(
+                    detail.contains("has no root"),
+                    "missing root cause: {detail}"
+                );
+            }
+            other => panic!("unexpected {other:?}"),
+        }
+    }
+
+    #[test]
+    fn bounded_validation_names_unreachable_halfedge() {
+        // Reciprocal 0↔1 cycle on face 0; he 2 is owned by face 0 but unreachable.
+        let halfedges = vec![
+            he(1, 1, 1, 0, 0),
+            he(0, 0, 0, 0, 1),
+            he(3, 2, 2, 0, 2),
+            he(2, 3, 3, 1, 3),
+        ];
+        let faces = vec![face(Some(0)), face(None)];
+        let err = validate_bounded_face_cycles(&halfedges, &faces, FaceId(1)).unwrap_err();
+        match err {
+            SkeletonError::IncompleteFaceCycle { detail } => {
+                assert!(
+                    detail.contains("stage=bounded-validation"),
+                    "missing stage: {detail}"
+                );
+                assert!(detail.contains("halfedge=2"), "missing halfedge: {detail}");
+                assert!(
+                    detail.contains("not reachable from face root"),
+                    "missing cause: {detail}"
+                );
+            }
+            other => panic!("unexpected {other:?}"),
+        }
+    }
+
+    #[test]
+    fn incomplete_cycle_detail_keeps_face_walk_failures() {
+        // Mirrors `build_dcel`'s concatenation so face-walk context is not discarded.
+        let mut detail =
+            "stage=bounded-validation face=3 halfedge=9: not reachable from face root".to_string();
+        let walk_failures =
+            ["stage=face-walk face=3 endpoint=VertexId(7) side=left: stuck".to_string()];
+        detail.push_str("; face-walk failures: ");
+        detail.push_str(&walk_failures.join("; "));
+        assert!(detail.contains("stage=bounded-validation"));
+        assert!(detail.contains("face=3"));
+        assert!(detail.contains("halfedge=9"));
+        assert!(detail.contains("stage=face-walk"));
+        assert!(detail.contains("endpoint=VertexId(7)"));
+    }
 }

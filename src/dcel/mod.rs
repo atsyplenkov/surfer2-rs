@@ -467,9 +467,12 @@ fn emit_skeleton_with_diagnostics(
     for (i, he) in halfedges.iter().enumerate() {
         let twin = he.twin.0 as usize;
         if twin >= halfedges.len() || halfedges[twin].twin.0 != i as u32 {
-            return Err(SkeletonError::NonManifoldTopology {
-                detail: format!("twin reciprocity failed at halfedge {i}"),
-            });
+            let mut detail = format!("twin reciprocity failed at halfedge {i}");
+            if !walk_failures.is_empty() {
+                detail.push_str("; face-walk failures: ");
+                detail.push_str(&walk_failures.join("; "));
+            }
+            return Err(SkeletonError::NonManifoldTopology { detail });
         }
     }
 

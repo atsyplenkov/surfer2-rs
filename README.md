@@ -74,7 +74,7 @@ machine, not a CI guarantee.
 
 | Side | What was timed | Median |
 |---|---|---:|
-| This crate | Criterion `lake9706_fast` (`interior_straight_skeleton`) | **~17.6 ms** |
+| This crate | Criterion `lake9706` (`interior_straight_skeleton`) | **~17.6 ms** |
 | This crate | Bare Instant around the same call | **~17 ms** |
 | Upstream Surfer2 `c42f9a7`, quiet `NT_USE_DOUBLE` Release | Full process: GraphML in → OBJ out (`--component=1`) | **~81 ms** |
 
@@ -89,8 +89,20 @@ crashes while building the DCEL and is not a fair speed opponent):
 | Side | What was timed | Median |
 |---|---|---:|
 | This crate | Bare Instant around `interior_straight_skeleton` (3 runs after 1 warmup) | **~0.47 s** |
+| This crate | Criterion `lake10623/skeleton` | **~0.82 s** |
 
-Re-run notes and helpers live under
+Instant and Criterion can disagree here when the machine is warm or busy; treat
+both as ballpark wall times, not a tight SLA.
+
+Criterion targets (load fixtures from `fixtures/gis/` when present):
+
+```bash
+cargo bench --bench magadan -- unit_square
+cargo bench --bench magadan -- lake9706
+cargo bench --bench magadan -- lake10623
+```
+
+Re-run notes for the C++ double bakeoff live under
 [`.scratch/cpp-double-bakeoff/`](.scratch/cpp-double-bakeoff/) (throwaway;
 not part of the published crate API).
 

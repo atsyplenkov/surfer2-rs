@@ -221,6 +221,7 @@ impl Propagator {
             if !stopped && !is_inf {
                 let v = &self.kt.vertices[vid];
                 let start = v.position_at(v.time_start);
+                let time_start = v.time_start;
                 let faces = [
                     v.incident_edges[0]
                         .and_then(|e| self.kt.edges.get(e).map(|ed| ed.skeleton_face))
@@ -229,17 +230,18 @@ impl Propagator {
                         .and_then(|e| self.kt.edges.get(e).map(|ed| ed.skeleton_face))
                         .unwrap_or(crate::triangulation::kinetic::UNBOUNDED_FACE),
                 ];
+                let component = self.kt.vertex_component(vid);
                 self.kt
                     .arcs
                     .push(crate::triangulation::kinetic::ArcRecord::traced(
                         vid,
                         start,
                         None,
-                        v.time_start,
+                        time_start,
                         None,
                         faces[0],
                         faces[1],
-                        0,
+                        component,
                     ));
                 if let Some(vv) = self.kt.vertices.get_mut(vid) {
                     vv.time_stop = Some(f64::INFINITY);

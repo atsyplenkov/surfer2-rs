@@ -332,6 +332,27 @@ impl KineticTriangulation {
         }
     }
 
+    /// Component of `v`'s incident kinetic triangle, or 0 if none.
+    pub(crate) fn vertex_component(&self, v: VertexId) -> i32 {
+        if let Some(vert) = self.vertices.get(v) {
+            for side in 0..2 {
+                if let Some(eid) = vert.incident_edges[side] {
+                    if let Some(tid) = self.edges.get(eid).and_then(|e| e.incident_triangle) {
+                        if let Some(t) = self.triangles.get(tid) {
+                            return t.component;
+                        }
+                    }
+                }
+            }
+        }
+        for t in self.triangles.values() {
+            if t.live() && t.vertices.iter().any(|&x| x == Some(v)) {
+                return t.component;
+            }
+        }
+        0
+    }
+
     pub fn stop_vertex_at(
         &mut self,
         v: VertexId,
@@ -379,7 +400,7 @@ impl KineticTriangulation {
                         Some(t),
                         faces[0],
                         faces[1],
-                        0,
+                        self.vertex_component(v),
                     ));
                 }
             }
@@ -398,7 +419,7 @@ impl KineticTriangulation {
             Some(t),
             left_face,
             right_face,
-            0,
+            self.vertex_component(v),
         ));
         Ok(())
     }
@@ -446,14 +467,19 @@ impl KineticTriangulation {
                 time_bits: time.to_bits(),
             }
         };
+        let start_time = from_v.time_start;
+        let mut component = self.vertex_component(from);
+        if component == 0 {
+            component = self.vertex_component(to);
+        }
         self.arcs.push(ArcRecord {
             start,
             end: Some(end),
-            start_time: from_v.time_start,
+            start_time,
             end_time: Some(time),
             left_face,
             right_face,
-            component: 0,
+            component,
             from_input_edge: false,
             start_end: ArcEnd::Start(from),
             end_end: Some(end_id),

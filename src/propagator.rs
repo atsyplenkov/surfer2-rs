@@ -221,7 +221,6 @@ impl Propagator {
             if !stopped && !is_inf {
                 let v = &self.kt.vertices[vid];
                 let start = v.position_at(v.time_start);
-                let vel = v.velocity;
                 let faces = [
                     v.incident_edges[0]
                         .and_then(|e| self.kt.edges.get(e).map(|ed| ed.skeleton_face))
@@ -242,7 +241,6 @@ impl Propagator {
                         faces[1],
                         0,
                     ));
-                let _ = vel;
                 if let Some(vv) = self.kt.vertices.get_mut(vid) {
                     vv.time_stop = Some(f64::INFINITY);
                 }
@@ -297,11 +295,9 @@ impl Propagator {
             CollapseType::SpokeCollapse => self.handle_spoke_collapse(tid, spec)?,
             CollapseType::SplitOrFlipRefine => self.handle_split_or_flip(tid, spec)?,
             CollapseType::VertexMovesOverSpoke => self.handle_flip(tid, spec)?,
-            CollapseType::FaceHasInfinitelyFastVertexOpposing => {
+            CollapseType::FaceHasInfinitelyFastVertexOpposing
+            | CollapseType::FaceHasInfinitelyFastVertexWeighted => {
                 self.handle_inf_opposing(tid, spec)?
-            }
-            CollapseType::FaceHasInfinitelyFastVertexWeighted => {
-                self.handle_inf_weighted(tid, spec)?
             }
             CollapseType::CcwVertexLeavesCh => self.handle_ccw_leaves(tid, spec)?,
             CollapseType::InvalidEvent | CollapseType::Undefined | CollapseType::Never => {
@@ -314,11 +310,6 @@ impl Propagator {
         }
         apply_event_refinement(&mut self.kt, Some(&mut self.queue), spec.type_, spec.time)?;
         Ok(())
-    }
-
-    /// C++ `KineticTriangulation::modified`.
-    fn modified(&mut self, tid: TriangleId, front: bool) -> Result<(), SkeletonError> {
-        mark_modified(&mut self.kt, Some(&mut self.queue), tid, front)
     }
 
     fn handle_triangle_collapse(
@@ -493,12 +484,11 @@ impl Propagator {
             }
         }
 
-        let (v_opp, va, vb) = {
+        let (v_opp, va) = {
             let t = &self.kt.triangles[tid];
             (
                 t.vertices[edge_idx].unwrap(),
                 t.vertices[ccw(edge_idx)].unwrap(),
-                t.vertices[cw(edge_idx)].unwrap(),
             )
         };
 
@@ -573,7 +563,6 @@ impl Propagator {
             }
         }
         self.constraint_collapse_part2(tid, edge_idx, time, left_sl, right_sl)?;
-        let _ = vb;
         Ok(())
     }
 
@@ -679,18 +668,11 @@ impl Propagator {
 
         // Link neighbors across the dying triangle (excluding collapsed side).
         if let (Some(na), Some(nb)) = (na_id, nb_id) {
-            let idx_a = (0..3).find(|&s| {
-                self.kt.triangles[na].neighbors[s] == Some(tid)
-                    || (self.kt.triangles[na].live()
-                        && self.kt.triangles[na].neighbors[s] == Some(tid))
-            });
-            // Re-find after possible rewires
             let idx_a = (0..3).find(|&s| self.kt.triangles[na].neighbors[s] == Some(tid));
             let idx_b = (0..3).find(|&s| self.kt.triangles[nb].neighbors[s] == Some(tid));
             if let (Some(ia), Some(ib)) = (idx_a, idx_b) {
                 self.kt.set_neighbor(na, ia, Some(nb), ib);
             }
-            let _ = idx_a;
         } else if let Some(na) = na_id {
             if let Some(ia) = (0..3).find(|&s| self.kt.triangles[na].neighbors[s] == Some(tid)) {
                 if let Some(tr) = self.kt.triangles.get_mut(na) {
@@ -1310,7 +1292,7 @@ impl Propagator {
             }
             self.kt.set_vertex(id, idx, new_v);
             if self.kt.triangles[id].live() {
-                self.modified(id, false)?;
+                mark_modified(&mut self.kt, Some(&mut self.queue), id, false)?;
             }
             cur = step_around(&self.kt, id, idx, use_cw);
         }
@@ -1344,12 +1326,6 @@ impl Propagator {
             .wavefronts
             .iter()
             .filter(|w| w.is_some())
-            .count();
-        let n_fast = self.kt.triangles[tid]
-            .vertices
-            .iter()
-            .flatten()
-            .filter(|v| self.kt.vertices[**v].infinite_speed != InfiniteSpeedType::None)
             .count();
 
         if n_const == 3 {
@@ -1424,7 +1400,7 @@ impl Propagator {
             };
             raw_flip(&mut self.kt, cur.0, nidx, nid)?;
             // C++ inf-opposing: do_raw_flip then modified(n) only.
-            self.modified(nid, false)?;
+            mark_modified(&mut self.kt, Some(&mut self.queue), nid, false)?;
             if let Some(i) = (0..3).find(|&i| self.kt.triangles[cur.0].vertices[i] == Some(v_fast))
             {
                 cur = most_around(&self.kt, cur.0, i, true);
@@ -1512,16 +1488,7 @@ impl Propagator {
             }
         }
         self.constraint_collapse_part2(tid, collapse, time, left_sl, right_sl)?;
-        let _ = n_fast;
         Ok(())
-    }
-
-    fn handle_inf_weighted(
-        &mut self,
-        tid: TriangleId,
-        spec: CollapseSpec,
-    ) -> Result<(), SkeletonError> {
-        self.handle_inf_opposing(tid, spec)
     }
 
     fn handle_ccw_leaves(
@@ -1553,9 +1520,9 @@ impl Propagator {
         };
         // Clear neighbor back-pointers
         let neighbors: Vec<_> = self.kt.triangles[tid].neighbors.iter().copied().collect();
-        for (s, nb) in neighbors.iter().enumerate() {
+        for nb in neighbors {
             if let Some(nid) = nb {
-                if let Some(n) = self.kt.triangles.get_mut(*nid) {
+                if let Some(n) = self.kt.triangles.get_mut(nid) {
                     for s2 in 0..3 {
                         if n.neighbors[s2] == Some(tid) {
                             n.neighbors[s2] = None;
@@ -1566,7 +1533,6 @@ impl Propagator {
                     self.queue.needs_update(n.tidx)?;
                 }
             }
-            let _ = s;
         }
         self.queue.needs_dropping(tidx)?;
         if let Some(t) = self.kt.triangles.get_mut(tid) {
@@ -1663,17 +1629,6 @@ fn seed_queue(
     Ok(())
 }
 
-fn estimate_vertex_velocity(_input: &Pslg, _incident: &[(usize, bool)], _p: Point2) -> Point2 {
-    Point2::new(0.0, 0.0)
-}
-
-fn edge_sl(input: &Pslg, ei: usize) -> Option<SupportingLine> {
-    let e = &input.edges()[ei];
-    let u = input.vertices()[e.vertices[0]];
-    let v = input.vertices()[e.vertices[1]];
-    SupportingLine::from_segment(u, v, e.weight)
-}
-
 /// Upstream `move_constraints_to_neighbor`: transfer non-collapsing constraints
 /// from dying triangle `tid` (collapsing side `edge_idx`) onto neighbors.
 fn move_constraints_to_neighbor(
@@ -1738,20 +1693,6 @@ fn move_constraints_to_neighbor(
         receivers.push(nid);
     }
     Ok(receivers)
-}
-
-fn link_vertex_edge(
-    kt: &mut KineticTriangulation,
-    vid: crate::wavefront::vertex::VertexId,
-    eid: crate::wavefront::edge::EdgeId,
-) {
-    if let Some(v) = kt.vertices.get_mut(vid) {
-        if v.incident_edges[0].is_none() {
-            v.incident_edges[0] = Some(eid);
-        } else if v.incident_edges[1].is_none() {
-            v.incident_edges[1] = Some(eid);
-        }
-    }
 }
 
 #[cfg(test)]

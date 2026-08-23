@@ -467,8 +467,7 @@ impl KineticTriangulation {
     }
 
     /// Validate live triangles' local topology.
-    pub fn check_invariants(&self, time: f64) -> Result<(), PropagationError> {
-        let _ = time;
+    pub fn check_invariants(&self, _time: f64) -> Result<(), PropagationError> {
         for (_, t) in &self.triangles {
             if !t.live() {
                 continue;
@@ -489,17 +488,8 @@ impl KineticTriangulation {
                             detail: "neighbor handle dangling".into(),
                         }
                     })?;
-                    let mut ok = false;
-                    for s2 in 0..3 {
-                        if other.neighbors[s2] == self.triangle_by_tidx(t.tidx) {
-                            ok = true;
-                            break;
-                        }
-                    }
-                    // Also check by identity
                     let tid = self.triangle_by_tidx(t.tidx);
-                    ok = other.neighbors.iter().any(|n| *n == tid);
-                    if !ok {
+                    if !other.neighbors.iter().any(|n| *n == tid) {
                         return Err(PropagationError::TopologyInvariant {
                             detail: format!("neighbor reciprocity failed tidx {}", t.tidx),
                         });
@@ -510,5 +500,3 @@ impl KineticTriangulation {
         Ok(())
     }
 }
-
-pub use crate::triangulation::collapse::{compute_collapse, compute_collapse_fast};

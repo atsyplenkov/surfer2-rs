@@ -259,7 +259,6 @@ pub fn refine_triangulation_initial(kt: &mut KineticTriangulation) -> Result<(),
     // Keep the pre-queue multi-pass at t=0: C++ one-pass+guard drops
     // weighted/srpg_octo0000035-random-2 131→130. Per-event drain uses
     // refine_triangulation (reflex-or-straight guard).
-    use crate::triangulation::kinetic::{ccw, cw};
     let mut guard = 0;
     loop {
         guard += 1;
@@ -324,7 +323,6 @@ pub fn refine_triangulation_initial(kt: &mut KineticTriangulation) -> Result<(),
             break;
         }
     }
-    let _ = (ccw(0), cw(0));
     Ok(())
 }
 

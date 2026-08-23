@@ -15,14 +15,6 @@ pub fn compute_collapse(
     t: &KineticTriangle,
     time_now: f64,
 ) -> Result<CollapseSpec, PropagationError> {
-    compute_collapse_fast(kt, t, time_now)
-}
-
-pub fn compute_collapse_fast(
-    kt: &KineticTriangulation,
-    t: &KineticTriangle,
-    time_now: f64,
-) -> Result<CollapseSpec, PropagationError> {
     if let Some(c) = t.collapse_cache {
         return Ok(c);
     }

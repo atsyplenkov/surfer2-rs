@@ -65,8 +65,6 @@ pub fn intersect_lines(p0: Point2, d0: Point2, p1: Point2, d1: Point2) -> Option
     // p0 + s d0 = p1 + u d1
     // s d0x - u d1x = p1x - p0x
     // s d0y - u d1y = p1y - p0y
-    let det = d0.x * (-d1.y) - d0.y * (-d1.x);
-    // det = -d0.x d1.y + d0.y d1.x = d0.y d1.x - d0.x d1.y
     let det = d0.x * d1.y - d0.y * d1.x;
     if det == 0.0 {
         return None;

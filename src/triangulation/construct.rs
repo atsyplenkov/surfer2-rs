@@ -103,7 +103,7 @@ pub(crate) fn initialize_kinetic(
     }
 
     if restrict < 0 && interior_filter.is_none() {
-        attach_unbounded_hull(&mut kt, basic, &tri_map, input);
+        attach_unbounded_hull(&mut kt, basic, &tri_map);
     }
 
     // Wavefront edges: one per constrained triangle side, oriented so the left
@@ -240,7 +240,6 @@ fn attach_unbounded_hull(
     kt: &mut KineticTriangulation,
     basic: &crate::triangulation::basic::BasicTriangulation,
     tri_map: &[Option<TriangleId>],
-    _input: &Pslg,
 ) {
     use crate::triangulation::kinetic::{ccw, cw};
 
@@ -457,8 +456,6 @@ fn create_kinetic_vertices(
 }
 
 fn create_bevels(kt: &mut KineticTriangulation, input: &Pslg) -> Result<(), SkeletonError> {
-    use crate::triangulation::kinetic::{ccw, cw};
-
     let mut deg = vec![0u32; input.vertex_count()];
     for e in input.edges() {
         deg[e.vertices[0]] += 1;
@@ -491,7 +488,6 @@ fn create_bevels(kt: &mut KineticTriangulation, input: &Pslg) -> Result<(), Skel
         seen[src as usize] = true;
         create_bevels_at_vertex(kt, tid, i)?;
     }
-    let _ = (ccw(0), cw(0));
     Ok(())
 }
 

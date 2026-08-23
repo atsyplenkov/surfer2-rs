@@ -12,7 +12,7 @@ mod endpoints;
 use std::collections::HashMap;
 
 use crate::error::SkeletonError;
-use crate::geometry::{Point2, Ray2, Segment2};
+use crate::geometry::{scene_extent, Point2, Ray2, Segment2};
 use crate::triangulation::KineticTriangulation;
 use crate::wavefront::vertex::VertexId;
 
@@ -105,28 +105,25 @@ impl Skeleton {
         &self.faces
     }
 
+    /// Finite skeleton segments after the documented runaway cutoff.
+    ///
+    /// Emission stores every finite-looking arc ([`Self::stored_segments`]).
+    /// This iterator is the public filtered view used by [`Self::segment_count`],
+    /// [`Self::node_count`], and [`Self::total_finite_length`].
+    ///
+    /// A segment is kept when its endpoints and times are finite,
+    /// `end_time >= start_time >= 0`, and its length `ℓ` satisfies
+    /// `1e-15 < ℓ ≤ 2 · D`. `D` is the axis-aligned bounding-box diagonal of
+    /// t=0 segment starts (the input footprint). An empty or degenerate
+    /// footprint floors `D` at 1 on that multiplier.
     pub fn finite_segments(&self) -> impl Iterator<Item = SkeletonSegment> + '_ {
-        // Bound runaway arcs using only t=0 endpoints (input footprint).
-        let mut min_x = f64::INFINITY;
-        let mut min_y = f64::INFINITY;
-        let mut max_x = f64::NEG_INFINITY;
-        let mut max_y = f64::NEG_INFINITY;
-        let mut any = false;
-        for s in &self.segments {
-            if s.start_time == 0.0 && s.start.is_finite() {
-                any = true;
-                min_x = min_x.min(s.start.x);
-                min_y = min_y.min(s.start.y);
-                max_x = max_x.max(s.start.x);
-                max_y = max_y.max(s.start.y);
-            }
-        }
-        let diag = if any {
-            (max_x - min_x).hypot(max_y - min_y).max(1.0)
-        } else {
-            1.0e6
-        };
-        let max_len = diag * 2.0;
+        let extent = scene_extent(
+            self.segments
+                .iter()
+                .filter(|s| s.start_time == 0.0)
+                .map(|s| s.start),
+        );
+        let max_len = extent.max(1.0) * 2.0;
         self.segments.iter().copied().filter(move |s| {
             if !(s.start.is_finite()
                 && s.end.is_finite()
@@ -142,7 +139,9 @@ impl Skeleton {
         })
     }
 
-    pub fn all_finite_segments(&self) -> &[SkeletonSegment] {
+    /// Unfiltered stored skeleton segments, including any the finite view
+    /// would drop as runaway or non-finite.
+    pub fn stored_segments(&self) -> &[SkeletonSegment] {
         &self.segments
     }
 

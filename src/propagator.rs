@@ -6,7 +6,7 @@
 use crate::dcel::{build_dcel, Skeleton};
 use crate::error::{SkeletonError, TriangulationError};
 use crate::event::{CollapseSpec, CollapseType, EventQueue};
-use crate::geometry::Point2;
+use crate::geometry::{scene_extent, Point2};
 use crate::input::{Polygon, Pslg};
 use crate::stats::Stats;
 use crate::triangulation::around_vertex::{most_around, step_around};
@@ -1034,20 +1034,13 @@ impl Propagator {
     }
 
     fn scene_gap(&self) -> f64 {
-        let mut min_x = f64::INFINITY;
-        let mut min_y = f64::INFINITY;
-        let mut max_x = f64::NEG_INFINITY;
-        let mut max_y = f64::NEG_INFINITY;
-        for iv in self.kt.vertices.values() {
-            if !iv.is_initial {
-                continue;
-            }
-            min_x = min_x.min(iv.pos_zero.x);
-            min_y = min_y.min(iv.pos_zero.y);
-            max_x = max_x.max(iv.pos_zero.x);
-            max_y = max_y.max(iv.pos_zero.y);
-        }
-        (max_x - min_x).hypot(max_y - min_y) * 1e-4
+        scene_extent(
+            self.kt
+                .vertices
+                .values()
+                .filter(|iv| iv.is_initial)
+                .map(|iv| iv.pos_zero),
+        ) * 1e-4
     }
 
     /// C++: a stopped vertex always has `next_vertex` on both sides.
@@ -1498,22 +1491,7 @@ impl Propagator {
 /// Based on bounding-box diagonal so a translated unit polygon keeps the
 /// near-exact snap. Metre-scale scenes (diagonal ≥ 1 km) use 5 mm.
 fn junction_eps_from_coords(pts: impl Iterator<Item = Point2>) -> f64 {
-    let mut min_x = f64::INFINITY;
-    let mut min_y = f64::INFINITY;
-    let mut max_x = f64::NEG_INFINITY;
-    let mut max_y = f64::NEG_INFINITY;
-    let mut any = false;
-    for p in pts {
-        any = true;
-        min_x = min_x.min(p.x);
-        min_y = min_y.min(p.y);
-        max_x = max_x.max(p.x);
-        max_y = max_y.max(p.y);
-    }
-    if !any {
-        return JUNCTION_EPS_UNIT;
-    }
-    let extent = (max_x - min_x).hypot(max_y - min_y);
+    let extent = scene_extent(pts);
     if extent.is_finite() && extent >= JUNCTION_METRE_SCALE {
         JUNCTION_EPS_METRE
     } else {

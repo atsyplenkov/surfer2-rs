@@ -152,6 +152,35 @@ pub fn require_finite_point(p: Point2, index: usize) -> Result<(), InputError> {
     }
 }
 
+/// Axis-aligned bounding-box diagonal of `pts`.
+///
+/// Callers pass the input footprint (t=0 / initial positions), not skeleton
+/// stop positions. Non-finite points are ignored. Returns 0 when no finite
+/// points remain. Multipliers (metre thresholds, gap, runaway length,
+/// endpoint-union ε) live at the call site.
+pub(crate) fn scene_extent(pts: impl Iterator<Item = Point2>) -> f64 {
+    let mut min_x = f64::INFINITY;
+    let mut min_y = f64::INFINITY;
+    let mut max_x = f64::NEG_INFINITY;
+    let mut max_y = f64::NEG_INFINITY;
+    let mut any = false;
+    for p in pts {
+        if !p.is_finite() {
+            continue;
+        }
+        any = true;
+        min_x = min_x.min(p.x);
+        min_y = min_y.min(p.y);
+        max_x = max_x.max(p.x);
+        max_y = max_y.max(p.y);
+    }
+    if !any {
+        0.0
+    } else {
+        (max_x - min_x).hypot(max_y - min_y)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

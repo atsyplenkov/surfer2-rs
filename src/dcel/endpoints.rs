@@ -7,7 +7,7 @@
 use std::collections::HashMap;
 
 use crate::dcel::{Node, NodeId};
-use crate::geometry::Point2;
+use crate::geometry::{scene_extent, Point2};
 use crate::triangulation::kinetic::{ArcEnd, ArcRecord};
 use crate::triangulation::KineticTriangulation;
 use crate::wavefront::vertex::VertexId;
@@ -78,21 +78,13 @@ impl EndpointUf {
             }
         }
 
-        let mut min = Point2::new(f64::INFINITY, f64::INFINITY);
-        let mut max = Point2::new(f64::NEG_INFINITY, f64::NEG_INFINITY);
-        for point in kt
-            .vertices
-            .values()
-            .flat_map(|v| [Some(v.pos_start), v.pos_stop])
-            .flatten()
-        {
-            min.x = min.x.min(point.x);
-            min.y = min.y.min(point.y);
-            max.x = max.x.max(point.x);
-            max.y = max.y.max(point.y);
-        }
-        let extent = (max.x - min.x).hypot(max.y - min.y).max(1.0);
-        let tolerance = extent * f64::EPSILON * 256.0;
+        let extent = scene_extent(
+            kt.vertices
+                .values()
+                .filter(|v| v.is_initial)
+                .map(|v| v.pos_zero),
+        );
+        let tolerance = extent.max(1.0) * f64::EPSILON * 256.0;
         let mut event_ends: HashMap<u64, Vec<(EndKey, Point2)>> = HashMap::new();
         for (id, v) in &kt.vertices {
             if v.time_start.is_finite() && v.pos_start.is_finite() {

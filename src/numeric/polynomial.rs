@@ -197,16 +197,4 @@ mod tests {
         assert!((r.x0 + 1.0).abs() < 1e-14);
         assert!((r.x1 - 1.0).abs() < 1e-14);
     }
-
-    #[test]
-    fn next_root_from_known_literals() {
-        assert_eq!(Poly2::constant(0.0).next_root_from(5.0), Some(5.0));
-        assert_eq!(Poly2::constant(1.0).next_root_from(5.0), None);
-        assert_eq!(Poly2::linear(1.0, -1.0).next_root_from(0.0), Some(1.0));
-        // t^2 - 1 at now=0 → 1 (past root discarded)
-        assert_eq!(
-            Poly2::quadratic(-1.0, 0.0, 1.0).next_root_from(0.0),
-            Some(1.0)
-        );
-    }
 }

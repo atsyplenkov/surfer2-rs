@@ -57,8 +57,9 @@ Known parity gaps:
   (C++ floods around the free tip before seeding the opposite half-edge).
   `degree-one-simple-000` is 15 kinetic (OBJ 19). Remaining degree-one
   gaps: simple-001/002/003, bevels-causing-splits, multi-3/4.
-- Still open: weighted inf-fast handler (stub still calls opposing;
-  random-1 117 vs OBJ 128 is not skip-∞ — kinetic geometry differs).
+- Weighted infinitely-fast events use the dedicated weighted handler
+  (oracle-bit gates for `srpg_octo0000035-random-{1,2,3}` at 117/112/120
+  kinetic; C++ double OBJ is 128/131/135).
 
 The progress and ignored exact-conformance gates are in `tests/gis.rs`.
 Frozen C++ oracle provenance is documented in

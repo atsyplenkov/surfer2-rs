@@ -302,9 +302,11 @@ impl Propagator {
             CollapseType::SpokeCollapse => self.handle_spoke_collapse(tid, spec)?,
             CollapseType::SplitOrFlipRefine => self.handle_split_or_flip(tid, spec)?,
             CollapseType::VertexMovesOverSpoke => self.handle_flip(tid, spec)?,
-            CollapseType::FaceHasInfinitelyFastVertexOpposing
-            | CollapseType::FaceHasInfinitelyFastVertexWeighted => {
+            CollapseType::FaceHasInfinitelyFastVertexOpposing => {
                 self.handle_inf_opposing(tid, spec)?
+            }
+            CollapseType::FaceHasInfinitelyFastVertexWeighted => {
+                self.handle_inf_weighted(tid, spec)?
             }
             CollapseType::CcwVertexLeavesCh => self.handle_ccw_leaves(tid, spec)?,
             CollapseType::InvalidEvent | CollapseType::Undefined | CollapseType::Never => {
@@ -1219,7 +1221,20 @@ impl Propagator {
             )
         };
         if self.same_stop(pa, pb) {
-            self.set_next_vertex(va, 1, vb, false);
+            // Constraint collapses pre-link va→vb on side 1. Weighted inf-fast
+            // may already have linked the pair on a different side; do not add
+            // a second ancestry edge.
+            let already = {
+                let a = &self.kt.vertices[va];
+                let b = &self.kt.vertices[vb];
+                a.next_vertex[0] == Some(vb)
+                    || a.next_vertex[1] == Some(vb)
+                    || b.next_vertex[0] == Some(va)
+                    || b.next_vertex[1] == Some(va)
+            };
+            if !already {
+                self.set_next_vertex(va, 1, vb, false);
+            }
             return Ok(());
         }
         if a_deg && !b_deg {
@@ -1422,6 +1437,244 @@ impl Propagator {
         self.kt.stop_vertex_at(v, time, p)?;
         self.set_next_vertex(v, if o == v_ccw { 1 } else { 0 }, o, false);
         self.collapse_side(tid, collapse, time)
+    }
+
+    /// Upstream `handle_face_with_infintely_fast_weighted_vertex`.
+    fn handle_inf_weighted(
+        &mut self,
+        tid: TriangleId,
+        spec: CollapseSpec,
+    ) -> Result<(), SkeletonError> {
+        use crate::geometry::orientation_sign;
+        use crate::triangulation::kinetic::{ccw, cw};
+
+        let time = spec.time;
+        let edge_idx = spec.relevant_edge as usize;
+        if edge_idx >= 3 {
+            return Err(crate::error::PropagationError::TopologyInvariant {
+                detail: "weighted inf-fast: bad relevant_edge".into(),
+            }
+            .into());
+        }
+
+        let winning_eid = self.kt.triangles[tid].wavefronts[edge_idx].ok_or_else(|| {
+            crate::error::PropagationError::TopologyInvariant {
+                detail: "weighted inf-fast: missing winning edge".into(),
+            }
+        })?;
+        let ccw_v = self.kt.triangles[tid].vertices[ccw(edge_idx)].ok_or_else(|| {
+            crate::error::PropagationError::TopologyInvariant {
+                detail: "weighted inf-fast: missing ccw vertex".into(),
+            }
+        })?;
+        let cw_v = self.kt.triangles[tid].vertices[cw(edge_idx)].ok_or_else(|| {
+            crate::error::PropagationError::TopologyInvariant {
+                detail: "weighted inf-fast: missing cw vertex".into(),
+            }
+        })?;
+
+        let (v_fast, winning_edge_idx_in_v, most_cw, idx_fast) =
+            if self.kt.vertices[ccw_v].infinite_speed == InfiniteSpeedType::Weighted {
+                (ccw_v, 1usize, tid, ccw(edge_idx))
+            } else {
+                let v_fast = cw_v;
+                if self.kt.vertices[v_fast].incident_edges[0] != Some(winning_eid) {
+                    return Err(crate::error::PropagationError::TopologyInvariant {
+                        detail: "weighted inf-fast: winning not left edge of right vertex".into(),
+                    }
+                    .into());
+                }
+                let other_eid = self.kt.vertices[v_fast].incident_edges[1].ok_or_else(|| {
+                    crate::error::PropagationError::TopologyInvariant {
+                        detail: "weighted inf-fast: missing other incident edge".into(),
+                    }
+                })?;
+                let most_cw = self.kt.edges[other_eid]
+                    .incident_triangle
+                    .ok_or_else(|| crate::error::PropagationError::TopologyInvariant {
+                        detail: "weighted inf-fast: other edge has no incident triangle".into(),
+                    })?;
+                let idx_fast = (0..3)
+                    .find(|&i| self.kt.triangles[most_cw].vertices[i] == Some(v_fast))
+                    .ok_or_else(|| crate::error::PropagationError::TopologyInvariant {
+                        detail: "weighted inf-fast: v_fast missing in most-cw triangle".into(),
+                    })?;
+                (v_fast, 0usize, most_cw, idx_fast)
+            };
+
+        let unbounded = self.kt.triangles[tid].vertices[edge_idx] == self.kt.infinite_vertex
+            && self.kt.infinite_vertex.is_some();
+
+        if unbounded {
+            let nidx = ccw(idx_fast);
+            let nid = self.kt.triangles[most_cw].neighbors[nidx].ok_or_else(|| {
+                crate::error::PropagationError::TopologyInvariant {
+                    detail: "weighted inf-fast unbounded: missing neighbor".into(),
+                }
+            })?;
+            raw_flip(&mut self.kt, most_cw, nidx, nid)?;
+            mark_modified(&mut self.kt, Some(&mut self.queue), nid, false)?;
+        } else {
+            let nidx_in_most_cw = ccw(idx_fast);
+            let mut flip_t = most_cw;
+            let mut flip_v = idx_fast;
+            let mut guard = 0;
+            let mut always_most_cw = false;
+            loop {
+                guard += 1;
+                if guard > 10_000 {
+                    return Err(crate::error::PropagationError::TopologyInvariant {
+                        detail: "weighted inf-fast: spoke flip loop".into(),
+                    }
+                    .into());
+                }
+                if self.kt.triangles[most_cw].vertices[idx_fast] != Some(v_fast) {
+                    return Err(crate::error::PropagationError::TopologyInvariant {
+                        detail: "weighted inf-fast: most-cw lost v_fast".into(),
+                    }
+                    .into());
+                }
+                if self.kt.triangles[most_cw].wavefronts[nidx_in_most_cw].is_some() {
+                    break;
+                }
+                if always_most_cw {
+                    let nid =
+                        self.kt.triangles[most_cw].neighbors[nidx_in_most_cw].ok_or_else(|| {
+                            crate::error::PropagationError::TopologyInvariant {
+                                detail: "weighted inf-fast: force flip neighbor".into(),
+                            }
+                        })?;
+                    raw_flip(&mut self.kt, most_cw, nidx_in_most_cw, nid)?;
+                    mark_modified(&mut self.kt, Some(&mut self.queue), nid, false)?;
+                    flip_t = most_cw;
+                    flip_v = idx_fast;
+                    continue;
+                }
+
+                // Keep flip_v aligned with v_fast in flip_t.
+                if self.kt.triangles[flip_t].vertices[flip_v] != Some(v_fast) {
+                    flip_v = (0..3)
+                        .find(|&i| self.kt.triangles[flip_t].vertices[i] == Some(v_fast))
+                        .ok_or_else(|| crate::error::PropagationError::TopologyInvariant {
+                            detail: "weighted inf-fast: flip_t lost v_fast".into(),
+                        })?;
+                }
+
+                let (pos_v0, pos_v1) = {
+                    let t = &self.kt.triangles[flip_t];
+                    let v0 = t.vertices[ccw(flip_v)].ok_or_else(|| {
+                        crate::error::PropagationError::TopologyInvariant {
+                            detail: "weighted inf-fast flip: missing ccw".into(),
+                        }
+                    })?;
+                    let v1 = t.vertices[cw(flip_v)].ok_or_else(|| {
+                        crate::error::PropagationError::TopologyInvariant {
+                            detail: "weighted inf-fast flip: missing cw".into(),
+                        }
+                    })?;
+                    (
+                        self.kt.vertices[v0].position_at(time),
+                        self.kt.vertices[v1].position_at(time),
+                    )
+                };
+
+                if flip_t != most_cw {
+                    let nidx = cw(flip_v);
+                    if let Some(nid) = self.kt.triangles[flip_t].neighbors[nidx] {
+                        let idx_in_n = self.kt.neighbor_side(nid, flip_t).ok_or_else(|| {
+                            crate::error::PropagationError::TopologyInvariant {
+                                detail: "weighted inf-fast: go-back backref".into(),
+                            }
+                        })?;
+                        let pos_v2 = {
+                            let v = self.kt.triangles[nid].vertices[idx_in_n].ok_or_else(|| {
+                                crate::error::PropagationError::TopologyInvariant {
+                                    detail: "weighted inf-fast: go-back vertex".into(),
+                                }
+                            })?;
+                            self.kt.vertices[v].position_at(time)
+                        };
+                        if orientation_sign(pos_v2, pos_v0, pos_v1) >= 0 {
+                            let Some(n) = step_around(&self.kt, flip_t, flip_v, true) else {
+                                always_most_cw = true;
+                                continue;
+                            };
+                            flip_t = n.0;
+                            flip_v = n.1;
+                            continue;
+                        }
+                    }
+                }
+
+                let nidx = ccw(flip_v);
+                let Some(nid) = self.kt.triangles[flip_t].neighbors[nidx] else {
+                    // f64 may walk onto the far constraint; finish like opposing.
+                    always_most_cw = true;
+                    continue;
+                };
+                let idx_in_n = self.kt.neighbor_side(nid, flip_t).ok_or_else(|| {
+                    crate::error::PropagationError::TopologyInvariant {
+                        detail: "weighted inf-fast: flip backref".into(),
+                    }
+                })?;
+                let pos_v2 = {
+                    let v = self.kt.triangles[nid].vertices[idx_in_n].ok_or_else(|| {
+                        crate::error::PropagationError::TopologyInvariant {
+                            detail: "weighted inf-fast: flip opp vertex".into(),
+                        }
+                    })?;
+                    self.kt.vertices[v].position_at(time)
+                };
+                if orientation_sign(pos_v0, pos_v1, pos_v2) < 0 {
+                    let Some(n) = step_around(&self.kt, flip_t, flip_v, false) else {
+                        always_most_cw = true;
+                        continue;
+                    };
+                    flip_t = n.0;
+                    flip_v = n.1;
+                } else {
+                    raw_flip(&mut self.kt, flip_t, nidx, nid)?;
+                    mark_modified(&mut self.kt, Some(&mut self.queue), nid, false)?;
+                }
+            }
+        }
+
+        if self.kt.vertices[v_fast].incident_edges[winning_edge_idx_in_v] != Some(winning_eid) {
+            return Err(crate::error::PropagationError::TopologyInvariant {
+                detail: "weighted inf-fast: winning edge slot mismatch".into(),
+            }
+            .into());
+        }
+        let losing_eid = self.kt.vertices[v_fast].incident_edges[1 - winning_edge_idx_in_v]
+            .ok_or_else(|| crate::error::PropagationError::TopologyInvariant {
+                detail: "weighted inf-fast: missing losing edge".into(),
+            })?;
+        if self.kt.edges[losing_eid].endpoints[winning_edge_idx_in_v] != v_fast {
+            return Err(crate::error::PropagationError::TopologyInvariant {
+                detail: "weighted inf-fast: losing edge endpoint".into(),
+            }
+            .into());
+        }
+        let o = self.kt.edges[losing_eid].endpoints[1 - winning_edge_idx_in_v];
+
+        if self.kt.vertices[o].infinite_speed != InfiniteSpeedType::None {
+            let pos_start = self.kt.vertices[o].pos_start;
+            self.kt.stop_vertex_at(o, time, pos_start)?;
+        } else {
+            self.kt.stop_vertex(o, time)?;
+        }
+        let p = self.kt.vertices[o]
+            .pos_stop
+            .unwrap_or_else(|| self.kt.vertices[o].position_at(time));
+        self.kt.stop_vertex_at(v_fast, time, p)?;
+        self.set_next_vertex(v_fast, 1 - winning_edge_idx_in_v, o, false);
+
+        let collapse = (0..3)
+            .find(|&i| self.kt.triangles[most_cw].wavefronts[i] == Some(losing_eid))
+            .ok_or_else(|| crate::error::PropagationError::TopologyInvariant {
+                detail: "weighted inf-fast: losing edge not on most-cw".into(),
+            })?;
+        self.collapse_side(most_cw, collapse, time)
     }
 
     fn handle_ccw_leaves(

@@ -46,9 +46,9 @@ pub fn mark_modified(
     };
     let tidx = t.tidx;
     let live = t.live();
-    // C++ also invalidates the unbounded neighbor(ccw(inf)). That extra
-    // needs_update changes event order on weighted hulls (random-2 131→130)
-    // while inf-weighted is still a stub. Queue the triangle only.
+    // C++ also invalidates the unbounded neighbor(ccw(inf)). Revisit after
+    // weighted event-order parity is locked; enabling it shifts weighted hull
+    // counts without closing the kinetic/OBJ gap on its own.
     if live {
         if let Some(q) = queue {
             q.needs_update(tidx)?;

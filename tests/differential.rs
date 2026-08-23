@@ -8,7 +8,7 @@ mod support;
 use std::path::PathBuf;
 
 use support::graph_match::{differential_tol, match_segments};
-use support::graphml::read_graphml_path;
+use support::graphml::{read_graphml_path, BitsRecord};
 use support::oracle::{double_bin, exact_bin, run_surfer};
 use surfer2::{straight_skeleton, ComponentMode, Options, Point2, Propagator};
 
@@ -207,6 +207,37 @@ fn spoke1_interior_count() {
 }
 
 #[test]
+fn weighted_oracle_bits_gates() {
+    // Always-on public-API gates from vendored oracle-bit records (no GraphML).
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("fixtures/oracle/bits");
+    let cases = [
+        // Kinetic counts after dedicated weighted inf-fast handler (C++ OBJ
+        // --component=-1 is 128/131/135; remaining gap is not skip-∞ alone).
+        ("weighted__srpg_octo0000035-random-1.json", 117),
+        ("weighted__srpg_octo0000035-random-2.json", 112),
+        ("weighted__srpg_octo0000035-random-3.json", 120),
+    ];
+    for (name, want) in cases {
+        let bits: BitsRecord = serde_json::from_str(
+            &std::fs::read_to_string(root.join(name)).unwrap_or_else(|e| panic!("{name}: {e}")),
+        )
+        .unwrap_or_else(|e| panic!("{name}: {e}"));
+        let pslg = support::graphml::GraphMlInput::from_bits_record(&bits, name)
+            .to_pslg()
+            .unwrap_or_else(|e| panic!("{name}: {e}"));
+        let sk = straight_skeleton(
+            &pslg,
+            &Options {
+                components: ComponentMode::AllSequential,
+            },
+        )
+        .unwrap_or_else(|e| panic!("{name}: {e}"));
+        assert_eq!(sk.segment_count(), want, "{name}");
+        assert_dcel_contract(&sk, name);
+    }
+}
+
+#[test]
 fn corpus_strict_count_gates() {
     // Frozen against C++ double `--component=-1` finite-nonzero OBJ counts
     // except spoke-*: C++ OBJ is 26 = 22 kinetic + 4 skip-∞ face chords.
@@ -227,7 +258,7 @@ fn corpus_strict_count_gates() {
         ("special-cases/degree-one-interior-1.graphml", 17),
         ("special-cases/degree-one-interior-2.graphml", 17),
         ("special-cases/degree-one-interior-3.graphml", 15),
-        ("weighted/srpg_octo0000035-random-2.graphml", 131),
+        ("weighted/srpg_octo0000035-random-2.graphml", 112),
     ];
     for (rel, want) in cases {
         let path = upstream_test_data().join(rel);

@@ -25,6 +25,23 @@ pub struct BitsRecord {
     pub edges: Vec<[u64; 3]>,
 }
 
+impl BitsRecord {
+    pub fn to_pslg(&self) -> Result<Pslg, surfer2::InputError> {
+        let vertices: Vec<Point2> = self
+            .xy_bits
+            .iter()
+            .copied()
+            .map(Point2::from_bits)
+            .collect();
+        let edges: Vec<InputEdge> = self
+            .edges
+            .iter()
+            .map(|e| InputEdge::new(e[0] as usize, e[1] as usize, f64::from_bits(e[2])))
+            .collect();
+        Pslg::new(vertices, edges)
+    }
+}
+
 pub fn read_graphml_path(path: &Path) -> Result<GraphMlInput, String> {
     let bytes = fs::read(path).map_err(|e| e.to_string())?;
     let mut input = read_graphml_bytes(&bytes)?;
@@ -211,6 +228,25 @@ pub fn read_graphml_bytes(bytes: &[u8]) -> Result<GraphMlInput, String> {
 impl GraphMlInput {
     pub fn to_pslg(&self) -> Result<Pslg, surfer2::InputError> {
         Pslg::new(self.vertices.clone(), self.edges.clone())
+    }
+
+    pub fn from_bits_record(bits: &BitsRecord, name: impl Into<String>) -> Self {
+        let vertices: Vec<Point2> = bits
+            .xy_bits
+            .iter()
+            .copied()
+            .map(Point2::from_bits)
+            .collect();
+        let edges: Vec<InputEdge> = bits
+            .edges
+            .iter()
+            .map(|e| InputEdge::new(e[0] as usize, e[1] as usize, f64::from_bits(e[2])))
+            .collect();
+        Self {
+            vertices,
+            edges,
+            name: name.into(),
+        }
     }
 
     pub fn to_bits_record(&self) -> BitsRecord {

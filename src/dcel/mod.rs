@@ -174,26 +174,37 @@ impl Skeleton {
     }
 }
 
+/// Build a Skeleton that satisfies the production DCEL contract.
+///
+/// This is the only constructor from a finished kinetic triangulation.
+/// Face-walk failures are retained in `IncompleteFaceCycle` diagnostics when
+/// coverage cannot be completed; they are never discarded behind an unchecked
+/// `Ok` return.
+///
+/// ```compile_fail
+/// // Unchecked emission without bounded-face validation is not public.
+/// use surfer2::dcel::emit_skeleton;
+/// ```
 pub fn build_dcel(kt: &KineticTriangulation) -> Result<Skeleton, SkeletonError> {
     let (sk, walk_failures) = emit_skeleton_with_diagnostics(kt)?;
     let unbounded = FaceId(sk.faces.len().saturating_sub(1) as u32);
     match validate_bounded_face_cycles(&sk.halfedges, &sk.faces, unbounded) {
+        // Non-empty walk_failures here mean repair resolved them; validation passed.
         Ok(()) => Ok(sk),
         Err(SkeletonError::IncompleteFaceCycle { mut detail }) => {
-            if !walk_failures.is_empty() {
-                detail.push_str("; face-walk failures: ");
-                detail.push_str(&walk_failures.join("; "));
-            }
+            append_face_walk_failures(&mut detail, &walk_failures);
             Err(SkeletonError::IncompleteFaceCycle { detail })
         }
         Err(error) => Err(error),
     }
 }
 
-/// Nodes, halfedges, and segments after face walking. Does not require
-/// reciprocal bounded coverage — that is `build_dcel`.
-pub fn emit_skeleton(kt: &KineticTriangulation) -> Result<Skeleton, SkeletonError> {
-    emit_skeleton_with_diagnostics(kt).map(|(skeleton, _)| skeleton)
+fn append_face_walk_failures(detail: &mut String, walk_failures: &[String]) {
+    if walk_failures.is_empty() {
+        return;
+    }
+    detail.push_str("; face-walk failures: ");
+    detail.push_str(&walk_failures.join("; "));
 }
 
 fn emit_skeleton_with_diagnostics(
@@ -468,10 +479,7 @@ fn emit_skeleton_with_diagnostics(
         let twin = he.twin.0 as usize;
         if twin >= halfedges.len() || halfedges[twin].twin.0 != i as u32 {
             let mut detail = format!("twin reciprocity failed at halfedge {i}");
-            if !walk_failures.is_empty() {
-                detail.push_str("; face-walk failures: ");
-                detail.push_str(&walk_failures.join("; "));
-            }
+            append_face_walk_failures(&mut detail, &walk_failures);
             return Err(SkeletonError::NonManifoldTopology { detail });
         }
     }
@@ -485,4 +493,63 @@ fn emit_skeleton_with_diagnostics(
         },
         walk_failures,
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{append_face_walk_failures, build_dcel};
+    use crate::input::Polygon;
+    use crate::propagator::Propagator;
+
+    fn finished_square() -> Propagator {
+        let poly =
+            Polygon::from_flat(&[[0.0, 0.0], [2.0, 0.0], [2.0, 2.0], [0.0, 2.0]], &[0]).unwrap();
+        let mut prop = Propagator::from_polygon(&poly).unwrap();
+        while prop.step().unwrap() {}
+        prop
+    }
+
+    #[test]
+    fn build_dcel_returns_validated_skeleton_for_finished_propagation() {
+        let prop = finished_square();
+        let sk = build_dcel(&prop.kt).expect("validated skeleton");
+        assert_eq!(sk.segment_count(), 4);
+        assert_eq!(sk.node_count(), 5);
+        let unbounded = sk.faces().len().saturating_sub(1);
+        for (fi, face) in sk.faces().iter().enumerate() {
+            if fi == unbounded {
+                continue;
+            }
+            let Some(start) = face.halfedge else {
+                panic!("bounded face {fi} has no root");
+            };
+            let mut he = start.0 as usize;
+            let mut closed = false;
+            for _ in 0..=sk.halfedges().len() {
+                assert_eq!(sk.halfedges()[he].face.0 as usize, fi);
+                he = sk.halfedges()[he].next.0 as usize;
+                if he == start.0 as usize {
+                    closed = true;
+                    break;
+                }
+            }
+            assert!(closed, "bounded face {fi} cycle did not close");
+        }
+    }
+
+    #[test]
+    fn face_walk_failures_are_retained_on_incomplete_cycle_detail() {
+        let mut detail =
+            "stage=bounded-validation face=3 halfedge=9: not reachable from face root".to_string();
+        append_face_walk_failures(
+            &mut detail,
+            &["stage=face-walk face=3 endpoint=VertexId(7) side=left: stuck".to_string()],
+        );
+        assert!(detail.contains("stage=bounded-validation"), "{detail}");
+        assert!(detail.contains("face-walk failures:"), "{detail}");
+        assert!(detail.contains("endpoint=VertexId(7)"), "{detail}");
+        let mut empty = "stage=bounded-validation face=0: has no root".to_string();
+        append_face_walk_failures(&mut empty, &[]);
+        assert_eq!(empty, "stage=bounded-validation face=0: has no root");
+    }
 }

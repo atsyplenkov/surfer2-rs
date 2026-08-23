@@ -955,20 +955,4 @@ mod tests {
             other => panic!("unexpected {other:?}"),
         }
     }
-
-    #[test]
-    fn incomplete_cycle_detail_keeps_face_walk_failures() {
-        // Mirrors `build_dcel`'s concatenation so face-walk context is not discarded.
-        let mut detail =
-            "stage=bounded-validation face=3 halfedge=9: not reachable from face root".to_string();
-        let walk_failures =
-            ["stage=face-walk face=3 endpoint=VertexId(7) side=left: stuck".to_string()];
-        detail.push_str("; face-walk failures: ");
-        detail.push_str(&walk_failures.join("; "));
-        assert!(detail.contains("stage=bounded-validation"));
-        assert!(detail.contains("face=3"));
-        assert!(detail.contains("halfedge=9"));
-        assert!(detail.contains("stage=face-walk"));
-        assert!(detail.contains("endpoint=VertexId(7)"));
-    }
 }

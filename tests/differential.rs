@@ -12,45 +12,6 @@ use support::graphml::read_graphml_path;
 use support::oracle::{double_bin, exact_bin, run_surfer};
 use surfer2::{straight_skeleton, ComponentMode, Options, Point2, Propagator};
 
-fn finite_kinetic_count(kt: &surfer2::triangulation::KineticTriangulation) -> usize {
-    let mut min_x = f64::INFINITY;
-    let mut min_y = f64::INFINITY;
-    let mut max_x = f64::NEG_INFINITY;
-    let mut max_y = f64::NEG_INFINITY;
-    let mut any = false;
-    for a in &kt.arcs {
-        if a.start_time == 0.0 && a.start.is_finite() {
-            any = true;
-            min_x = min_x.min(a.start.x);
-            min_y = min_y.min(a.start.y);
-            max_x = max_x.max(a.start.x);
-            max_y = max_y.max(a.start.y);
-        }
-    }
-    let diag = if any {
-        (max_x - min_x).hypot(max_y - min_y).max(1.0)
-    } else {
-        1.0e6
-    };
-    let max_len = diag * 2.0;
-    kt.arcs
-        .iter()
-        .filter(|a| {
-            let Some(end) = a.end else {
-                return false;
-            };
-            let Some(et) = a.end_time else {
-                return false;
-            };
-            if !(end.is_finite() && et.is_finite() && et >= a.start_time && a.start_time >= 0.0) {
-                return false;
-            }
-            let len = a.start.distance_to(end);
-            len > 1e-15 && len <= max_len
-        })
-        .count()
-}
-
 fn upstream_test_data() -> PathBuf {
     std::env::var_os("SURFER2_TEST_DATA")
         .map(PathBuf::from)
@@ -485,7 +446,11 @@ fn degree_one_interior2_events() {
         saw_t12_sof,
         "missing C++ t=12 bevel split; events={times:?}"
     );
-    assert_eq!(finite_kinetic_count(&prop.kt), 17);
+    let sk = prop
+        .into_skeleton()
+        .expect("degree-one-interior-2 skeleton");
+    assert_eq!(sk.segment_count(), 17);
+    assert_dcel_contract(&sk, "degree-one-interior-2");
 }
 
 #[test]

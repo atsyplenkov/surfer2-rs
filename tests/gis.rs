@@ -11,6 +11,7 @@ use support::oracle::ObjSkeleton;
 use surfer2::{interior_straight_skeleton, NodeId, Point2, Polygon, Skeleton};
 
 fn skeleton_graph(poly: &Polygon) -> Skeleton {
+    // Validated public API only — no IncompleteFaceCycle → raw-emit fallback.
     interior_straight_skeleton(poly).expect("skeleton")
 }
 

@@ -4,10 +4,10 @@
 
 **Blocked by:** 02 — Restore public skeleton completion for the strict corpus; 03 — Restore lake9706 through the public skeleton API; 04 — Restore lake10623 with validated TraceAt topology.
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] No public API can return a Skeleton that has skipped bounded-face coverage validation.
-- [ ] GIS acceptance tests contain no incomplete-cycle fallback path.
-- [ ] Strict corpus tests contain no duplicated finite-arc counting substitute for completed skeletons.
-- [ ] Face-walk failures are either resolved or surfaced; none are explicitly discarded.
-- [ ] Formatting, clippy, and the full locked release test suite pass.
+- [x] No public API can return a Skeleton that has skipped bounded-face coverage validation.
+- [x] GIS acceptance tests contain no incomplete-cycle fallback path.
+- [x] Strict corpus tests contain no duplicated finite-arc counting substitute for completed skeletons.
+- [x] Face-walk failures are either resolved or surfaced; none are explicitly discarded.
+- [x] Formatting, clippy, and the full locked release test suite pass.

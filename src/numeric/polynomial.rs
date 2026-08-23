@@ -35,6 +35,47 @@ impl Poly2 {
         self.c[0] + t * (self.c[1] + t * self.c[2])
     }
 
+    /// First root at or after `now`. Degree 2 prefers x1 when the leading
+    /// coefficient is negative, otherwise x0, then falls back to the later root.
+    pub fn next_root_from(self, now: f64) -> Option<f64> {
+        match self.degree() {
+            0 => {
+                if self.c[0] == 0.0 {
+                    Some(now)
+                } else {
+                    None
+                }
+            }
+            1 => {
+                if self.c[1] == 0.0 {
+                    None
+                } else {
+                    let tc = -self.c[0] / self.c[1];
+                    if tc >= now {
+                        Some(tc)
+                    } else {
+                        None
+                    }
+                }
+            }
+            2 => {
+                let roots = solve_quadratic_f64(self.c[2], self.c[1], self.c[0]);
+                if roots.count == 0 {
+                    return None;
+                }
+                let cand = if self.c[2] < 0.0 { roots.x1 } else { roots.x0 };
+                if cand >= now {
+                    Some(cand)
+                } else if roots.count == 2 && roots.x1 >= now {
+                    Some(roots.x1)
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+    }
+
     pub fn derivative(self) -> Poly1 {
         Poly1 {
             c: [self.c[1], 2.0 * self.c[2]],
@@ -155,5 +196,17 @@ mod tests {
         assert_eq!(r.count, 2);
         assert!((r.x0 + 1.0).abs() < 1e-14);
         assert!((r.x1 - 1.0).abs() < 1e-14);
+    }
+
+    #[test]
+    fn next_root_from_known_literals() {
+        assert_eq!(Poly2::constant(0.0).next_root_from(5.0), Some(5.0));
+        assert_eq!(Poly2::constant(1.0).next_root_from(5.0), None);
+        assert_eq!(Poly2::linear(1.0, -1.0).next_root_from(0.0), Some(1.0));
+        // t^2 - 1 at now=0 → 1 (past root discarded)
+        assert_eq!(
+            Poly2::quadratic(-1.0, 0.0, 1.0).next_root_from(0.0),
+            Some(1.0)
+        );
     }
 }

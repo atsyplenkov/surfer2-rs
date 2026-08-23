@@ -361,41 +361,8 @@ fn split_or_flip_from_det(
     det: crate::numeric::Poly2,
     time_now: f64,
 ) -> Result<CollapseSpec, PropagationError> {
-    use crate::numeric::solve_quadratic_f64;
-
-    let split_time = match det.degree() {
-        0 => {
-            if det.c[0] == 0.0 {
-                time_now
-            } else {
-                return Ok(CollapseSpec::never(t.component));
-            }
-        }
-        1 => {
-            if det.c[1] == 0.0 {
-                return Ok(CollapseSpec::never(t.component));
-            }
-            let tc = -det.c[0] / det.c[1];
-            if tc < time_now {
-                return Ok(CollapseSpec::never(t.component));
-            }
-            tc
-        }
-        2 => {
-            let roots = solve_quadratic_f64(det.c[2], det.c[1], det.c[0]);
-            if roots.count == 0 {
-                return Ok(CollapseSpec::never(t.component));
-            }
-            let cand = if det.c[2] < 0.0 { roots.x1 } else { roots.x0 };
-            if cand >= time_now {
-                cand
-            } else if roots.count == 2 && roots.x1 >= time_now {
-                roots.x1
-            } else {
-                return Ok(CollapseSpec::never(t.component));
-            }
-        }
-        _ => return Ok(CollapseSpec::never(t.component)),
+    let Some(split_time) = det.next_root_from(time_now) else {
+        return Ok(CollapseSpec::never(t.component));
     };
     Ok(CollapseSpec::with_edge(
         t.component,
@@ -468,7 +435,7 @@ fn generic_collapse_fast(
     t: &KineticTriangle,
     time_now: f64,
 ) -> Result<CollapseSpec, PropagationError> {
-    use crate::numeric::{determinant_poly_f64, solve_quadratic_f64};
+    use crate::numeric::determinant_poly_f64;
 
     let mut ps = [[0.0; 2]; 3];
     let mut vs = [[0.0; 2]; 3];
@@ -487,44 +454,8 @@ fn generic_collapse_fast(
         vs[i] = [v.velocity.x, v.velocity.y];
     }
     let det = determinant_poly_f64(ps[0], vs[0], ps[1], vs[1], ps[2], vs[2]);
-    let collapse_time = match det.degree() {
-        0 => {
-            if det.c[0] == 0.0 {
-                time_now
-            } else {
-                return Ok(CollapseSpec::never(t.component));
-            }
-        }
-        1 => {
-            // a0 + a1 t = 0 → t = -a0/a1
-            if det.c[1] == 0.0 {
-                return Ok(CollapseSpec::never(t.component));
-            }
-            let tc = -det.c[0] / det.c[1];
-            if tc < time_now {
-                return Ok(CollapseSpec::never(t.component));
-            }
-            tc
-        }
-        2 => {
-            let roots = solve_quadratic_f64(det.c[2], det.c[1], det.c[0]);
-            if roots.count == 0 {
-                return Ok(CollapseSpec::never(t.component));
-            }
-            // Upstream: sign of leading coeff selects root
-            let sign2 = det.c[2].signum();
-            let candidate = if sign2 < 0.0 { roots.x1 } else { roots.x0 };
-            if candidate < time_now {
-                if roots.count == 2 && roots.x1 >= time_now {
-                    roots.x1
-                } else {
-                    return Ok(CollapseSpec::never(t.component));
-                }
-            } else {
-                candidate
-            }
-        }
-        _ => return Ok(CollapseSpec::never(t.component)),
+    let Some(collapse_time) = det.next_root_from(time_now) else {
+        return Ok(CollapseSpec::never(t.component));
     };
 
     // Classify at collapse time
@@ -739,7 +670,7 @@ fn generic_collapse_time_3(
     w: &WavefrontVertex,
     time_now: f64,
 ) -> Option<f64> {
-    use crate::numeric::{determinant_poly_f64, solve_quadratic_f64};
+    use crate::numeric::determinant_poly_f64;
     let det = determinant_poly_f64(
         [u.pos_zero.x, u.pos_zero.y],
         [u.velocity.x, u.velocity.y],
@@ -748,41 +679,11 @@ fn generic_collapse_time_3(
         [w.pos_zero.x, w.pos_zero.y],
         [w.velocity.x, w.velocity.y],
     );
-    match det.degree() {
-        0 => {
-            // Always-colinear CH triple: they are not leaving (C++ NEVER).
-            None
-        }
-        1 => {
-            if det.c[1] == 0.0 {
-                return None;
-            }
-            let tc = -det.c[0] / det.c[1];
-            if tc >= time_now {
-                Some(tc)
-            } else {
-                None
-            }
-        }
-        2 => {
-            let roots = solve_quadratic_f64(det.c[2], det.c[1], det.c[0]);
-            if roots.count == 0 {
-                return None;
-            }
-            if det.c[2] < 0.0 {
-                if roots.x1 >= time_now {
-                    Some(roots.x1)
-                } else {
-                    None
-                }
-            } else if roots.x0 >= time_now {
-                Some(roots.x0)
-            } else {
-                None
-            }
-        }
-        _ => None,
+    if det.degree() == 0 {
+        // Always-colinear CH triple: they are not leaving (C++ NEVER).
+        return None;
     }
+    det.next_root_from(time_now)
 }
 
 #[cfg(test)]

@@ -4,8 +4,9 @@
 //! `TraceAt`). `TraceAt` splits the host vertex's traced ridge at the
 //! landing time so a spoke shares that node — no geometric search.
 
-use std::collections::HashMap;
+use rustc_hash::FxHashMap as HashMap;
 
+use super::sewing_map;
 use crate::dcel::{Node, NodeId};
 use crate::geometry::Point2;
 use crate::triangulation::kinetic::{ArcEnd, ArcRecord};
@@ -70,7 +71,7 @@ fn union_nearby_ends(uf: &mut EndpointUf, ends: &[(EndKey, Point2)], tolerance: 
         )
     };
 
-    let mut bins: HashMap<(i64, i64), Vec<usize>> = HashMap::new();
+    let mut bins: HashMap<(i64, i64), Vec<usize>> = sewing_map(ends.len());
     for (i, &(_, p)) in ends.iter().enumerate() {
         bins.entry(cell_of(p)).or_default().push(i);
     }
@@ -102,8 +103,9 @@ pub(super) struct EndpointUf {
 
 impl EndpointUf {
     pub(super) fn from_links(kt: &KineticTriangulation) -> Self {
+        let n_vert = kt.vertices.len();
         let mut uf = Self {
-            parent: HashMap::new(),
+            parent: sewing_map(n_vert.saturating_mul(4)),
             uniq: 0,
         };
         for (id, v) in &kt.vertices {
@@ -127,7 +129,7 @@ impl EndpointUf {
 
         let extent = kt.footprint_extent();
         let tolerance = extent.max(1.0) * f64::EPSILON * 256.0;
-        let mut event_ends: HashMap<u64, Vec<(EndKey, Point2)>> = HashMap::new();
+        let mut event_ends: HashMap<u64, Vec<(EndKey, Point2)>> = sewing_map(n_vert);
         for (id, v) in &kt.vertices {
             if v.time_start.is_finite() && v.pos_start.is_finite() {
                 event_ends
@@ -144,6 +146,8 @@ impl EndpointUf {
                 }
             }
         }
+        // Fx hasher: bucket visit order is deterministic (not SipHash-random).
+        // Union partition does not depend on which time group runs first.
         for ends in event_ends.values() {
             union_nearby_ends(&mut uf, ends, tolerance);
         }
@@ -223,7 +227,7 @@ pub(super) fn ensure_node(
 /// Split traced ridges through every `TraceAt` landing on the same vertex.
 /// Also returns identity unions for omitted zero-length pieces (same vertex).
 pub(super) fn expand_arcs(arcs: &[ArcRecord]) -> (Vec<ArcRecord>, Vec<(EndKey, EndKey)>) {
-    let mut hits: HashMap<u64, Vec<(u64, Point2)>> = HashMap::new();
+    let mut hits: HashMap<u64, Vec<(u64, Point2)>> = sewing_map(arcs.len());
     for a in arcs {
         if let Some(ArcEnd::TraceAt { vertex, time_bits }) = a.end_end {
             if let Some(p) = a.end {

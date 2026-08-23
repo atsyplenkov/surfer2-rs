@@ -19,6 +19,7 @@ slotmap = "=1.1.1"
 spade = "=2.15.1"
 robust = "=1.2.0"
 thiserror = "2.0"
+rustc-hash = "2"
 
 [dev-dependencies]
 quick-xml = "0.40.1"

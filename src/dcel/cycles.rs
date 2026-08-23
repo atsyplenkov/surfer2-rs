@@ -1,7 +1,8 @@
 //! Face-cycle construction and DCEL validation.
 
-use std::collections::HashMap;
+use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 
+use super::{sewing_map, sewing_set};
 use crate::dcel::{ArcGeometry, Face, FaceId, HalfEdge, HalfEdgeId, Node, NodeId};
 use crate::error::SkeletonError;
 use crate::triangulation::KineticTriangulation;
@@ -29,7 +30,7 @@ pub(super) fn connect_face_cycles(
 
     // C++ `create_remaining_skeleton_dcel_one_face`: walk next_vertex /
     // prev_vertex from each initial vertex, skipping degenerates.
-    let mut walked_faces = std::collections::HashSet::new();
+    let mut walked_faces: HashSet<u32> = sewing_set(face_base.len());
     let mut walk_failures = Vec::new();
     let mut seeds: Vec<(u32, VertexId)> = Vec::new();
     for (id, v) in &kt.vertices {
@@ -47,7 +48,8 @@ pub(super) fn connect_face_cycles(
         };
         seeds.push((edge.skeleton_face, id));
     }
-    for (&face, _) in face_base {
+    // face_base uses Fx hasher (deterministic bucket order, not SipHash-random).
+    for &face in face_base.keys() {
         if seeds.iter().any(|(f, _)| *f == face) {
             continue;
         }
@@ -588,17 +590,17 @@ fn rebuild_incomplete_faces(
             halfedges[i].next = HalfEdgeId(i as u32);
             halfedges[i].prev = HalfEdgeId(i as u32);
         }
-        let mut outgoing: HashMap<u32, Vec<usize>> = HashMap::new();
-        let mut incoming: HashMap<u32, Vec<usize>> = HashMap::new();
+        let mut outgoing: HashMap<u32, Vec<usize>> = sewing_map(face_halfedges.len());
+        let mut incoming: HashMap<u32, Vec<usize>> = sewing_map(face_halfedges.len());
         for &i in &face_halfedges {
             outgoing.entry(halfedges[i].origin.0).or_default().push(i);
             incoming.entry(dest[i]).or_default().push(i);
         }
-        for (node, ins) in incoming {
-            let Some(outs) = outgoing.get(&node) else {
+        for (node, ins) in &incoming {
+            let Some(outs) = outgoing.get(node) else {
                 continue;
             };
-            for (from, to) in pair_at_vertex(halfedges, nodes, &dest, node, &ins, outs) {
+            for (from, to) in pair_at_vertex(halfedges, nodes, &dest, *node, ins, outs) {
                 halfedges[from].next = HalfEdgeId(to as u32);
                 halfedges[to].prev = HalfEdgeId(from as u32);
             }
@@ -856,8 +858,8 @@ fn leftover_face_node_buckets(
     HashMap<(u32, u32), Vec<usize>>,
     HashMap<(u32, u32), Vec<usize>>,
 ) {
-    let mut outgoing: HashMap<(u32, u32), Vec<usize>> = HashMap::new();
-    let mut incoming: HashMap<(u32, u32), Vec<usize>> = HashMap::new();
+    let mut outgoing: HashMap<(u32, u32), Vec<usize>> = sewing_map(halfedges.len());
+    let mut incoming: HashMap<(u32, u32), Vec<usize>> = sewing_map(halfedges.len());
     for i in 0..halfedges.len() {
         if !leftover(i) {
             continue;
@@ -880,6 +882,7 @@ fn pair_remaining_by_dest(halfedges: &mut [HalfEdge], nodes: &[Node], dest: &[u3
     let (outgoing, incoming) =
         leftover_face_node_buckets(halfedges, dest, |i| halfedges[i].next.0 == i as u32);
 
+    // Fx hasher keeps key visit order deterministic across runs.
     let keys: Vec<(u32, u32)> = outgoing.keys().copied().collect();
     for key in keys {
         let outs = match outgoing.get(&key) {

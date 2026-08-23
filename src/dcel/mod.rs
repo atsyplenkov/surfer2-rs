@@ -9,7 +9,7 @@
 mod cycles;
 mod endpoints;
 
-use std::collections::HashMap;
+use rustc_hash::{FxBuildHasher, FxHashMap as HashMap};
 
 use crate::error::SkeletonError;
 use crate::geometry::{Point2, Ray2, Segment2};
@@ -18,6 +18,18 @@ use crate::wavefront::vertex::VertexId;
 
 use cycles::{connect_face_cycles, validate_bounded_face_cycles};
 use endpoints::{arc_keys, ensure_node, expand_arcs, EndKey, EndpointUf};
+
+/// Fast non-crypto map for integer/EndKey sewing tables (no SipHash tax).
+#[inline]
+pub(super) fn sewing_map<K, V>(capacity: usize) -> HashMap<K, V> {
+    HashMap::with_capacity_and_hasher(capacity, FxBuildHasher)
+}
+
+/// Fast non-crypto set twin of [`sewing_map`].
+#[inline]
+pub(super) fn sewing_set<K>(capacity: usize) -> rustc_hash::FxHashSet<K> {
+    rustc_hash::FxHashSet::with_capacity_and_hasher(capacity, FxBuildHasher)
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NodeId(pub u32);
@@ -207,8 +219,10 @@ fn emit_skeleton_with_diagnostics(
     kt: &KineticTriangulation,
 ) -> Result<(Skeleton, Vec<String>), SkeletonError> {
     let mut uf = EndpointUf::from_links(kt);
-    let mut nodes: Vec<Node> = Vec::new();
-    let mut root_node: HashMap<EndKey, u32> = HashMap::new();
+    let n_vert = kt.vertices.len();
+    let n_arcs = kt.arcs.len();
+    let mut nodes: Vec<Node> = Vec::with_capacity(n_vert.saturating_mul(2));
+    let mut root_node: HashMap<EndKey, u32> = sewing_map(n_vert.saturating_mul(2));
 
     let mut faces: Vec<Face> = kt
         .faces
@@ -246,17 +260,18 @@ fn emit_skeleton_with_diagnostics(
         }
     };
 
-    let mut halfedges: Vec<HalfEdge> = Vec::new();
-    let mut segments: Vec<SkeletonSegment> = Vec::new();
-    let mut face_base: HashMap<u32, u32> = HashMap::new();
-    let mut vertex_left_he: HashMap<VertexId, u32> = HashMap::new();
-    let mut ridge_pieces: HashMap<VertexId, Vec<(u64, u32)>> = HashMap::new();
+    let mut halfedges: Vec<HalfEdge> =
+        Vec::with_capacity(n_skel_faces.saturating_mul(2).saturating_add(n_arcs.saturating_mul(2)));
+    let mut segments: Vec<SkeletonSegment> = Vec::with_capacity(n_arcs);
+    let mut face_base: HashMap<u32, u32> = sewing_map(n_skel_faces);
+    let mut vertex_left_he: HashMap<VertexId, u32> = sewing_map(n_vert);
+    let mut ridge_pieces: HashMap<VertexId, Vec<(u64, u32)>> = sewing_map(n_vert);
     let mut infinite_node = None;
 
     // One emanating input HE per input face, from the two *initial*
     // kinetic vertices of that edge. Current WavefrontEdge::endpoints are
     // rewritten by splits/collapses and must not be used as t=0 corners.
-    let mut face_ends: HashMap<u32, [Option<VertexId>; 2]> = HashMap::new();
+    let mut face_ends: HashMap<u32, [Option<VertexId>; 2]> = sewing_map(n_skel_faces);
     for (id, v) in &kt.vertices {
         if !v.is_initial || v.source_input_vertex.is_some() {
             continue;

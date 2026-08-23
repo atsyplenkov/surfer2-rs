@@ -96,11 +96,15 @@ pub(super) fn connect_face_cycles(
         }
     }
 
-    pair_remaining_by_dest(halfedges, nodes);
-    splice_remaining_into_cycles(halfedges, unbounded);
-    attach_free_ends(halfedges, unbounded);
-    rebuild_incomplete_faces(halfedges, nodes, faces, unbounded);
-    close_infinity_gaps(halfedges, faces, unbounded);
+    let mut dest: Vec<u32> = halfedges
+        .iter()
+        .map(|he| halfedges[he.twin.0 as usize].origin.0)
+        .collect();
+    pair_remaining_by_dest(halfedges, nodes, &dest);
+    splice_remaining_into_cycles(halfedges, unbounded, &dest);
+    attach_free_ends(halfedges, unbounded, &dest);
+    rebuild_incomplete_faces(halfedges, nodes, faces, unbounded, &dest);
+    close_infinity_gaps(halfedges, faces, unbounded, &mut dest);
     repair_face_halfedges(halfedges, faces, unbounded);
     Ok(walk_failures)
 }
@@ -351,9 +355,8 @@ fn next_on_face(
 
 /// Insert leftover chains into an existing same-face cycle when their
 /// endpoint nodes match an existing link.
-fn splice_remaining_into_cycles(halfedges: &mut [HalfEdge], unbounded: FaceId) {
+fn splice_remaining_into_cycles(halfedges: &mut [HalfEdge], unbounded: FaceId, dest: &[u32]) {
     let n = halfedges.len();
-    let dest = |he: usize, hes: &[HalfEdge]| hes[hes[he].twin.0 as usize].origin.0;
     for start in 0..n {
         if halfedges[start].face == unbounded || halfedges[start].prev.0 != start as u32 {
             continue;
@@ -372,12 +375,12 @@ fn splice_remaining_into_cycles(halfedges: &mut [HalfEdge], unbounded: FaceId) {
         for pred in 0..n {
             if halfedges[pred].face != halfedges[start].face
                 || halfedges[pred].next.0 == pred as u32
-                || dest(pred, halfedges) != halfedges[start].origin.0
+                || dest[pred] != halfedges[start].origin.0
             {
                 continue;
             }
             let succ = halfedges[pred].next.0 as usize;
-            if dest(end, halfedges) != halfedges[succ].origin.0 {
+            if dest[end] != halfedges[succ].origin.0 {
                 continue;
             }
             halfedges[pred].next = HalfEdgeId(start as u32);
@@ -422,12 +425,11 @@ fn he_starts_reciprocal_cycle(halfedges: &[HalfEdge], start: usize, face: u32) -
 
 /// Link a leftover next to the unique same-face halfedge whose origin is
 /// this dest and whose prev is still free. Topology only — no face rewrite.
-fn attach_free_ends(halfedges: &mut [HalfEdge], unbounded: FaceId) {
+fn attach_free_ends(halfedges: &mut [HalfEdge], unbounded: FaceId, dest: &[u32]) {
     let n = halfedges.len();
-    let dest: Vec<u32> = halfedges
-        .iter()
-        .map(|he| halfedges[he.twin.0 as usize].origin.0)
-        .collect();
+    let (mut starts, _) = leftover_face_node_buckets(halfedges, dest, |i| {
+        halfedges[i].face != unbounded && halfedges[i].prev.0 == i as u32
+    });
     let mut grew = true;
     let mut guard = 0;
     while grew {
@@ -440,22 +442,27 @@ fn attach_free_ends(halfedges: &mut [HalfEdge], unbounded: FaceId) {
             if halfedges[i].face == unbounded || halfedges[i].next.0 != i as u32 {
                 continue;
             }
+            let key = (halfedges[i].face.0, dest[i]);
+            let Some(cands) = starts.get(&key) else {
+                continue;
+            };
             let mut found = None;
-            for j in 0..n {
-                if i == j || halfedges[j].face != halfedges[i].face {
+            for &j in cands {
+                if i == j || halfedges[j].prev.0 != j as u32 {
                     continue;
                 }
-                if halfedges[j].prev.0 == j as u32 && halfedges[j].origin.0 == dest[i] {
-                    if found.is_some() {
-                        found = None;
-                        break;
-                    }
-                    found = Some(j);
+                if found.is_some() {
+                    found = None;
+                    break;
                 }
+                found = Some(j);
             }
             if let Some(j) = found {
                 halfedges[i].next = HalfEdgeId(j as u32);
                 halfedges[j].prev = HalfEdgeId(i as u32);
+                if let Some(v) = starts.get_mut(&key) {
+                    v.retain(|&x| x != j);
+                }
                 grew = true;
             }
         }
@@ -467,11 +474,8 @@ fn rebuild_incomplete_faces(
     nodes: &[Node],
     faces: &mut [Face],
     unbounded: FaceId,
+    dest: &[u32],
 ) {
-    let dest: Vec<u32> = halfedges
-        .iter()
-        .map(|he| halfedges[he.twin.0 as usize].origin.0)
-        .collect();
     let mut by_face = vec![Vec::new(); faces.len()];
     for (i, he) in halfedges.iter().enumerate() {
         if he.face != unbounded {
@@ -516,11 +520,12 @@ fn rebuild_incomplete_faces(
     }
 }
 
-fn close_infinity_gaps(halfedges: &mut Vec<HalfEdge>, faces: &[Face], unbounded: FaceId) {
-    let dest: Vec<u32> = halfedges
-        .iter()
-        .map(|he| halfedges[he.twin.0 as usize].origin.0)
-        .collect();
+fn close_infinity_gaps(
+    halfedges: &mut Vec<HalfEdge>,
+    faces: &[Face],
+    unbounded: FaceId,
+    dest: &mut Vec<u32>,
+) {
     let mut ends = vec![Vec::new(); faces.len()];
     let mut starts = vec![Vec::new(); faces.len()];
     for (i, he) in halfedges.iter().enumerate() {
@@ -583,6 +588,8 @@ fn close_infinity_gaps(halfedges: &mut Vec<HalfEdge>, faces: &[Face], unbounded:
         halfedges[start_a].prev = HalfEdgeId(a);
         halfedges[end_b].next = HalfEdgeId(b);
         halfedges[start_b].prev = HalfEdgeId(b);
+        dest.push(to);
+        dest.push(from);
         closed[i] = true;
         closed[j] = true;
     }
@@ -753,19 +760,19 @@ pub(super) fn validate_bounded_face_cycles(
     Ok(())
 }
 
-/// Pair leftover self-loops by (face, dest → origin). Unique at a node, or
-/// smallest CCW turn when several halfedges share a vertex on one face.
-fn pair_remaining_by_dest(halfedges: &mut [HalfEdge], nodes: &[Node]) {
-    let n = halfedges.len();
-    let dest: Vec<u32> = halfedges
-        .iter()
-        .map(|he| halfedges[he.twin.0 as usize].origin.0)
-        .collect();
-
+/// Leftover halfedges keyed by (face, origin) and (face, dest).
+fn leftover_face_node_buckets(
+    halfedges: &[HalfEdge],
+    dest: &[u32],
+    mut leftover: impl FnMut(usize) -> bool,
+) -> (
+    HashMap<(u32, u32), Vec<usize>>,
+    HashMap<(u32, u32), Vec<usize>>,
+) {
     let mut outgoing: HashMap<(u32, u32), Vec<usize>> = HashMap::new();
     let mut incoming: HashMap<(u32, u32), Vec<usize>> = HashMap::new();
-    for i in 0..n {
-        if halfedges[i].next.0 != i as u32 {
+    for i in 0..halfedges.len() {
+        if !leftover(i) {
             continue;
         }
         outgoing
@@ -777,6 +784,14 @@ fn pair_remaining_by_dest(halfedges: &mut [HalfEdge], nodes: &[Node]) {
             .or_default()
             .push(i);
     }
+    (outgoing, incoming)
+}
+
+/// Pair leftover self-loops by (face, dest → origin). Unique at a node, or
+/// smallest CCW turn when several halfedges share a vertex on one face.
+fn pair_remaining_by_dest(halfedges: &mut [HalfEdge], nodes: &[Node], dest: &[u32]) {
+    let (outgoing, incoming) =
+        leftover_face_node_buckets(halfedges, dest, |i| halfedges[i].next.0 == i as u32);
 
     let keys: Vec<(u32, u32)> = outgoing.keys().copied().collect();
     for key in keys {

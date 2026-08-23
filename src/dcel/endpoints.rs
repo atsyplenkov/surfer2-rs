@@ -7,7 +7,7 @@
 use std::collections::HashMap;
 
 use crate::dcel::{Node, NodeId};
-use crate::geometry::{scene_extent, Point2};
+use crate::geometry::Point2;
 use crate::triangulation::kinetic::{ArcEnd, ArcRecord};
 use crate::triangulation::KineticTriangulation;
 use crate::wavefront::vertex::VertexId;
@@ -78,12 +78,7 @@ impl EndpointUf {
             }
         }
 
-        let extent = scene_extent(
-            kt.vertices
-                .values()
-                .filter(|v| v.is_initial)
-                .map(|v| v.pos_zero),
-        );
+        let extent = kt.footprint_extent();
         let tolerance = extent.max(1.0) * f64::EPSILON * 256.0;
         let mut event_ends: HashMap<u64, Vec<(EndKey, Point2)>> = HashMap::new();
         for (id, v) in &kt.vertices {

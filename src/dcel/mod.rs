@@ -12,7 +12,7 @@ mod endpoints;
 use std::collections::HashMap;
 
 use crate::error::SkeletonError;
-use crate::geometry::{scene_extent, Point2, Ray2, Segment2};
+use crate::geometry::{Point2, Ray2, Segment2};
 use crate::triangulation::KineticTriangulation;
 use crate::wavefront::vertex::VertexId;
 
@@ -92,6 +92,8 @@ pub struct Skeleton {
     pub halfedges: Vec<HalfEdge>,
     pub faces: Vec<Face>,
     segments: Vec<SkeletonSegment>,
+    /// Input-footprint bbox diagonal (original PSLG vertices at t=0).
+    footprint_extent: f64,
 }
 
 impl Skeleton {
@@ -114,16 +116,11 @@ impl Skeleton {
     /// A segment is kept when its endpoints and times are finite,
     /// `end_time >= start_time >= 0`, and its length `ℓ` satisfies
     /// `1e-15 < ℓ ≤ 2 · D`. `D` is the axis-aligned bounding-box diagonal of
-    /// t=0 segment starts (the input footprint). An empty or degenerate
-    /// footprint floors `D` at 1 on that multiplier.
+    /// the input footprint (original PSLG vertices at t=0), the same extent
+    /// used for junction epsilon, scene gap, and endpoint-union tolerance.
+    /// An empty or degenerate footprint floors `D` at 1 on that multiplier.
     pub fn finite_segments(&self) -> impl Iterator<Item = SkeletonSegment> + '_ {
-        let extent = scene_extent(
-            self.segments
-                .iter()
-                .filter(|s| s.start_time == 0.0)
-                .map(|s| s.start),
-        );
-        let max_len = extent.max(1.0) * 2.0;
+        let max_len = self.footprint_extent.max(1.0) * 2.0;
         self.segments.iter().copied().filter(move |s| {
             if !(s.start.is_finite()
                 && s.end.is_finite()
@@ -489,6 +486,7 @@ fn emit_skeleton_with_diagnostics(
             halfedges,
             faces,
             segments,
+            footprint_extent: kt.footprint_extent(),
         },
         walk_failures,
     ))

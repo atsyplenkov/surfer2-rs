@@ -9,7 +9,7 @@ use slotmap::{new_key_type, SlotMap};
 
 use crate::error::PropagationError;
 use crate::event::CollapseSpec;
-use crate::geometry::Point2;
+use crate::geometry::{scene_extent, Point2};
 use crate::wavefront::edge::{EdgeId, WavefrontEdge};
 use crate::wavefront::vertex::{VertexId, WavefrontVertex};
 
@@ -332,6 +332,17 @@ impl KineticTriangulation {
         }
     }
 
+    /// Axis-aligned bbox diagonal of the input footprint (original PSLG
+    /// vertices at t=0). Unbounded-hull extras are not input.
+    pub(crate) fn footprint_extent(&self) -> f64 {
+        scene_extent(
+            self.vertices
+                .values()
+                .filter(|v| v.source_input_vertex.is_some())
+                .map(|v| v.pos_zero),
+        )
+    }
+
     /// Component of `v`'s incident kinetic triangle, or 0 if none.
     pub(crate) fn vertex_component(&self, v: VertexId) -> i32 {
         if let Some(vert) = self.vertices.get(v) {
@@ -468,10 +479,7 @@ impl KineticTriangulation {
             }
         };
         let start_time = from_v.time_start;
-        let mut component = self.vertex_component(from);
-        if component == 0 {
-            component = self.vertex_component(to);
-        }
+        let component = self.vertex_component(from);
         self.arcs.push(ArcRecord {
             start,
             end: Some(end),

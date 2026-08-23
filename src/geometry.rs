@@ -154,10 +154,10 @@ pub fn require_finite_point(p: Point2, index: usize) -> Result<(), InputError> {
 
 /// Axis-aligned bounding-box diagonal of `pts`.
 ///
-/// Callers pass the input footprint (t=0 / initial positions), not skeleton
-/// stop positions. Non-finite points are ignored. Returns 0 when no finite
-/// points remain. Multipliers (metre thresholds, gap, runaway length,
-/// endpoint-union ε) live at the call site.
+/// Callers pass the input footprint (original PSLG vertices at t=0), not
+/// skeleton stop positions or unbounded-hull extras. Non-finite points are
+/// ignored. Returns 0 when no finite points remain. Multipliers (metre
+/// thresholds, gap, runaway length, endpoint-union ε) live at the call site.
 pub(crate) fn scene_extent(pts: impl Iterator<Item = Point2>) -> f64 {
     let mut min_x = f64::INFINITY;
     let mut min_y = f64::INFINITY;

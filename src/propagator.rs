@@ -6,7 +6,7 @@
 use crate::dcel::{build_dcel, Skeleton};
 use crate::error::{SkeletonError, TriangulationError};
 use crate::event::{CollapseSpec, CollapseType, EventQueue};
-use crate::geometry::{scene_extent, Point2};
+use crate::geometry::Point2;
 use crate::input::{Polygon, Pslg};
 use crate::stats::Stats;
 use crate::triangulation::around_vertex::{most_around, step_around};
@@ -67,6 +67,7 @@ impl Propagator {
         let mut kt = initialize_kinetic(&basic, input, restrict, None)?;
         let mut queue = EventQueue::with_capacity(kt.next_tidx as usize);
         seed_queue(&mut kt, &mut queue, 0.0)?;
+        let junction_eps = junction_eps_from_extent(kt.footprint_extent());
         Ok(Self {
             kt,
             queue,
@@ -76,7 +77,7 @@ impl Propagator {
             check_invariants_each_step: cfg!(debug_assertions),
             simultaneous_streak: 0,
             last_event_time: f64::NEG_INFINITY,
-            junction_eps: junction_eps_from_coords(input.vertices().iter().copied()),
+            junction_eps,
         })
     }
 
@@ -89,6 +90,7 @@ impl Propagator {
         let mut kt = initialize_kinetic(&basic, &pslg, comp as i32, Some(&interior))?;
         let mut queue = EventQueue::with_capacity(kt.next_tidx as usize);
         seed_queue(&mut kt, &mut queue, 0.0)?;
+        let junction_eps = junction_eps_from_extent(kt.footprint_extent());
         Ok(Self {
             kt,
             queue,
@@ -98,7 +100,7 @@ impl Propagator {
             check_invariants_each_step: cfg!(debug_assertions),
             simultaneous_streak: 0,
             last_event_time: f64::NEG_INFINITY,
-            junction_eps: junction_eps_from_coords(pslg.vertices().iter().copied()),
+            junction_eps,
         })
     }
 
@@ -1036,13 +1038,7 @@ impl Propagator {
     }
 
     fn scene_gap(&self) -> f64 {
-        scene_extent(
-            self.kt
-                .vertices
-                .values()
-                .filter(|iv| iv.is_initial)
-                .map(|iv| iv.pos_zero),
-        ) * 1e-4
+        self.kt.footprint_extent() * 1e-4
     }
 
     /// C++: a stopped vertex always has `next_vertex` on both sides.
@@ -1492,13 +1488,17 @@ impl Propagator {
 ///
 /// Based on bounding-box diagonal so a translated unit polygon keeps the
 /// near-exact snap. Metre-scale scenes (diagonal ≥ 1 km) use 5 mm.
-fn junction_eps_from_coords(pts: impl Iterator<Item = Point2>) -> f64 {
-    let extent = scene_extent(pts);
+fn junction_eps_from_extent(extent: f64) -> f64 {
     if extent.is_finite() && extent >= JUNCTION_METRE_SCALE {
         JUNCTION_EPS_METRE
     } else {
         JUNCTION_EPS_UNIT
     }
+}
+
+#[cfg(test)]
+fn junction_eps_from_coords(pts: impl Iterator<Item = Point2>) -> f64 {
+    junction_eps_from_extent(crate::geometry::scene_extent(pts))
 }
 
 fn recompute_collapse(

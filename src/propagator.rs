@@ -152,6 +152,9 @@ impl Propagator {
         } else {
             self.simultaneous_streak = 0;
             self.last_event_time = spec.time;
+            // New kinetic time: drop prior-time stop candidates. Keep the list
+            // across same-time events so seal still sees co-timed stops.
+            self.kt.seal_candidates.clear();
         }
 
         self.time = spec.time;
@@ -1045,15 +1048,22 @@ impl Propagator {
     fn seal_stops(&mut self, time: f64) {
         let stopped: Vec<(VertexId, Point2)> = self
             .kt
-            .vertices
+            .seal_candidates
             .iter()
-            .filter(|(id, v)| {
-                self.kt.infinite_vertex != Some(*id)
-                    && v.time_stop
-                        .is_some_and(|t| (t - time).abs() <= 1e-9 * (1.0 + time.abs()))
+            .filter_map(|&id| {
+                if self.kt.infinite_vertex == Some(id) {
+                    return None;
+                }
+                let v = self.kt.vertices.get(id)?;
+                if v.time_stop
+                    .is_some_and(|t| (t - time).abs() <= 1e-9 * (1.0 + time.abs()))
                     && v.pos_stop.is_some()
+                {
+                    Some((id, v.pos_stop.unwrap()))
+                } else {
+                    None
+                }
             })
-            .map(|(id, v)| (id, v.pos_stop.unwrap()))
             .collect();
         for i in 0..stopped.len() {
             for j in (i + 1)..stopped.len() {

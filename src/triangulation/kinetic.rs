@@ -204,6 +204,9 @@ pub struct KineticTriangulation {
     pub tidx_in_check_refinement: Vec<bool>,
     /// Immutable after wavefront edges are created. Weights never change.
     pub has_nonunit_weight: bool,
+    /// Vertices that received a finite stop since the last clear; used by
+    /// `Propagator::seal_stops` so discovery stays O(stopped), not O(arena).
+    pub(crate) seal_candidates: Vec<VertexId>,
 }
 
 #[derive(Debug, Clone)]
@@ -421,6 +424,9 @@ impl KineticTriangulation {
         let (left_face, right_face) = (faces[0], faces[1]);
         if let Some(vert) = self.vertices.get_mut(v) {
             vert.stop(t, pos);
+        }
+        if t.is_finite() {
+            self.seal_candidates.push(v);
         }
         self.arcs.push(ArcRecord::traced(
             v,

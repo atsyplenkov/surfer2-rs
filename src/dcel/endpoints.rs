@@ -48,6 +48,53 @@ fn slotmap_key(v: VertexId) -> u64 {
     v.data().as_ffi()
 }
 
+/// Union EndKeys whose positions are within `tolerance`.
+///
+/// Compares only spatial neighbours (cell size = tolerance). Same merge
+/// predicate as the former all-pairs-in-bucket scan; bins only choose which
+/// pairs are tested. Pair selection uses endpoint index order, not HashMap
+/// visit order, so union topology does not depend on hasher iteration.
+///
+/// `tolerance` must be positive and finite (callers use footprint-extent × ε × 256).
+fn union_nearby_ends(uf: &mut EndpointUf, ends: &[(EndKey, Point2)], tolerance: f64) {
+    if ends.len() < 2 {
+        return;
+    }
+    debug_assert!(tolerance > 0.0 && tolerance.is_finite());
+
+    let inv_cell = 1.0 / tolerance;
+    let cell_of = |p: Point2| -> (i64, i64) {
+        (
+            (p.x * inv_cell).floor() as i64,
+            (p.y * inv_cell).floor() as i64,
+        )
+    };
+
+    let mut bins: HashMap<(i64, i64), Vec<usize>> = HashMap::new();
+    for (i, &(_, p)) in ends.iter().enumerate() {
+        bins.entry(cell_of(p)).or_default().push(i);
+    }
+
+    for (i, &(key_i, p_i)) in ends.iter().enumerate() {
+        let (cx, cy) = cell_of(p_i);
+        for dx in -1..=1_i64 {
+            for dy in -1..=1_i64 {
+                let Some(js) = bins.get(&(cx + dx, cy + dy)) else {
+                    continue;
+                };
+                for &j in js {
+                    if j <= i {
+                        continue;
+                    }
+                    if p_i.distance_to(ends[j].1) <= tolerance {
+                        uf.union(key_i, ends[j].0);
+                    }
+                }
+            }
+        }
+    }
+}
+
 pub(super) struct EndpointUf {
     parent: HashMap<EndKey, EndKey>,
     uniq: u64,
@@ -98,14 +145,7 @@ impl EndpointUf {
             }
         }
         for ends in event_ends.values() {
-            // ponytail: event-local quadratic scan; use spatial buckets for huge simultaneous events.
-            for i in 0..ends.len() {
-                for j in i + 1..ends.len() {
-                    if ends[i].1.distance_to(ends[j].1) <= tolerance {
-                        uf.union(ends[i].0, ends[j].0);
-                    }
-                }
-            }
+            union_nearby_ends(&mut uf, ends, tolerance);
         }
         uf
     }

@@ -6,6 +6,7 @@
 use slotmap::new_key_type;
 
 use super::edge::EdgeId;
+use super::supporting_line::SupportingLine;
 use crate::geometry::Point2;
 
 new_key_type! { pub struct VertexId; }
@@ -162,5 +163,27 @@ pub fn angle_type_at(a: Point2, b: Point2, c: Point2) -> AngleType {
         AngleType::Right
     } else {
         AngleType::Acute
+    }
+}
+
+/// C++ `WavefrontVertex`: orientation of `a.direction` then `b.direction`.
+/// LEFT_TURN → convex, COLLINEAR → straight, RIGHT_TURN → reflex.
+pub(crate) fn vertex_angle_from_lines(a: SupportingLine, b: SupportingLine) -> AngleType {
+    let d0 = a.direction;
+    let d1 = b.direction;
+    let cross = d0.x * d1.y - d0.y * d1.x;
+    let scale = d0.x.hypot(d0.y) * d1.x.hypot(d1.y);
+    if scale == 0.0 || cross.abs() <= 1e-14 * scale {
+        return AngleType::Straight;
+    }
+    if cross > 0.0 {
+        let dot = d0.x * d1.x + d0.y * d1.y;
+        if dot < 0.0 {
+            AngleType::Obtuse
+        } else {
+            AngleType::Acute
+        }
+    } else {
+        AngleType::Reflex
     }
 }

@@ -75,12 +75,6 @@ impl Poly2 {
             _ => None,
         }
     }
-
-    pub fn derivative(self) -> Poly1 {
-        Poly1 {
-            c: [self.c[1], 2.0 * self.c[2]],
-        }
-    }
 }
 
 /// Linear polynomial a0 + a1 t.

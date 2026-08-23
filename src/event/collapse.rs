@@ -106,16 +106,6 @@ impl CollapseSpec {
         }
     }
 
-    pub fn undefined(component: i32) -> Self {
-        Self {
-            component,
-            type_: CollapseType::Undefined,
-            time: 0.0,
-            relevant_edge: -1,
-            secondary_key: 0.0,
-        }
-    }
-
     pub fn new(component: i32, type_: CollapseType, time: f64) -> Self {
         debug_assert!(!type_.requires_relevant_edge());
         Self {
@@ -196,21 +186,6 @@ impl CollapseSpec {
         }
 
         Ordering::Equal
-    }
-
-    pub fn allows_refinement_to(&self, other: &Self) -> bool {
-        if self.time != other.time {
-            return false;
-        }
-        if self.type_ == CollapseType::SplitOrFlipRefine
-            && matches!(
-                other.type_,
-                CollapseType::VertexMovesOverSpoke | CollapseType::SpokeCollapse
-            )
-        {
-            return self.relevant_edge != other.relevant_edge;
-        }
-        false
     }
 }
 

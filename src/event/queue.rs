@@ -128,10 +128,6 @@ impl EventQueue {
         Ok(())
     }
 
-    pub fn is_valid_heap(&self) -> bool {
-        self.heap.is_heap()
-    }
-
     /// Drop all NEVER entries from the top until a real event or empty.
     pub fn peak_is_never(&self) -> Result<bool, PropagationError> {
         Ok(self

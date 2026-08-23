@@ -79,11 +79,6 @@ impl<P: Ord + Clone> IndexedHeap<P> {
         self.heap.first().map(|&i| &self.entries[i])
     }
 
-    pub fn peak_mut(&mut self) -> Option<&mut HeapEntry<P>> {
-        let idx = *self.heap.first()?;
-        Some(&mut self.entries[idx])
-    }
-
     pub fn get_by_payload(&self, payload: u32) -> Option<&HeapEntry<P>> {
         let ei = *self.by_payload.get(payload as usize)?;
         if ei == usize::MAX {

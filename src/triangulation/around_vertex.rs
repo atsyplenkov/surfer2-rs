@@ -24,8 +24,7 @@ pub fn step_around(
     } else {
         t.neighbors[ccw(v_idx)]
     }?;
-    let n = kt.triangles.get(next)?;
-    let t_in_n = (0..3).find(|&s| n.neighbors[s] == Some(tid))?;
+    let t_in_n = kt.neighbor_side(next, tid)?;
     let v_in_n = if use_cw { cw(t_in_n) } else { ccw(t_in_n) };
     Some((next, v_in_n))
 }

@@ -362,11 +362,11 @@ impl Propagator {
                     }
                 }
             } else if let Some(nid) = nb {
-                let idx_in_n = (0..3)
-                    .find(|&s| self.kt.triangles[nid].neighbors[s] == Some(tid))
-                    .ok_or_else(|| crate::error::PropagationError::TopologyInvariant {
+                let idx_in_n = self.kt.neighbor_side(nid, tid).ok_or_else(|| {
+                    crate::error::PropagationError::TopologyInvariant {
                         detail: "triangle collapse: neighbor missing backref".into(),
-                    })?;
+                    }
+                })?;
                 if let Some(tr) = self.kt.triangles.get_mut(tid) {
                     tr.neighbors[i] = None;
                 }
@@ -378,10 +378,7 @@ impl Propagator {
             }
         }
 
-        self.queue.needs_dropping(self.kt.triangles[tid].tidx)?;
-        if let Some(t) = self.kt.triangles.get_mut(tid) {
-            t.set_dead();
-        }
+        self.retire_face(tid)?;
         Ok(())
     }
 
@@ -392,27 +389,15 @@ impl Propagator {
     ) -> Result<(), SkeletonError> {
         use crate::triangulation::kinetic::{ccw, cw};
         let edge_idx = spec.relevant_edge as usize;
-        // Snapshot supporting lines BEFORE move_constraints clears wavefronts on t.
-        let (va, vb, left_sl, right_sl) = {
+        let (va, vb) = {
             let t = &self.kt.triangles[tid];
-            let va = t.vertices[ccw(edge_idx)].unwrap();
-            let vb = t.vertices[cw(edge_idx)].unwrap();
-            let left_sl = t.wavefronts[cw(edge_idx)].map(|e| self.kt.edges[e].supporting_line);
-            let right_sl = t.wavefronts[ccw(edge_idx)].map(|e| self.kt.edges[e].supporting_line);
-            (va, vb, left_sl, right_sl)
+            (
+                t.vertices[ccw(edge_idx)].unwrap(),
+                t.vertices[cw(edge_idx)].unwrap(),
+            )
         };
         self.stop_collapse_pair(va, vb, spec.time)?;
-        if let Some(tr) = self.kt.triangles.get_mut(tid) {
-            tr.set_dying();
-        }
-        let receivers = move_constraints_to_neighbor(&mut self.kt, tid, edge_idx)?;
-        for ntid in receivers {
-            if self.kt.triangles[ntid].live() {
-                self.queue.needs_update(self.kt.triangles[ntid].tidx)?;
-            }
-        }
-        self.constraint_collapse_part2(tid, edge_idx, spec.time, left_sl, right_sl)?;
-        Ok(())
+        self.collapse_side(tid, edge_idx, spec.time)
     }
 
     fn handle_spoke_collapse(
@@ -448,11 +433,11 @@ impl Propagator {
             return self.constraint_collapse_part2(tid, edge_idx, spec.time, left_sl, right_sl);
         };
 
-        let idx_in_n = (0..3)
-            .find(|&s| self.kt.triangles[nid].neighbors[s] == Some(tid))
-            .ok_or_else(|| crate::error::PropagationError::TopologyInvariant {
+        let idx_in_n = self.kt.neighbor_side(nid, tid).ok_or_else(|| {
+            crate::error::PropagationError::TopologyInvariant {
                 detail: "spoke collapse: neighbor missing backref".into(),
-            })?;
+            }
+        })?;
 
         // Disconnect across the spoke.
         if let Some(tr) = self.kt.triangles.get_mut(tid) {
@@ -510,11 +495,11 @@ impl Propagator {
                 let edge = (edge_idx + i) % 3;
                 let nb = self.kt.triangles[tid].neighbors[edge];
                 if let Some(nid) = nb {
-                    let idx_in_n = (0..3)
-                        .find(|&s| self.kt.triangles[nid].neighbors[s] == Some(tid))
-                        .ok_or_else(|| crate::error::PropagationError::TopologyInvariant {
+                    let idx_in_n = self.kt.neighbor_side(nid, tid).ok_or_else(|| {
+                        crate::error::PropagationError::TopologyInvariant {
                             detail: "spoke part2 complete: backref".into(),
-                        })?;
+                        }
+                    })?;
                     if let Some(tr) = self.kt.triangles.get_mut(tid) {
                         tr.neighbors[edge] = None;
                     }
@@ -537,14 +522,21 @@ impl Propagator {
                     }
                 }
             }
-            self.queue.needs_dropping(self.kt.triangles[tid].tidx)?;
-            if let Some(t) = self.kt.triangles.get_mut(tid) {
-                t.set_dead();
-            }
+            self.retire_face(tid)?;
             return Ok(());
         }
 
-        // Partial: same as constraint collapse part2 on this triangle.
+        self.collapse_side(tid, edge_idx, time)
+    }
+
+    /// Collapse this side of this triangle: snapshot supports before moving constraints.
+    fn collapse_side(
+        &mut self,
+        tid: TriangleId,
+        edge_idx: usize,
+        time: f64,
+    ) -> Result<(), SkeletonError> {
+        use crate::triangulation::kinetic::{ccw, cw};
         let (left_sl, right_sl) = {
             let t = &self.kt.triangles[tid];
             let left_sl = t.wavefronts[cw(edge_idx)].map(|e| self.kt.edges[e].supporting_line);
@@ -552,9 +544,7 @@ impl Propagator {
             (left_sl, right_sl)
         };
         if let Some(tr) = self.kt.triangles.get_mut(tid) {
-            if !tr.is_dying {
-                tr.set_dying();
-            }
+            tr.set_dying();
         }
         let receivers = move_constraints_to_neighbor(&mut self.kt, tid, edge_idx)?;
         for ntid in receivers {
@@ -562,8 +552,7 @@ impl Propagator {
                 self.queue.needs_update(self.kt.triangles[ntid].tidx)?;
             }
         }
-        self.constraint_collapse_part2(tid, edge_idx, time, left_sl, right_sl)?;
-        Ok(())
+        self.constraint_collapse_part2(tid, edge_idx, time, left_sl, right_sl)
     }
 
     /// Upstream `do_constraint_collapse_part2`: spawn successor, rewire fans, drop t.
@@ -668,13 +657,13 @@ impl Propagator {
 
         // Link neighbors across the dying triangle (excluding collapsed side).
         if let (Some(na), Some(nb)) = (na_id, nb_id) {
-            let idx_a = (0..3).find(|&s| self.kt.triangles[na].neighbors[s] == Some(tid));
-            let idx_b = (0..3).find(|&s| self.kt.triangles[nb].neighbors[s] == Some(tid));
+            let idx_a = self.kt.neighbor_side(na, tid);
+            let idx_b = self.kt.neighbor_side(nb, tid);
             if let (Some(ia), Some(ib)) = (idx_a, idx_b) {
                 self.kt.set_neighbor(na, ia, Some(nb), ib);
             }
         } else if let Some(na) = na_id {
-            if let Some(ia) = (0..3).find(|&s| self.kt.triangles[na].neighbors[s] == Some(tid)) {
+            if let Some(ia) = self.kt.neighbor_side(na, tid) {
                 if let Some(tr) = self.kt.triangles.get_mut(na) {
                     tr.neighbors[ia] = None;
                     tr.invalidate_collapse();
@@ -684,7 +673,7 @@ impl Propagator {
                 }
             }
         } else if let Some(nb) = nb_id {
-            if let Some(ib) = (0..3).find(|&s| self.kt.triangles[nb].neighbors[s] == Some(tid)) {
+            if let Some(ib) = self.kt.neighbor_side(nb, tid) {
                 if let Some(tr) = self.kt.triangles.get_mut(nb) {
                     tr.neighbors[ib] = None;
                     tr.invalidate_collapse();
@@ -701,25 +690,7 @@ impl Propagator {
             }
         }
 
-        self.queue.needs_dropping(self.kt.triangles[tid].tidx)?;
-        if let Some(t) = self.kt.triangles.get_mut(tid) {
-            t.set_dead();
-        }
-        // Clear neighbor back-pointers still pointing at tid
-        let neighbors: Vec<_> = self.kt.triangles[tid].neighbors.iter().copied().collect();
-        for nb in neighbors.into_iter().flatten() {
-            if let Some(n) = self.kt.triangles.get_mut(nb) {
-                for s2 in 0..3 {
-                    if n.neighbors[s2] == Some(tid) {
-                        n.neighbors[s2] = None;
-                        n.invalidate_collapse();
-                    }
-                }
-                if n.live() {
-                    self.queue.needs_update(n.tidx)?;
-                }
-            }
-        }
+        self.retire_face(tid)?;
         Ok(())
     }
 
@@ -899,7 +870,7 @@ impl Propagator {
         self.rewrite_star_side(tid, edge_idx, false, nvb_id)?;
 
         if let Some(na) = na_id {
-            if let Some(i) = (0..3).find(|&s| self.kt.triangles[na].neighbors[s] == Some(tid)) {
+            if let Some(i) = self.kt.neighbor_side(na, tid) {
                 self.kt.set_wavefront(na, i, nea);
                 self.schedule_leftover_collapse(na, i, nva_id, nva_motion, pos, time)?;
                 if self.kt.triangles[na].live() {
@@ -908,7 +879,7 @@ impl Propagator {
             }
         }
         if let Some(nb) = nb_id {
-            if let Some(i) = (0..3).find(|&s| self.kt.triangles[nb].neighbors[s] == Some(tid)) {
+            if let Some(i) = self.kt.neighbor_side(nb, tid) {
                 self.kt.set_wavefront(nb, i, neb);
                 self.schedule_leftover_collapse(nb, i, nvb_id, nvb_motion, pos, time)?;
                 if self.kt.triangles[nb].live() {
@@ -917,10 +888,7 @@ impl Propagator {
             }
         }
 
-        self.queue.needs_dropping(self.kt.triangles[tid].tidx)?;
-        if let Some(t) = self.kt.triangles.get_mut(tid) {
-            t.set_dead();
-        }
+        self.retire_face(tid)?;
         Ok(())
     }
 
@@ -1304,7 +1272,7 @@ impl Propagator {
         let neighbor = self.kt.triangles[tid].neighbors[side];
         if neighbor.is_none() {
             // Nothing to flip — degrade to kill if degenerate
-            self.kill_triangle(tid)?;
+            self.retire_face(tid)?;
             return Ok(());
         }
         let ntid = neighbor.unwrap();
@@ -1359,10 +1327,7 @@ impl Propagator {
                     }
                 }
             }
-            self.queue.needs_dropping(self.kt.triangles[tid].tidx)?;
-            if let Some(t) = self.kt.triangles.get_mut(tid) {
-                t.set_dead();
-            }
+            self.retire_face(tid)?;
             return Ok(());
         }
 
@@ -1372,12 +1337,12 @@ impl Propagator {
                 .map(|v| v.infinite_speed != InfiniteSpeedType::None)
                 .unwrap_or(false)
         }) else {
-            return self.kill_triangle(tid);
+            return self.retire_face(tid);
         };
 
         let v_fast = self.kt.triangles[tid].vertices[fast_idx].unwrap();
         if self.kt.infinite_vertex == Some(v_fast) {
-            return self.kill_triangle(tid);
+            return self.retire_face(tid);
         }
         let mut cur = most_around(&self.kt, tid, fast_idx, true);
         let mut guard = 0;
@@ -1438,11 +1403,11 @@ impl Propagator {
                 }
             }
             if let Some(nid) = self.kt.triangles[tid].neighbors[vidx] {
-                let idx_in_n = (0..3)
-                    .find(|&s| self.kt.triangles[nid].neighbors[s] == Some(tid))
-                    .ok_or_else(|| crate::error::PropagationError::TopologyInvariant {
+                let idx_in_n = self.kt.neighbor_side(nid, tid).ok_or_else(|| {
+                    crate::error::PropagationError::TopologyInvariant {
                         detail: "opposing spoke: backref".into(),
-                    })?;
+                    }
+                })?;
                 if let Some(tr) = self.kt.triangles.get_mut(tid) {
                     tr.neighbors[vidx] = None;
                 }
@@ -1451,13 +1416,7 @@ impl Propagator {
                 }
                 self.spoke_collapse_part2(nid, idx_in_n, time)?;
             }
-            if let Some(tr) = self.kt.triangles.get_mut(tid) {
-                tr.set_dying();
-            }
-            self.queue.needs_dropping(self.kt.triangles[tid].tidx)?;
-            if let Some(t) = self.kt.triangles.get_mut(tid) {
-                t.set_dead();
-            }
+            self.retire_face(tid)?;
             return Ok(());
         } else if d_cw < d_ccw {
             (ccw(vidx), v_cw)
@@ -1471,24 +1430,7 @@ impl Propagator {
             .unwrap_or_else(|| self.kt.vertices[o].position_at(time));
         self.kt.stop_vertex_at(v, time, p)?;
         self.set_next_vertex(v, if o == v_ccw { 1 } else { 0 }, o, false);
-        let (left_sl, right_sl) = {
-            let t = &self.kt.triangles[tid];
-            (
-                t.wavefronts[cw(collapse)].map(|e| self.kt.edges[e].supporting_line),
-                t.wavefronts[ccw(collapse)].map(|e| self.kt.edges[e].supporting_line),
-            )
-        };
-        if let Some(tr) = self.kt.triangles.get_mut(tid) {
-            tr.set_dying();
-        }
-        let receivers = move_constraints_to_neighbor(&mut self.kt, tid, collapse)?;
-        for ntid in receivers {
-            if self.kt.triangles[ntid].live() {
-                self.queue.needs_update(self.kt.triangles[ntid].tidx)?;
-            }
-        }
-        self.constraint_collapse_part2(tid, collapse, time, left_sl, right_sl)?;
-        Ok(())
+        self.collapse_side(tid, collapse, time)
     }
 
     fn handle_ccw_leaves(
@@ -1508,35 +1450,37 @@ impl Propagator {
         Ok(())
     }
 
-    fn kill_triangle(&mut self, tid: TriangleId) -> Result<(), SkeletonError> {
+    /// Dying → drop from queue → dead → clear neighbour back-pointers.
+    fn retire_face(&mut self, tid: TriangleId) -> Result<(), SkeletonError> {
         let tidx = {
             let t = self.kt.triangles.get_mut(tid).ok_or_else(|| {
                 crate::error::PropagationError::TopologyInvariant {
-                    detail: "kill missing triangle".into(),
+                    detail: "retire missing triangle".into(),
                 }
             })?;
             t.set_dying();
             t.tidx
         };
-        // Clear neighbor back-pointers
-        let neighbors: Vec<_> = self.kt.triangles[tid].neighbors.iter().copied().collect();
-        for nb in neighbors {
-            if let Some(nid) = nb {
-                if let Some(n) = self.kt.triangles.get_mut(nid) {
-                    for s2 in 0..3 {
-                        if n.neighbors[s2] == Some(tid) {
-                            n.neighbors[s2] = None;
-                            // leave as hole — wavefront should be set by handlers in full port
-                            n.invalidate_collapse();
-                        }
-                    }
-                    self.queue.needs_update(n.tidx)?;
-                }
-            }
-        }
         self.queue.needs_dropping(tidx)?;
         if let Some(t) = self.kt.triangles.get_mut(tid) {
             t.set_dead();
+        }
+        let neighbors: Vec<_> = self.kt.triangles[tid]
+            .neighbors
+            .iter()
+            .copied()
+            .flatten()
+            .collect();
+        for nb in neighbors {
+            if let Some(s) = self.kt.neighbor_side(nb, tid) {
+                if let Some(n) = self.kt.triangles.get_mut(nb) {
+                    n.neighbors[s] = None;
+                    n.invalidate_collapse();
+                    if n.live() {
+                        self.queue.needs_update(n.tidx)?;
+                    }
+                }
+            }
         }
         Ok(())
     }
@@ -1650,15 +1594,11 @@ fn move_constraints_to_neighbor(
         let Some(eid) = wf else { continue };
         let Some(nid) = nb else { continue };
 
-        // index of tid in neighbor
-        let nidx = {
-            let n = &kt.triangles[nid];
-            (0..3)
-                .find(|&s| n.neighbors[s] == Some(tid))
-                .ok_or_else(|| crate::error::PropagationError::TopologyInvariant {
-                    detail: "move_constraint: neighbor missing backref".into(),
-                })?
-        };
+        let nidx = kt.neighbor_side(nid, tid).ok_or_else(|| {
+            crate::error::PropagationError::TopologyInvariant {
+                detail: "move_constraint: neighbor missing backref".into(),
+            }
+        })?;
 
         // n must not already be constrained on nidx
         if kt.triangles[nid].wavefronts[nidx].is_some() {

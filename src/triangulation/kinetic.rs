@@ -290,6 +290,12 @@ impl KineticTriangulation {
         }
     }
 
+    /// Which side of `neighbor` points at triangle `of`.
+    pub fn neighbor_side(&self, neighbor: TriangleId, of: TriangleId) -> Option<Side> {
+        let n = self.triangles.get(neighbor)?;
+        (0..3).find(|&s| n.neighbors[s] == Some(of))
+    }
+
     pub fn set_wavefront(&mut self, t: TriangleId, side: Side, e: EdgeId) {
         if let Some(tr) = self.triangles.get_mut(t) {
             tr.wavefronts[side] = Some(e);

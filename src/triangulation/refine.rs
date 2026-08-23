@@ -122,7 +122,7 @@ pub fn refine_triangulation(
     if n.is_unbounded || !n.live() {
         return Ok(());
     }
-    let Some(idx_in_n) = (0..3).find(|&s| n.neighbors[s] == Some(tid)) else {
+    let Some(idx_in_n) = kt.neighbor_side(nid, tid) else {
         return Ok(());
     };
     let Some(o) = n.vertices[idx_in_n] else {
@@ -334,23 +334,16 @@ pub fn raw_flip(
 ) -> Result<(), SkeletonError> {
     use crate::triangulation::kinetic::{ccw, cw};
 
-    let nidx = {
-        let n = kt.triangles.get(ntid).ok_or_else(|| {
-            crate::error::PropagationError::TopologyInvariant {
-                detail: "flip missing neighbor".into(),
-            }
+    kt.triangles
+        .get(ntid)
+        .ok_or_else(|| crate::error::PropagationError::TopologyInvariant {
+            detail: "flip missing neighbor".into(),
         })?;
-        let mut found = None;
-        for s in 0..3 {
-            if n.neighbors[s] == Some(tid) {
-                found = Some(s);
-                break;
-            }
-        }
-        found.ok_or_else(|| crate::error::PropagationError::TopologyInvariant {
+    let nidx = kt.neighbor_side(ntid, tid).ok_or_else(|| {
+        crate::error::PropagationError::TopologyInvariant {
             detail: "flip: neighbor does not point back".into(),
-        })?
-    };
+        }
+    })?;
 
     let (v, o) = {
         let t = &kt.triangles[tid];
@@ -421,13 +414,10 @@ pub fn raw_flip(
                 e.incident_triangle = Some(tid);
             }
         } else if let Some(other_id) = nb {
-            if let Some(other) = kt.triangles.get_mut(other_id) {
-                for s in 0..3 {
-                    if other.neighbors[s] == Some(ntid) {
-                        other.neighbors[s] = Some(tid);
-                        other.invalidate_collapse();
-                        break;
-                    }
+            if let Some(s) = kt.neighbor_side(other_id, ntid) {
+                if let Some(other) = kt.triangles.get_mut(other_id) {
+                    other.neighbors[s] = Some(tid);
+                    other.invalidate_collapse();
                 }
             }
         }
@@ -440,13 +430,10 @@ pub fn raw_flip(
                 e.incident_triangle = Some(ntid);
             }
         } else if let Some(other_id) = nb {
-            if let Some(other) = kt.triangles.get_mut(other_id) {
-                for s in 0..3 {
-                    if other.neighbors[s] == Some(tid) {
-                        other.neighbors[s] = Some(ntid);
-                        other.invalidate_collapse();
-                        break;
-                    }
+            if let Some(s) = kt.neighbor_side(other_id, tid) {
+                if let Some(other) = kt.triangles.get_mut(other_id) {
+                    other.neighbors[s] = Some(ntid);
+                    other.invalidate_collapse();
                 }
             }
         }

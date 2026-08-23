@@ -678,7 +678,7 @@ fn split_vertex_bevel(
         t.invalidate_collapse();
     }
     if let Some(nb) = nb_cw {
-        if let Some(s) = (0..3).find(|&s| kt.triangles[nb].neighbors[s] == Some(tid)) {
+        if let Some(s) = kt.neighbor_side(nb, tid) {
             kt.triangles[nb].neighbors[s] = Some(new_t);
             kt.triangles[nb].invalidate_collapse();
         }

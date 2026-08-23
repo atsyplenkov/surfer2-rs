@@ -1065,8 +1065,31 @@ impl Propagator {
         } else {
             return Ok(());
         };
+        // The leftover wavefront edge's face is one side of the spoke; the
+        // child's other incident edge supplies the opposite bounded face.
+        // Orientation: traveling child→far, put the leftover face on the
+        // right so the directed HE child→far lies on the opposite face and
+        // can close that face's free end at the child.
+        let right_face = e.skeleton_face;
+        let left_face = {
+            let child_v = &self.kt.vertices[child];
+            let mut other = crate::triangulation::kinetic::UNBOUNDED_FACE;
+            for s in 0..2 {
+                let Some(oid) = child_v.incident_edges[s] else {
+                    continue;
+                };
+                if oid == eid {
+                    continue;
+                }
+                if let Some(oe) = self.kt.edges.get(oid) {
+                    other = oe.skeleton_face;
+                    break;
+                }
+            }
+            other
+        };
         self.kt
-            .emit_spoke(child, far, time, self.junction_eps, e.skeleton_face)
+            .emit_spoke(child, far, time, self.junction_eps, left_face, right_face)
             .map_err(SkeletonError::from)
     }
 

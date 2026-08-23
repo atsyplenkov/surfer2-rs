@@ -399,13 +399,19 @@ impl KineticTriangulation {
 
     /// Output-only spoke between two existing vertex ends. Does not insert
     /// kinetic vertices or rewrite `next_vertex` / `prev_vertex`.
+    ///
+    /// `left_face` / `right_face` are the two bounded faces adjacent to the
+    /// spoke (typically the child's two incident wavefront faces). Using
+    /// `UNBOUNDED_FACE` for the right side leaves a TraceAt landing that
+    /// cannot join reciprocal bounded cycles.
     pub fn emit_spoke(
         &mut self,
         from: VertexId,
         to: VertexId,
         time: f64,
         min_len: f64,
-        face: u32,
+        left_face: u32,
+        right_face: u32,
     ) -> Result<(), PropagationError> {
         let from_v =
             self.vertices
@@ -439,8 +445,8 @@ impl KineticTriangulation {
             end: Some(end),
             start_time: from_v.time_start,
             end_time: Some(time),
-            left_face: face,
-            right_face: UNBOUNDED_FACE,
+            left_face,
+            right_face,
             component: 0,
             from_input_edge: false,
             start_end: ArcEnd::Start(from),

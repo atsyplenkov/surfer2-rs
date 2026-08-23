@@ -12,6 +12,11 @@ use crate::triangulation::kinetic::{ArcEnd, ArcRecord};
 use crate::triangulation::KineticTriangulation;
 use crate::wavefront::vertex::VertexId;
 
+/// Collapse a TraceAt onto Stop when the landing is this close to the ridge
+/// endpoint (metres). Prevents a micro ridge piece that breaks face cycles
+/// while still allowing real mid-edge TraceAt splits further from the stop.
+const TRACE_AT_NEAR_STOP_EPS: f64 = 1e-3;
+
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub(super) enum EndKey {
     Start(u64),
@@ -250,6 +255,19 @@ fn split_traced(
                     continue;
                 }
                 if tb == etb {
+                    extra.push((
+                        end_key(ArcEnd::TraceAt {
+                            vertex: v,
+                            time_bits: tb,
+                        }),
+                        EndKey::stop(v),
+                    ));
+                    continue;
+                }
+                // Near-degenerate TraceAt just before Stop: share the stop
+                // node instead of emitting a micro ridge piece. Real mid-edge
+                // landings stay metres from the endpoint on GIS inputs.
+                if t > t0 && t < et && p.distance_to(end) <= TRACE_AT_NEAR_STOP_EPS {
                     extra.push((
                         end_key(ArcEnd::TraceAt {
                             vertex: v,

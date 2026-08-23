@@ -5,8 +5,7 @@ mod support;
 use std::path::{Path, PathBuf};
 
 use support::graph_match::{
-    bidirectional_proximity, edges_on_nodes, interior_segment_distance, match_graphs,
-    match_indexed_graphs, split_one_interior_edge, unique_points_bits,
+    bidirectional_proximity, edges_on_nodes, match_graphs, match_indexed_graphs, unique_points_bits,
 };
 use support::oracle::ObjSkeleton;
 use surfer2::{interior_straight_skeleton, NodeId, Point2, Polygon, Skeleton};
@@ -115,57 +114,6 @@ fn rust_node_ix(
         pts.push(endpoint);
         k
     })
-}
-
-/// C++ OBJ has one unsplit ridge that Rust splits at a `TraceAt` landing.
-/// Locate that unique interior Steiner and split the oracle edge there.
-fn cpp_graph_with_traceat_split(
-    cpp: &[(Point2, Point2)],
-    cpp_nodes: &[Point2],
-    rust_nodes: &[Point2],
-    rust_edges: &[(usize, usize)],
-) -> (Vec<Point2>, Vec<(usize, usize)>) {
-    let cpp_edges = edges_on_nodes(cpp, cpp_nodes, 1e-9).expect("cpp endpoints on unique-xy");
-    let mut steiners = Vec::new();
-    for (ri, &p) in rust_nodes.iter().enumerate() {
-        let nearest = cpp_nodes
-            .iter()
-            .map(|q| p.distance_to(*q))
-            .fold(f64::INFINITY, f64::min);
-        if nearest <= 1e-3 {
-            continue;
-        }
-        let hits = cpp_edges
-            .iter()
-            .filter(|&&(i, j)| {
-                interior_segment_distance(cpp_nodes[i], cpp_nodes[j], p).is_some_and(|d| d <= 0.15)
-            })
-            .count();
-        if hits == 1 {
-            steiners.push(ri);
-        }
-    }
-    assert_eq!(
-        steiners.len(),
-        1,
-        "expected one TraceAt Steiner on a C++ edge, got {}",
-        steiners.len()
-    );
-    let p = rust_nodes[steiners[0]];
-    let mut nodes = cpp_nodes.to_vec();
-    let mut edges = cpp_edges;
-    split_one_interior_edge(&mut nodes, &mut edges, p, 0.15).expect("split oracle edge");
-    assert_eq!(
-        edges.len(),
-        rust_edges.len(),
-        "split oracle should match rust segment count"
-    );
-    assert_eq!(
-        nodes.len(),
-        rust_nodes.len(),
-        "split oracle should match rust node count"
-    );
-    (nodes, edges)
 }
 
 fn obj_ends(obj: &ObjSkeleton) -> (Vec<(Point2, Point2)>, Vec<Point2>, f64) {
@@ -610,9 +558,8 @@ fn lake9706_matches_cpp_double_interior() {
 }
 
 /// Progress gate: C++ exact is 31330/31130 Euler 0. Counts, cyclomatic,
-/// and topology match.
+/// proximity, and topology match through the public validated skeleton API.
 #[test]
-#[ignore = "issue 04: restore validated TraceAt topology"]
 fn lake10623_load_and_skeleton() {
     let obj_path = gis_root().join("lake10623-cpp-exact.obj");
     let text = std::fs::read_to_string(&obj_path).expect("cpp exact obj");
@@ -632,6 +579,7 @@ fn lake10623_load_and_skeleton() {
     assert!(poly.vertices().len() >= 15365 && poly.vertices().len() <= 15567);
 
     let sk = skeleton_graph(&poly);
+    assert_dcel_contract(&sk);
     let (rust_nodes, rust_edges) = rust_graph(&sk);
     let rust_len = sk.total_finite_length();
     eprintln!(
@@ -639,8 +587,8 @@ fn lake10623_load_and_skeleton() {
         rust_edges.len(),
         rust_nodes.len()
     );
-    assert_eq!(rust_edges.len(), 31331);
-    assert_eq!(rust_nodes.len(), 31131);
+    assert_eq!(rust_edges.len(), 31330);
+    assert_eq!(rust_nodes.len(), 31130);
     assert!(
         (rust_len - 1007737.3828873356).abs() < 1.0,
         "rust len {rust_len} vs cpp {cpp_len}"
@@ -683,16 +631,14 @@ fn lake10623_load_and_skeleton() {
         prox.a_within_1mm,
         cpp_nodes.len()
     );
-    let (exp_nodes, exp_edges) =
-        cpp_graph_with_traceat_split(&cpp, &cpp_nodes, &rust_nodes, &rust_edges);
-    let report = match_indexed_graphs(&rust_nodes, &rust_edges, &exp_nodes, &exp_edges, 0.15);
+    let cpp_edges = edges_on_nodes(&cpp, &cpp_nodes, 1e-9).expect("cpp endpoints on unique-xy");
+    let report = match_indexed_graphs(&rust_nodes, &rust_edges, &cpp_nodes, &cpp_edges, 0.15);
     eprintln!("lake10623 topology {}", report.detail);
     assert!(report.ok, "{}", report.detail);
 }
 
 /// Exact conformance: 31330 segments, cyclomatic 0, bidirectional graph match.
 #[test]
-#[ignore = "issue 04: restore validated TraceAt topology"]
 fn lake10623_matches_cpp_exact_interior() {
     let obj_path = gis_root().join("lake10623-cpp-exact.obj");
     let text = std::fs::read_to_string(&obj_path).expect("cpp exact obj");
@@ -704,22 +650,22 @@ fn lake10623_matches_cpp_exact_interior() {
 
     let poly = load_geojson_polygon(&gis_root().join("lake10623.json")).expect("load");
     let sk = skeleton_graph(&poly);
+    assert_dcel_contract(&sk);
     let (rust_nodes, rust_edges) = rust_graph(&sk);
     let rust_len = sk.total_finite_length();
     assert_eq!(
         rust_edges.len(),
-        31331,
-        "rust segs {} vs cpp 31330 (+1 TraceAt ridge split)",
+        31330,
+        "rust segs {} vs cpp 31330",
         rust_edges.len()
     );
-    assert_eq!(rust_nodes.len(), 31131);
+    assert_eq!(rust_nodes.len(), 31130);
     assert_eq!(cyclomatic(&sk, 201), 0);
     assert!(
         (rust_len - 1007737.3828873356).abs() < 1.0,
         "rust len {rust_len} vs cpp {cpp_len}"
     );
-    let (exp_nodes, exp_edges) =
-        cpp_graph_with_traceat_split(&cpp, &cpp_nodes, &rust_nodes, &rust_edges);
-    let report = match_indexed_graphs(&rust_nodes, &rust_edges, &exp_nodes, &exp_edges, 0.15);
+    let cpp_edges = edges_on_nodes(&cpp, &cpp_nodes, 1e-9).expect("cpp endpoints on unique-xy");
+    let report = match_indexed_graphs(&rust_nodes, &rust_edges, &cpp_nodes, &cpp_edges, 0.15);
     assert!(report.ok, "10623 graph topology: {}", report.detail);
 }

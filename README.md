@@ -64,6 +64,36 @@ The progress and ignored exact-conformance gates are in `tests/gis.rs`.
 Frozen C++ oracle provenance is documented in
 [`fixtures/gis/README.txt`](fixtures/gis/README.txt).
 
+## Performance (Magadan lakes)
+
+Timed on host `oma` (Intel Core i7-10875H), 2026-08-23, Rust at
+`72b8641`. Interior component only. These are wall-clock numbers on one
+machine, not a CI guarantee.
+
+**lake9706** (matches frozen C++ *double* oracle for topology/counts):
+
+| Side | What was timed | Median |
+|---|---|---:|
+| This crate | Criterion `lake9706_fast` (`interior_straight_skeleton`) | **~17.6 ms** |
+| This crate | Bare Instant around the same call | **~17 ms** |
+| Upstream Surfer2 `c42f9a7`, quiet `NT_USE_DOUBLE` Release | Full process: GraphML in → OBJ out (`--component=1`) | **~81 ms** |
+
+Rust Instant and Criterion agree. The C++ figure includes reading GraphML
+and writing an OBJ, so it is not a pure “engine kernel vs engine kernel”
+split — but on this box the Rust interior skeleton is clearly faster than
+that quiet double build for lake9706.
+
+**lake10623** (matches frozen C++ *exact* oracle; C++ double historically
+crashes while building the DCEL and is not a fair speed opponent):
+
+| Side | What was timed | Median |
+|---|---|---:|
+| This crate | Bare Instant around `interior_straight_skeleton` (3 runs after 1 warmup) | **~0.47 s** |
+
+Re-run notes and helpers live under
+[`.scratch/cpp-double-bakeoff/`](.scratch/cpp-double-bakeoff/) (throwaway;
+not part of the published crate API).
+
 ## Usage
 
 ```rust

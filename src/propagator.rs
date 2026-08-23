@@ -1515,11 +1515,14 @@ impl Propagator {
             raw_flip(&mut self.kt, most_cw, nidx, nid)?;
             mark_modified(&mut self.kt, Some(&mut self.queue), nid, false)?;
         } else {
+            // C++ delays some flips when orientation(pos_v0,pos_v1,pos_v2) is a
+            // RIGHT_TURN. Under f64 that delay can walk onto the far constraint
+            // (null neighbor). Peek before delaying: if the ccw neighbor already
+            // has the constraint on its ccw(v_fast) side, flip now instead.
             let nidx_in_most_cw = ccw(idx_fast);
             let mut flip_t = most_cw;
             let mut flip_v = idx_fast;
             let mut guard = 0;
-            let mut always_most_cw = false;
             loop {
                 guard += 1;
                 if guard > 10_000 {
@@ -1537,21 +1540,7 @@ impl Propagator {
                 if self.kt.triangles[most_cw].wavefronts[nidx_in_most_cw].is_some() {
                     break;
                 }
-                if always_most_cw {
-                    let nid =
-                        self.kt.triangles[most_cw].neighbors[nidx_in_most_cw].ok_or_else(|| {
-                            crate::error::PropagationError::TopologyInvariant {
-                                detail: "weighted inf-fast: force flip neighbor".into(),
-                            }
-                        })?;
-                    raw_flip(&mut self.kt, most_cw, nidx_in_most_cw, nid)?;
-                    mark_modified(&mut self.kt, Some(&mut self.queue), nid, false)?;
-                    flip_t = most_cw;
-                    flip_v = idx_fast;
-                    continue;
-                }
 
-                // Keep flip_v aligned with v_fast in flip_t.
                 if self.kt.triangles[flip_t].vertices[flip_v] != Some(v_fast) {
                     flip_v = (0..3)
                         .find(|&i| self.kt.triangles[flip_t].vertices[i] == Some(v_fast))
@@ -1596,8 +1585,10 @@ impl Propagator {
                         };
                         if orientation_sign(pos_v2, pos_v0, pos_v1) >= 0 {
                             let Some(n) = step_around(&self.kt, flip_t, flip_v, true) else {
-                                always_most_cw = true;
-                                continue;
+                                return Err(crate::error::PropagationError::TopologyInvariant {
+                                    detail: "weighted inf-fast: go-back step".into(),
+                                }
+                                .into());
                             };
                             flip_t = n.0;
                             flip_v = n.1;
@@ -1608,9 +1599,10 @@ impl Propagator {
 
                 let nidx = ccw(flip_v);
                 let Some(nid) = self.kt.triangles[flip_t].neighbors[nidx] else {
-                    // f64 may walk onto the far constraint; finish like opposing.
-                    always_most_cw = true;
-                    continue;
+                    return Err(crate::error::PropagationError::TopologyInvariant {
+                        detail: "weighted inf-fast: flip neighbor".into(),
+                    }
+                    .into());
                 };
                 let idx_in_n = self.kt.neighbor_side(nid, flip_t).ok_or_else(|| {
                     crate::error::PropagationError::TopologyInvariant {
@@ -1625,16 +1617,30 @@ impl Propagator {
                     })?;
                     self.kt.vertices[v].position_at(time)
                 };
-                if orientation_sign(pos_v0, pos_v1, pos_v2) < 0 {
+                let delay = orientation_sign(pos_v0, pos_v1, pos_v2) < 0;
+                let delay_hits_constraint = delay && {
+                    let v_in_n = (0..3)
+                        .find(|&i| self.kt.triangles[nid].vertices[i] == Some(v_fast));
+                    v_in_n.is_some_and(|i| self.kt.triangles[nid].wavefronts[ccw(i)].is_some())
+                };
+                if delay && !delay_hits_constraint {
                     let Some(n) = step_around(&self.kt, flip_t, flip_v, false) else {
-                        always_most_cw = true;
-                        continue;
+                        return Err(crate::error::PropagationError::TopologyInvariant {
+                            detail: "weighted inf-fast: delay step".into(),
+                        }
+                        .into());
                     };
                     flip_t = n.0;
                     flip_v = n.1;
                 } else {
+                    // Flip now: either orientation allows it, or delaying would
+                    // land on the far constraint (f64 vs C++ exact positions).
                     raw_flip(&mut self.kt, flip_t, nidx, nid)?;
                     mark_modified(&mut self.kt, Some(&mut self.queue), nid, false)?;
+                    // Constraint may now sit on flip_t rather than most_cw; restart
+                    // at most_cw so the exit check sees the migrated edge.
+                    flip_t = most_cw;
+                    flip_v = idx_fast;
                 }
             }
         }

@@ -36,22 +36,40 @@ pub fn apply_event_refinement(
 
 pub fn mark_modified(
     kt: &mut KineticTriangulation,
-    queue: Option<&mut EventQueue>,
+    mut queue: Option<&mut EventQueue>,
     tid: TriangleId,
     front: bool,
 ) -> Result<(), SkeletonError> {
+    use crate::triangulation::kinetic::ccw;
+
     kt.put_on_check_refinement(tid, front);
     let Some(t) = kt.triangles.get(tid) else {
         return Ok(());
     };
     let tidx = t.tidx;
     let live = t.live();
-    // C++ also invalidates the unbounded neighbor(ccw(inf)). Revisit after
-    // weighted event-order parity is locked; enabling it shifts weighted hull
-    // counts without closing the kinetic/OBJ gap on its own.
+    let unbounded_neighbor = if t.is_unbounded {
+        (0..3)
+            .find(|&i| t.vertices[i] == kt.infinite_vertex)
+            .and_then(|i| t.neighbors[ccw(i)])
+    } else {
+        None
+    };
     if live {
-        if let Some(q) = queue {
+        if let Some(q) = queue.as_deref_mut() {
             q.needs_update(tidx)?;
+        }
+    }
+    // C++ `modified`: also invalidate unbounded neighbor(ccw(inf)).
+    if let Some(nid) = unbounded_neighbor {
+        if let Some(n) = kt.triangles.get_mut(nid) {
+            if n.live() {
+                n.invalidate_collapse();
+                let ntidx = n.tidx;
+                if let Some(q) = queue {
+                    q.needs_update(ntidx)?;
+                }
+            }
         }
     }
     Ok(())

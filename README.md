@@ -59,7 +59,11 @@ Known parity gaps:
   gaps: simple-001/002/003, bevels-causing-splits, multi-3/4.
 - Weighted infinitely-fast events use the dedicated weighted handler
   (oracle-bit gates for `srpg_octo0000035-random-{1,2,3}` at 117/112/120
-  kinetic; C++ double OBJ is 128/131/135).
+  kinetic; C++ double OBJ is 128/131/135). The old random-2 kinetic 131
+  matched OBJ *count* only while Weighted events were still routed to the
+  opposing handler — node match was worse (≈70/102 within 1 mm vs ≈82/92
+  after the real handler). Remaining kinetic↔OBJ gap is geometry/event-mix,
+  not a stub to restore.
 
 The progress and ignored exact-conformance gates are in `tests/gis.rs`.
 Frozen C++ oracle provenance is documented in

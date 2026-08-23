@@ -211,8 +211,9 @@ fn weighted_oracle_bits_gates() {
     // Always-on public-API gates from vendored oracle-bit records (no GraphML).
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("fixtures/oracle/bits");
     let cases = [
-        // Kinetic counts after dedicated weighted inf-fast handler (C++ OBJ
-        // --component=-1 is 128/131/135; remaining gap is not skip-∞ alone).
+        // Kinetic counts with dedicated weighted inf-fast handler. C++ OBJ
+        // --component=-1 is 128/131/135. Prior random-2 kinetic 131 matched
+        // OBJ count under the opposing stub only (worse node proximity).
         ("weighted__srpg_octo0000035-random-1.json", 117),
         ("weighted__srpg_octo0000035-random-2.json", 112),
         ("weighted__srpg_octo0000035-random-3.json", 120),

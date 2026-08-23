@@ -418,19 +418,9 @@ impl Propagator {
         self.stop_collapse_pair(va, vb, spec.time)?;
 
         let Some(nid) = nb else {
-            // No neighbor: treat as constraint-style collapse on this triangle alone.
-            if let Some(tr) = self.kt.triangles.get_mut(tid) {
-                tr.set_dying();
-            }
-            let (left_sl, right_sl) = {
-                use crate::triangulation::kinetic::{ccw, cw};
-                let t = &self.kt.triangles[tid];
-                let left_sl = t.wavefronts[cw(edge_idx)].map(|e| self.kt.edges[e].supporting_line);
-                let right_sl =
-                    t.wavefronts[ccw(edge_idx)].map(|e| self.kt.edges[e].supporting_line);
-                (left_sl, right_sl)
-            };
-            return self.constraint_collapse_part2(tid, edge_idx, spec.time, left_sl, right_sl);
+            // No neighbor on the spoke: same collapse-side sequence (move is a
+            // no-op on that side; other constrained sides still transfer).
+            return self.collapse_side(tid, edge_idx, spec.time);
         };
 
         let idx_in_n = self.kt.neighbor_side(nid, tid).ok_or_else(|| {

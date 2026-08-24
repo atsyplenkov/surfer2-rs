@@ -43,23 +43,6 @@ fn load_geojson_polygon(path: &std::path::Path) -> Option<Polygon> {
                 })
                 .collect::<Option<_>>()?
         }
-        "MultiPolygon" => {
-            let mut out = Vec::new();
-            for poly in coords.as_array()? {
-                for ring in poly.as_array()? {
-                    let pts: Vec<[f64; 2]> = ring
-                        .as_array()?
-                        .iter()
-                        .map(|p| {
-                            let a = p.as_array()?;
-                            Some([a.first()?.as_f64()?, a.get(1)?.as_f64()?])
-                        })
-                        .collect::<Option<_>>()?;
-                    out.push(pts);
-                }
-            }
-            out
-        }
         _ => return None,
     };
     if rings_raw.is_empty() {

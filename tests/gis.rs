@@ -42,17 +42,6 @@ fn load_geojson_polygon(path: &Path) -> Result<Polygon, String> {
             let rings = coords.as_array().ok_or("poly coords")?;
             rings.iter().map(parse_ring).collect::<Result<_, _>>()?
         }
-        "MultiPolygon" => {
-            let polys = coords.as_array().ok_or("mpoly")?;
-            let mut out = Vec::new();
-            for poly in polys {
-                let rings = poly.as_array().ok_or("poly in mpoly")?;
-                for ring in rings {
-                    out.push(parse_ring(ring)?);
-                }
-            }
-            out
-        }
         other => return Err(format!("unsupported geometry {other}")),
     };
 

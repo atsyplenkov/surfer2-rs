@@ -53,9 +53,9 @@ Offsets are drawn into the IPE `offsets` layer. Plain OBJ output is skeleton
 faces only and does **not** embed offset polylines, so use `--ipe`:
 
 ```bash
-# GraphML already vendored under fixtures/graphml/, or emit from bits:
-#   GraphMlInput::from_bits_record(...).to_graphml()  (tests/support/graphml.rs)
-#   writes 17-digit vertex coordinates.
+# Prefer vendored GraphML under fixtures/graphml/. For bits-only fixtures,
+# emit GraphML when regenerating (17-digit coords); do not keep a dormant
+# serializer in-tree until that workflow is automated.
 
 /tmp/surfer2-build-double/cc/surfer \
   --component=-1 \

@@ -109,13 +109,3 @@ pub fn structural_skip_inf_chords(obj: &ObjSkeleton) -> Vec<OracleSegment> {
     }
     out
 }
-
-/// Accounting classifier: same as [`structural_skip_inf_chords`] (OBJ-intrinsic).
-pub fn classify_skip_inf_chords(obj: &ObjSkeleton) -> Vec<OracleSegment> {
-    structural_skip_inf_chords(obj)
-}
-
-/// Number of classified skip-∞ chords.
-pub fn count_skip_inf_chords(obj: &ObjSkeleton) -> usize {
-    classify_skip_inf_chords(obj).len()
-}

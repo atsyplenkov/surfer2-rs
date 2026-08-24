@@ -35,6 +35,8 @@ fn simple_cases() -> Vec<PathBuf> {
         "special-cases/collinear-split-event.graphml",
         "special-cases/spoke-1.graphml",
         "weighted/srpg_octo0000035-random-1.graphml",
+        "weighted/srpg_octo0000035-random-2.graphml",
+        "weighted/srpg_octo0000035-random-3.graphml",
     ]
     .iter()
     .map(|n| root.join(n))
@@ -333,7 +335,7 @@ fn degree_one_oracle_bits_gates() {
 #[test]
 fn skip_inf_count_equation_gates() {
     use support::oracle::ObjSkeleton;
-    use support::skip_inf::{classify_skip_inf_chords, count_skip_inf_chords};
+    use support::skip_inf::structural_skip_inf_chords;
 
     let bits_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("fixtures/oracle/bits");
     let obj_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("fixtures/oracle/obj");
@@ -400,13 +402,8 @@ fn skip_inf_count_equation_gates() {
         let obj_n = obj.finite_nonzero_segments().len();
         assert_eq!(obj_n, want_o, "{obj_name} finite_nonzero");
 
-        let skip_n = count_skip_inf_chords(&obj);
+        let skip_n = structural_skip_inf_chords(&obj).len();
         assert_eq!(skip_n, want_s, "{bits_name} structural skip-∞");
-        assert_eq!(
-            classify_skip_inf_chords(&obj).len(),
-            skip_n,
-            "{bits_name}: classify == structural"
-        );
 
         // Stored finite-looking arcs: public filter without the length cutoff.
         let stored_finite = sk

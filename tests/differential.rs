@@ -278,6 +278,101 @@ fn degree_one_oracle_bits_gates() {
     }
 }
 
+/// Always-on skip-∞ accounting: kinetic == OBJ finite_nonzero − classified skip-∞.
+///
+/// Kinetic from bits → PSLG → `straight_skeleton(AllSequential)`. OBJ from
+/// vendored `fixtures/oracle/obj/*-double.obj` (C++ double, `--component=-1`,
+/// stream precision 17). Classifier in `support::skip_inf`.
+#[test]
+fn skip_inf_count_equation_gates() {
+    use support::oracle::ObjSkeleton;
+    use support::skip_inf::{count_skip_inf_chords, structural_skip_inf_chords};
+
+    let bits_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("fixtures/oracle/bits");
+    let obj_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("fixtures/oracle/obj");
+    // (bits, obj, kinetic, obj_finite_nonzero, skip_inf)
+    let cases = [
+        (
+            "special-cases__spoke-1.json",
+            "spoke-1-double.obj",
+            22,
+            26,
+            4,
+        ),
+        (
+            "special-cases__collinear-split-event.json",
+            "collinear-split-event-double.obj",
+            17,
+            19,
+            2,
+        ),
+        ("srpg0000025.json", "srpg0000025-double.obj", 73, 81, 8),
+        ("srpg0000028.json", "srpg0000028-double.obj", 87, 97, 10),
+        (
+            "special-cases__same-speed-convex-hull-000.json",
+            "same-speed-convex-hull-000-double.obj",
+            9,
+            13,
+            4,
+        ),
+        (
+            "issue2__issue2-minimal1.json",
+            "issue2-minimal1-double.obj",
+            23,
+            25,
+            2,
+        ),
+    ];
+    for (bits_name, obj_name, want_k, want_o, want_s) in cases {
+        let bits: BitsRecord = serde_json::from_str(
+            &std::fs::read_to_string(bits_root.join(bits_name))
+                .unwrap_or_else(|e| panic!("{bits_name}: {e}")),
+        )
+        .unwrap_or_else(|e| panic!("{bits_name}: {e}"));
+        let pslg = support::graphml::GraphMlInput::from_bits_record(&bits, bits_name)
+            .to_pslg()
+            .unwrap_or_else(|e| panic!("{bits_name}: {e}"));
+        let sk = straight_skeleton(
+            &pslg,
+            &Options {
+                components: ComponentMode::AllSequential,
+            },
+        )
+        .unwrap_or_else(|e| panic!("{bits_name}: {e}"));
+        let kinetic: Vec<_> = sk.finite_segments().map(|s| (s.start, s.end)).collect();
+        assert_eq!(kinetic.len(), want_k, "{bits_name} kinetic");
+
+        let obj_path = obj_root.join(obj_name);
+        let obj = ObjSkeleton::parse(
+            &std::fs::read_to_string(&obj_path).unwrap_or_else(|e| panic!("{obj_name}: {e}")),
+        )
+        .unwrap_or_else(|e| panic!("{obj_name}: {e}"));
+        let obj_n = obj.finite_nonzero_segments().len();
+        assert_eq!(obj_n, want_o, "{obj_name} finite_nonzero");
+
+        let skip_n = count_skip_inf_chords(&obj, &kinetic);
+        assert_eq!(skip_n, want_s, "{bits_name} classified skip-∞");
+        assert_eq!(
+            want_k,
+            want_o - want_s,
+            "{bits_name} equation kinetic == obj − skip_inf"
+        );
+        assert_eq!(
+            kinetic.len(),
+            obj_n - skip_n,
+            "{bits_name} live equation kinetic == obj − classified_skip_inf"
+        );
+
+        // Structural omit-gap chords are always a subset of the classified set.
+        let structural = structural_skip_inf_chords(&obj).len();
+        assert!(
+            structural <= skip_n,
+            "{bits_name}: structural skip-∞ {structural} > classified {skip_n}"
+        );
+        assert_dcel_contract(&sk, bits_name);
+    }
+}
+
 #[test]
 fn corpus_strict_count_gates() {
     // Frozen against C++ double `--component=-1` finite-nonzero OBJ counts

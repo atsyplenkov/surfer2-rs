@@ -39,26 +39,31 @@ Known parity gaps:
   unsafe; the remaining catch-up is a 1e-4 s on-segment SOF after a late flip.
 - `convex10` is 17 (C++ double hub chords ~1e-11). Junction snap is 5 mm
   on metre-scale input and near-exact on unit GraphML.
-- `issue2-minimal1` is 23 kinetic segments; C++ OBJ 25 is 23 arcs plus
-  2 skip-∞ face chords (same family as spoke-1).
+- Skip-∞ accounting is closed for the corpus fixtures below (test-support
+  classifier; engine still returns kinetic only). Equation:
+  `kinetic == OBJ finite_nonzero − classified skip-∞`, gated in
+  `skip_inf_count_equation_gates` against vendored `*-double.obj`:
+  - `spoke-1`: 22 = 26 − 4
+  - `collinear-split-event`: 17 = 19 − 2
+  - `srpg0000025`: 73 = 81 − 8
+  - `srpg0000028`: 87 = 97 − 10
+  - `same-speed-convex-hull-000`: 9 = 13 − 4
+  - `issue2-minimal1`: 23 = 25 − 2
 - Additive GraphML `edge-weight-additive` is unsupported (upstream parses
   it and never applies it). Multiplicative `edge-weight` is implemented.
 - Offset contours walk C++-style face cycles and are gated on a unit
   square and a rectangle-with-hole. Broad C++ offset comparison (many
   times, topology changes) is still open.
-- `collinear-split-event` is 17 kinetic; C++ OBJ 19 is 17 plus 2 skip-∞
-  face chords (same family as spoke-1). `srpg0000025`/`srpg0000028` are
-  73/87 kinetic (C++ OBJ 81/97 = kinetic plus skip-∞).
-- `same-speed-convex-hull-000` is 9 kinetic; C++ OBJ 13 is 9 plus 4
-  skip-∞ chords. Do not force `tc ≥ now` CH-leave to chase the OBJ
-  extras (`spoke-3` NonAdvancingLoop).
+- Do not force `tc ≥ now` CH-leave to chase OBJ extras on
+  `same-speed-convex-hull-000` (`spoke-3` NonAdvancingLoop); skip-∞
+  accounting already closes that fixture’s count equation.
 - Degree-1 family: free-tip component flood matches C++ (both sides of a
   dangling edge share one component; infinite CDT faces participate). Oracle-bit
   gates pin AllSequential kinetic counts. Exact vs OBJ−skip-∞: interiors
   `1/2/3` 17/17/15 (OBJ 19), `simple-000` 15 (OBJ 19), `bevels-causing-splits`
   46 (OBJ 53). Still mixed residual (not clean skip-∞): `simple-001/002/003`
   40/26/27 (OBJ 49/33/35) and `multi-3/4` 53/53 (OBJ 65/66) — tip-bevel
-  geometry still differs; ticket 03 classifies skip-∞ only.
+  geometry still differs.
 - Weighted infinitely-fast events use the dedicated weighted handler
   (oracle-bit gates for `srpg_octo0000035-random-{1,2,3}` at 121/121/123
   kinetic after infinite-face tagging; C++ double OBJ is 128/131/135).

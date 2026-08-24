@@ -252,4 +252,39 @@ impl GraphMlInput {
                 .collect(),
         }
     }
+
+    /// Dev-only Surfer2 GraphML (17-digit coords) for regenerating C++ OBJ oracles.
+    pub fn to_graphml(&self) -> String {
+        let mut out = String::new();
+        out.push_str("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+        out.push_str("<graphml xmlns=\"http://graphml.graphdrawing.org/xmlns\"\n");
+        out.push_str("  xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"\n");
+        out.push_str("  xsi:schemaLocation=\"http://graphml.graphdrawing.org/xmlns http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd\">\n");
+        out.push_str("  <key attr.name=\"vertex-coordinate-x\" attr.type=\"string\" for=\"node\" id=\"x\"/>\n");
+        out.push_str("  <key attr.name=\"vertex-coordinate-y\" attr.type=\"string\" for=\"node\" id=\"y\"/>\n");
+        out.push_str("  <key attr.name=\"edge-weight\" attr.type=\"string\" for=\"edge\" id=\"w\">\n");
+        out.push_str("    <default>1.0</default>\n");
+        out.push_str("  </key>\n");
+        out.push_str("  <key attr.name=\"edge-weight-additive\" attr.type=\"string\" for=\"edge\" id=\"wa\">\n");
+        out.push_str("    <default>0.0</default>\n");
+        out.push_str("  </key>\n");
+        out.push_str("  <graph edgedefault=\"undirected\">\n");
+        for (i, p) in self.vertices.iter().enumerate() {
+            out.push_str(&format!("    <node id=\"{i}\">\n"));
+            // Display is shortest round-trip for f64.
+            out.push_str(&format!("      <data key=\"x\">{}</data>\n", p.x));
+            out.push_str(&format!("      <data key=\"y\">{}</data>\n", p.y));
+            out.push_str("    </node>\n");
+        }
+        for (i, e) in self.edges.iter().enumerate() {
+            out.push_str(&format!(
+                "    <edge id=\"e{i}\" source=\"{}\" target=\"{}\">\n",
+                e.vertices[0], e.vertices[1]
+            ));
+            out.push_str(&format!("      <data key=\"w\">{}</data>\n", e.weight));
+            out.push_str("    </edge>\n");
+        }
+        out.push_str("  </graph>\n</graphml>\n");
+        out
+    }
 }

@@ -52,18 +52,17 @@ Known parity gaps:
 - `same-speed-convex-hull-000` is 9 kinetic; C++ OBJ 13 is 9 plus 4
   skip-∞ chords. Do not force `tc ≥ now` CH-leave to chase the OBJ
   extras (`spoke-3` NonAdvancingLoop).
-- Degree-1 interiors `1/2/3` are 17/17/15 kinetic (C++ OBJ 19/19/19 =
-  kinetic plus skip-∞). Both sides of a dangling edge share a component
-  (C++ floods around the free tip before seeding the opposite half-edge).
-  `degree-one-simple-000` is 15 kinetic (OBJ 19). Remaining degree-one
-  gaps: simple-001/002/003, bevels-causing-splits, multi-3/4.
+- Degree-1 family: free-tip component flood matches C++ (both sides of a
+  dangling edge share one component; infinite CDT faces participate). Oracle-bit
+  gates pin AllSequential kinetic counts. Exact vs OBJ−skip-∞: interiors
+  `1/2/3` 17/17/15 (OBJ 19), `simple-000` 15 (OBJ 19), `bevels-causing-splits`
+  46 (OBJ 53). Still mixed residual (not clean skip-∞): `simple-001/002/003`
+  40/26/27 (OBJ 49/33/35) and `multi-3/4` 53/53 (OBJ 65/66) — tip-bevel
+  geometry still differs; ticket 03 classifies skip-∞ only.
 - Weighted infinitely-fast events use the dedicated weighted handler
-  (oracle-bit gates for `srpg_octo0000035-random-{1,2,3}` at 117/112/120
-  kinetic; C++ double OBJ is 128/131/135). The old random-2 kinetic 131
-  matched OBJ *count* only while Weighted events were still routed to the
-  opposing handler — node match was worse (≈70/102 within 1 mm vs ≈82/92
-  after the real handler). Remaining kinetic↔OBJ gap is geometry/event-mix,
-  not a stub to restore.
+  (oracle-bit gates for `srpg_octo0000035-random-{1,2,3}` at 121/121/123
+  kinetic after infinite-face tagging; C++ double OBJ is 128/131/135).
+  Remaining kinetic↔OBJ gap is geometry/event-mix, not a stub to restore.
 
 The progress and ignored exact-conformance gates are in `tests/gis.rs`.
 Frozen C++ oracle provenance is documented in

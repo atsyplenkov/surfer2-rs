@@ -211,12 +211,52 @@ fn weighted_oracle_bits_gates() {
     // Always-on public-API gates from vendored oracle-bit records (no GraphML).
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("fixtures/oracle/bits");
     let cases = [
-        // Kinetic counts with dedicated weighted inf-fast handler. C++ OBJ
-        // --component=-1 is 128/131/135. Prior random-2 kinetic 131 matched
-        // OBJ count under the opposing stub only (worse node proximity).
-        ("weighted__srpg_octo0000035-random-1.json", 117),
-        ("weighted__srpg_octo0000035-random-2.json", 112),
-        ("weighted__srpg_octo0000035-random-3.json", 120),
+        // Kinetic counts after C++-style infinite-face component tagging.
+        // C++ OBJ --component=-1 is 128/131/135. Counts moved 117/112/120 →
+        // 121/121/123 with the infinite-ring flood (closer to OBJ on random-1).
+        ("weighted__srpg_octo0000035-random-1.json", 121),
+        ("weighted__srpg_octo0000035-random-2.json", 121),
+        ("weighted__srpg_octo0000035-random-3.json", 123),
+    ];
+    for (name, want) in cases {
+        let bits: BitsRecord = serde_json::from_str(
+            &std::fs::read_to_string(root.join(name)).unwrap_or_else(|e| panic!("{name}: {e}")),
+        )
+        .unwrap_or_else(|e| panic!("{name}: {e}"));
+        let pslg = support::graphml::GraphMlInput::from_bits_record(&bits, name)
+            .to_pslg()
+            .unwrap_or_else(|e| panic!("{name}: {e}"));
+        let sk = straight_skeleton(
+            &pslg,
+            &Options {
+                components: ComponentMode::AllSequential,
+            },
+        )
+        .unwrap_or_else(|e| panic!("{name}: {e}"));
+        assert_eq!(sk.segment_count(), want, "{name}");
+        assert_dcel_contract(&sk, name);
+    }
+}
+
+#[test]
+fn degree_one_oracle_bits_gates() {
+    // Always-on gates from vendored oracle-bit records (no GraphML).
+    // Bevels/simple-000/interiors: kinetic matches C++ OBJ minus skip-∞.
+    // simple-001/002/003 and multi-3/4: pinned kinetic after free-tip component
+    // flood + unbounded-hull tagging; residual vs C++ OBJ is mixed skip-∞ and
+    // tip-bevel geometry (not a clean skip-∞ decomposition — see README).
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("fixtures/oracle/bits");
+    let cases = [
+        ("special-cases__degree-one-simple-000.json", 15),
+        ("special-cases__degree-one-simple-001.json", 40),
+        ("special-cases__degree-one-simple-002.json", 26),
+        ("special-cases__degree-one-simple-003.json", 27),
+        ("special-cases__degree-one-bevels-causing-splits.json", 46),
+        ("special-cases__degree-one-multi3-000.json", 53),
+        ("special-cases__degree-one-multi4-000.json", 53),
+        ("special-cases__degree-one-interior-1.json", 17),
+        ("special-cases__degree-one-interior-2.json", 17),
+        ("special-cases__degree-one-interior-3.json", 15),
     ];
     for (name, want) in cases {
         let bits: BitsRecord = serde_json::from_str(
@@ -259,7 +299,7 @@ fn corpus_strict_count_gates() {
         ("special-cases/degree-one-interior-1.graphml", 17),
         ("special-cases/degree-one-interior-2.graphml", 17),
         ("special-cases/degree-one-interior-3.graphml", 15),
-        ("weighted/srpg_octo0000035-random-2.graphml", 112),
+        ("weighted/srpg_octo0000035-random-2.graphml", 121),
     ];
     for (rel, want) in cases {
         let path = upstream_test_data().join(rel);

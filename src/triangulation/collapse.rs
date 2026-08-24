@@ -454,7 +454,7 @@ fn generic_collapse_fast(
         vs[i] = [v.velocity.x, v.velocity.y];
     }
     let det = determinant_poly_f64(ps[0], vs[0], ps[1], vs[1], ps[2], vs[2]);
-    let Some(collapse_time) = det.next_root_from(time_now) else {
+    let Some(collapse_time) = det.generic_collapse_time(time_now) else {
         return Ok(CollapseSpec::never(t.component));
     };
 
@@ -683,7 +683,7 @@ fn generic_collapse_time_3(
         // Always-colinear CH triple: they are not leaving (C++ NEVER).
         return None;
     }
-    det.next_root_from(time_now)
+    det.generic_collapse_time(time_now)
 }
 
 #[cfg(test)]

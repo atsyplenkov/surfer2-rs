@@ -28,6 +28,9 @@ pub struct BasicTriangulation {
     /// Component id per finite triangle; `None` = exterior / unrestricted.
     pub components: Vec<Option<u32>>,
     pub max_component: Option<u32>,
+    /// Convex-hull edge → infinite-face component from C++-style tagging.
+    /// Each entry is `(finite_ti, side, component)` for one CH edge.
+    pub infinite_hull: Vec<(usize, usize, u32)>,
     /// Infinite outer face sentinel — not stored as triangle; boundary sides
     /// with no neighbor are outer.
     pub input_edge_endpoints: Vec<[usize; 2]>,
@@ -130,80 +133,88 @@ pub fn build_basic_triangulation(pslg: &Pslg) -> Result<BasicTriangulation, Tria
         }
     }
 
-    // Component tagging: left of first input edge = 0, right = 1, then BFS.
+    // C++ `tag_components` floods through infinite CDT faces. Build a
+    // temporary infinite-face ring (hull edges) so unconstrained exterior
+    // adjacency matches CGAL; do not mutate finite `neighbors` (hull
+    // attachment and interior selection need `None` on the boundary).
+    let (aug_neighbors, aug_constraints, hull, n_aug) =
+        augment_with_infinite_ring(pslg.vertices(), &triangles, &neighbors, &constraints);
+
     let first = pslg.edges().first().ok_or(TriangulationError::RegionClassification)?;
     let u = first.vertices[0];
     let v = first.vertices[1];
+    // Seed only the face left of the first input edge (v ccw of u). The
+    // right face is discovered across that constraint; if the flood already
+    // reached it around a degree-1 tip (or via the infinite ring), both
+    // sides share a component. Seeding both immediately splits a spur.
     let left = directed.get(&(u, v)).copied();
 
-    let mut assigned = vec![None; n];
-    let mut next_id = 0u32;
-    let mut max_component = None;
+    let mut assigned = vec![None; n_aug];
+    let mut queued_potential = vec![false; n_aug];
+    let mut queued_this = vec![false; n_aug];
+    let mut next_id: i32 = -1;
 
-    // C++ `tag_components`: seed only the face left of the first input
-    // edge. The right face is discovered across that constraint; if the
-    // flood already reached it around a degree-1 tip, both sides share a
-    // component (dangling spur). Seeding both immediately splits a spur.
-    let mut seed_order: Vec<usize> = Vec::new();
+    let mut potential: VecDeque<usize> = VecDeque::new();
     if let Some(t) = left {
-        seed_order.push(t);
-    }
-    // Also collect any unvisited later
-
-    let mut region_queue: VecDeque<(usize, u32)> = VecDeque::new();
-    for t in seed_order {
-        if assigned[t].is_none() {
-            assigned[t] = Some(next_id);
-            max_component = Some(next_id);
-            region_queue.push_back((t, next_id));
-            next_id += 1;
-        }
+        queued_potential[t] = true;
+        potential.push_back(t);
     }
 
-    let mut frontier: VecDeque<usize> = VecDeque::new();
-    // Process each component flood, collecting constrained-adj for later seeds
-    let mut next_seeds: VecDeque<usize> = VecDeque::new();
-    for &(s, _) in &region_queue {
-        frontier.push_back(s);
-    }
-
-    while !frontier.is_empty() || !next_seeds.is_empty() || region_queue.iter().any(|_| false) {
-        if frontier.is_empty() {
-            if let Some(s) = next_seeds.pop_front() {
-                if assigned[s].is_none() {
-                    assigned[s] = Some(next_id);
-                    max_component = Some(next_id);
-                    frontier.push_back(s);
-                    next_id += 1;
-                }
-                continue;
-            }
-            // Any remaining triangle
-            if let Some(t) = assigned.iter().position(|c| c.is_none()) {
-                assigned[t] = Some(next_id);
-                max_component = Some(next_id);
-                frontier.push_back(t);
-                next_id += 1;
-            } else {
-                break;
-            }
+    while let Some(f0) = potential.pop_front() {
+        if queued_this[f0] {
             continue;
         }
-        let t = frontier.pop_front().unwrap();
-        let comp = assigned[t].unwrap();
-        for s in 0..3 {
-            if let Some(nbi) = neighbors[t][s] {
-                if constraints[t][s].is_some() {
-                    if assigned[nbi].is_none() {
-                        next_seeds.push_back(nbi);
+        next_id += 1;
+        let comp = next_id as u32;
+        let mut this_component: VecDeque<usize> = VecDeque::new();
+        queued_this[f0] = true;
+        this_component.push_back(f0);
+
+        while let Some(f1) = this_component.pop_front() {
+            assigned[f1] = Some(comp);
+            for s in 0..3 {
+                let Some(nbi) = aug_neighbors[f1][s] else {
+                    continue;
+                };
+                if aug_constraints[f1][s].is_some() {
+                    if !queued_potential[nbi] {
+                        queued_potential[nbi] = true;
+                        potential.push_back(nbi);
                     }
-                } else if assigned[nbi].is_none() {
-                    assigned[nbi] = Some(comp);
-                    frontier.push_back(nbi);
+                } else if !queued_this[nbi] {
+                    queued_this[nbi] = true;
+                    queued_potential[nbi] = true;
+                    this_component.push_back(nbi);
                 }
             }
         }
     }
+
+    // Finite faces only in the stored labeling. C++ also labels infinite
+    // faces; max_component still reflects seeds that may have been infinite.
+    let mut components: Vec<Option<u32>> = assigned[..n].to_vec();
+    let mut max_component = if next_id >= 0 {
+        Some(next_id as u32)
+    } else {
+        None
+    };
+    // Any finite face still unlabeled is disconnected from the seed even via
+    // the infinite ring — keep a distinct id rather than leaving None.
+    for c in &mut components {
+        if c.is_none() {
+            let id = max_component.map(|m| m + 1).unwrap_or(0);
+            *c = Some(id);
+            max_component = Some(id);
+        }
+    }
+
+    let infinite_hull: Vec<(usize, usize, u32)> = hull
+        .iter()
+        .enumerate()
+        .filter_map(|(k, &(ti, s, _, _))| {
+            assigned[n + k].map(|c| (ti, s, c))
+        })
+        .collect();
 
     let input_edge_endpoints = pslg
         .edges()
@@ -216,10 +227,121 @@ pub fn build_basic_triangulation(pslg: &Pslg) -> Result<BasicTriangulation, Tria
         triangles,
         neighbors,
         constraints: constraints,
-        components: assigned,
+        components,
         max_component,
+        infinite_hull,
         input_edge_endpoints,
     })
+}
+
+/// Temporary infinite faces for one convex-hull edge each, linked in a ring
+/// at the infinite vertex — mirrors CGAL's infinite faces for tagging only.
+/// Hull entries are `(ti, s, a=ccw, b=cw)`.
+fn augment_with_infinite_ring(
+    verts: &[Point2],
+    triangles: &[[usize; 3]],
+    neighbors: &[[Option<usize>; 3]],
+    constraints: &[[Option<u32>; 3]],
+) -> (
+    Vec<[Option<usize>; 3]>,
+    Vec<[Option<u32>; 3]>,
+    Vec<(usize, usize, usize, usize)>,
+    usize,
+) {
+    let n = triangles.len();
+    // Dedup colinear CDT twins that share endpoints and both lack a neighbor.
+    let mut seen: Vec<(usize, usize, usize, usize, bool)> = Vec::new();
+    let mut twin_links: Vec<(usize, usize, usize, usize)> = Vec::new();
+    for ti in 0..n {
+        for s in 0..3 {
+            if neighbors[ti][s].is_some() {
+                continue;
+            }
+            let a = triangles[ti][(s + 1) % 3];
+            let b = triangles[ti][(s + 2) % 3];
+            let (ia, ib) = canonical(a, b);
+            let constrained = constraints[ti][s].is_some();
+            if let Some(idx) = seen.iter().position(|e| e.0 == ia && e.1 == ib) {
+                if !constrained && !seen[idx].4 {
+                    let (_, _, ot, os, _) = seen.swap_remove(idx);
+                    twin_links.push((ti, s, ot, os));
+                }
+            } else {
+                seen.push((ia, ib, ti, s, constrained));
+            }
+        }
+    }
+
+    let mut hull: Vec<(usize, usize, usize, usize)> = Vec::new();
+    for (_ia, _ib, ti, s, _constrained) in seen {
+        let a = triangles[ti][(s + 1) % 3];
+        let b = triangles[ti][(s + 2) % 3];
+        if !edge_on_point_set_hull(verts, verts[a], verts[b]) {
+            continue;
+        }
+        // Oriented as C++ unbounded: U = [∞, b, a] with a=ccw(s), b=cw(s).
+        hull.push((ti, s, a, b));
+    }
+
+    let n_inf = hull.len();
+    let n_aug = n + n_inf;
+    let mut aug_neighbors = neighbors.to_vec();
+    let mut aug_constraints = constraints.to_vec();
+    aug_neighbors.resize(n_aug, [None; 3]);
+    aug_constraints.resize(n_aug, [None; 3]);
+
+    for (ti, s, ot, os) in twin_links {
+        aug_neighbors[ti][s] = Some(ot);
+        aug_neighbors[ot][os] = Some(ti);
+    }
+
+    for (k, &(ti, s, _a, _b)) in hull.iter().enumerate() {
+        let inf = n + k;
+        aug_neighbors[ti][s] = Some(inf);
+        aug_neighbors[inf][0] = Some(ti);
+        aug_constraints[inf][0] = constraints[ti][s];
+    }
+
+    // Ring at ∞: side 2 of U (∞–b) meets side 1 of U' with vertices[2]=b.
+    for (i, &(_, _, _a, b)) in hull.iter().enumerate() {
+        for (j, &(_, _, a2, _)) in hull.iter().enumerate() {
+            if i == j {
+                continue;
+            }
+            if a2 == b {
+                let ui = n + i;
+                let uj = n + j;
+                aug_neighbors[ui][2] = Some(uj);
+                aug_neighbors[uj][1] = Some(ui);
+                break;
+            }
+        }
+    }
+
+    (aug_neighbors, aug_constraints, hull, n_aug)
+}
+
+fn edge_on_point_set_hull(pts: &[Point2], a: Point2, b: Point2) -> bool {
+    let mut sign = 0i8;
+    for p in pts {
+        let c = (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x);
+        let s = if c > 1e-12 {
+            1
+        } else if c < -1e-12 {
+            -1
+        } else {
+            0
+        };
+        if s == 0 {
+            continue;
+        }
+        if sign == 0 {
+            sign = s;
+        } else if s != sign {
+            return false;
+        }
+    }
+    true
 }
 
 /// Odd/even interior selection for a polygon CDT: faces reachable from outer

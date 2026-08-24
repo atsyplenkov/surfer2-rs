@@ -102,8 +102,11 @@ pub(crate) fn initialize_kinetic(
         }
     }
 
+    // AllSequential/Simultaneous: attach every hull infinite face with the
+    // component id from tagging. Index(c) historically omits the unbounded
+    // ring (finite-only); gates use AllSequential.
     if restrict < 0 && interior_filter.is_none() {
-        attach_unbounded_hull(&mut kt, basic, &tri_map);
+        attach_unbounded_hull(&mut kt, basic, &tri_map, &input_vertex_ids, restrict);
     }
 
     // Wavefront edges: one per constrained triangle side, oriented so the left
@@ -235,11 +238,14 @@ fn input_edge_between(
 }
 
 /// One unbounded triangle per unique CDT hull edge + a shared infinite vertex.
-/// C++ `initialize_tds` copies infinite faces from the CDT.
+/// C++ `initialize_tds` copies infinite faces from the CDT; component ids come
+/// from `BasicTriangulation::infinite_hull` (same tagging as finite faces).
 fn attach_unbounded_hull(
     kt: &mut KineticTriangulation,
     basic: &crate::triangulation::basic::BasicTriangulation,
     tri_map: &[Option<TriangleId>],
+    input_vertex_ids: &[VertexId],
+    restrict: i32,
 ) {
     use crate::triangulation::kinetic::{ccw, cw};
 
@@ -277,26 +283,57 @@ fn attach_unbounded_hull(
         }
     }
 
+    // Prefer components from tagging's infinite ring; fall back to geometric hull.
     let mut hull = Vec::new();
-    for (_ia, _ib, tid, s, a, b, constrained) in seen {
-        let pa = kt.vertices[a].pos_zero;
-        let pb = kt.vertices[b].pos_zero;
-        if !edge_on_point_set_hull(&basic.vertices, pa, pb) {
-            continue;
+    if !basic.infinite_hull.is_empty() {
+        for &(ti, s, comp) in &basic.infinite_hull {
+            if restrict >= 0 && comp as i32 != restrict {
+                continue;
+            }
+            // Finite side may be omitted under Index(c) when it belongs to
+            // another component; still emit the infinite face alone.
+            let tid_opt = tri_map.get(ti).copied().flatten();
+            let (a, b, constrained) = if let Some(tid) = tid_opt {
+                if kt.triangles[tid].neighbors[s].is_some() {
+                    continue;
+                }
+                let t = &kt.triangles[tid];
+                let Some(a) = t.vertices[ccw(s)] else {
+                    continue;
+                };
+                let Some(b) = t.vertices[cw(s)] else { continue };
+                (a, b, basic.constraints[ti][s].is_some())
+            } else {
+                let a = basic.triangles[ti][(s + 1) % 3];
+                let b = basic.triangles[ti][(s + 2) % 3];
+                if a >= input_vertex_ids.len() || b >= input_vertex_ids.len() {
+                    continue;
+                }
+                (
+                    input_vertex_ids[a],
+                    input_vertex_ids[b],
+                    basic.constraints[ti][s].is_some(),
+                )
+            };
+            hull.push((tid_opt, s, a, b, constrained, comp as i32));
         }
-        hull.push((tid, s, a, b, constrained, kt.triangles[tid].component));
+    } else {
+        for (_ia, _ib, tid, s, a, b, constrained) in seen {
+            let pa = kt.vertices[a].pos_zero;
+            let pb = kt.vertices[b].pos_zero;
+            if !edge_on_point_set_hull(&basic.vertices, pa, pb) {
+                continue;
+            }
+            let comp = kt.triangles[tid].component;
+            if restrict >= 0 && comp != restrict {
+                continue;
+            }
+            hull.push((Some(tid), s, a, b, constrained, comp));
+        }
     }
     if hull.is_empty() {
         return;
     }
-
-    let ub_comp = kt
-        .triangles
-        .values()
-        .map(|t| t.component)
-        .max()
-        .unwrap_or(0)
-        + 1;
 
     let mut inf = WavefrontVertex::new_kinetic(
         Point2::new(0.0, 0.0),
@@ -311,12 +348,16 @@ fn attach_unbounded_hull(
     // U: [∞, b, a] so hull side 0 has ccw=b, cw=a (exterior left of b→a).
     let mut ub = Vec::with_capacity(hull.len());
     for (ftid, fs, a, b, constrained, fcomp) in &hull {
-        let uid = kt.alloc_triangle(if *constrained { ub_comp } else { *fcomp });
+        let uid = kt.alloc_triangle(*fcomp);
         kt.set_vertex(uid, 0, inf_id);
         kt.set_vertex(uid, 1, *b);
         kt.set_vertex(uid, 2, *a);
+        // Constrained hull edges stay unlinked to the finite side (wavefront);
+        // unconstrained leak the component into the unbounded triangle.
         if !*constrained {
-            kt.set_neighbor(*ftid, *fs, Some(uid), 0);
+            if let Some(ftid) = ftid {
+                kt.set_neighbor(*ftid, *fs, Some(uid), 0);
+            }
         }
         ub.push(uid);
     }
@@ -333,26 +374,6 @@ fn attach_unbounded_hull(
             if kt.triangles[ub[j]].vertices[2] == Some(v) {
                 kt.set_neighbor(ub[i], 2, Some(ub[j]), 1);
                 break;
-            }
-        }
-    }
-
-    // C++ flood: unconstrained hull leaks one component around the infinite ring.
-    let mut changed = true;
-    while changed {
-        changed = false;
-        for &uid in &ub {
-            let nbs = kt.triangles[uid].neighbors;
-            let c = kt.triangles[uid].component;
-            if c == ub_comp {
-                continue;
-            }
-            for s in 0..3 {
-                let Some(nid) = nbs[s] else { continue };
-                if kt.triangles[nid].component == ub_comp {
-                    kt.triangles[nid].component = c;
-                    changed = true;
-                }
             }
         }
     }

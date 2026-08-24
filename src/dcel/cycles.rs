@@ -682,6 +682,40 @@ fn close_infinity_gaps(
         closed[i] = true;
         closed[j] = true;
     }
+
+    // Degree-one bevel tips can leave a k-cycle of gaps around ∞ that is not
+    // a mutual 2-pair. Close each remaining gap with a chord whose twin sits
+    // on the unbounded face (topology only — not a kinetic segment).
+    for (i, closed_i) in closed.iter().enumerate() {
+        if *closed_i {
+            continue;
+        }
+        let (face, end, start, from, to) = gaps[i];
+        let a = halfedges.len() as u32;
+        let b = a + 1;
+        halfedges.push(HalfEdge {
+            twin: HalfEdgeId(b),
+            next: HalfEdgeId(start as u32),
+            prev: HalfEdgeId(end as u32),
+            face: FaceId(face),
+            origin: NodeId(from),
+            geometry: ArcGeometry::InfinityChord,
+            is_input: false,
+        });
+        halfedges.push(HalfEdge {
+            twin: HalfEdgeId(a),
+            next: HalfEdgeId(b),
+            prev: HalfEdgeId(b),
+            face: unbounded,
+            origin: NodeId(to),
+            geometry: ArcGeometry::InfinityChord,
+            is_input: false,
+        });
+        halfedges[end].next = HalfEdgeId(a);
+        halfedges[start].prev = HalfEdgeId(a);
+        dest.push(to);
+        dest.push(from);
+    }
 }
 
 fn cycle_covers_face(halfedges: &[HalfEdge], start: usize, face: u32, expected: usize) -> bool {

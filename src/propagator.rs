@@ -42,6 +42,8 @@ pub struct Propagator {
     pub check_invariants_each_step: bool,
     simultaneous_streak: u32,
     last_event_time: f64,
+    /// C++ `last_event_component`: time may reset when the component increases.
+    last_event_component: i32,
     /// Scale-aware stand-in for C++ exact `pos_stop` equality.
     junction_eps: f64,
 }
@@ -77,6 +79,7 @@ impl Propagator {
             check_invariants_each_step: cfg!(debug_assertions),
             simultaneous_streak: 0,
             last_event_time: f64::NEG_INFINITY,
+            last_event_component: -1,
             junction_eps,
         })
     }
@@ -100,6 +103,7 @@ impl Propagator {
             check_invariants_each_step: cfg!(debug_assertions),
             simultaneous_streak: 0,
             last_event_time: f64::NEG_INFINITY,
+            last_event_component: -1,
             junction_eps,
         })
     }
@@ -139,7 +143,14 @@ impl Propagator {
             }
         };
 
-        // Watchdog for non-advancing fast kernel
+        // Watchdog for non-advancing fast kernel. C++ allows time to restart
+        // when `next_event.component > current_component` (AllSequential).
+        if spec.component > self.last_event_component {
+            self.simultaneous_streak = 0;
+            self.last_event_time = f64::NEG_INFINITY;
+            self.last_event_component = spec.component;
+            self.kt.seal_candidates.clear();
+        }
         if spec.time <= self.last_event_time {
             self.simultaneous_streak += 1;
             if self.simultaneous_streak > 10_000 {

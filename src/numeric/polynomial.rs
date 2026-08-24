@@ -75,6 +75,60 @@ impl Poly2 {
             _ => None,
         }
     }
+
+    /// C++ `KineticTriangle::get_generic_collapse_time`: leading-sign rules for
+    /// which root is a collapse (reject area-zero-and-increasing at `now`).
+    pub fn generic_collapse_time(self, now: f64) -> Option<f64> {
+        match self.degree() {
+            0 => {
+                if self.c[0] == 0.0 {
+                    Some(now)
+                } else {
+                    None
+                }
+            }
+            1 => {
+                let lead = self.c[1];
+                if lead == 0.0 {
+                    return None;
+                }
+                let tc = -self.c[0] / lead;
+                if tc == now {
+                    // Zero now: only if decreasing (leading sign negative).
+                    if lead < 0.0 {
+                        Some(tc)
+                    } else {
+                        None
+                    }
+                } else if tc > now {
+                    Some(tc)
+                } else {
+                    None
+                }
+            }
+            2 => {
+                let roots = solve_quadratic_f64(self.c[2], self.c[1], self.c[0]);
+                if roots.count == 0 {
+                    return None;
+                }
+                let lead = self.c[2];
+                if lead < 0.0 {
+                    // Prefer second root; must not be in the past.
+                    if roots.x1 >= now {
+                        Some(roots.x1)
+                    } else {
+                        None
+                    }
+                } else if roots.x0 >= now {
+                    Some(roots.x0)
+                } else {
+                    // Lead > 0 and first root past: C++ rejects (no fallthrough to x1).
+                    None
+                }
+            }
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]

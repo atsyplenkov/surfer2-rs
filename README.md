@@ -40,13 +40,13 @@ Known parity gaps:
 - `convex10` is 17 (C++ double hub chords ~1e-11). Junction snap is 5 mm
   on metre-scale input and near-exact on unit GraphML.
 - Skip-∞ accounting is closed for the corpus fixtures below (test-support
-  classifier; engine still returns kinetic only). Equation:
-  `kinetic == OBJ finite_nonzero − classified skip-∞`, gated in
-  `skip_inf_count_equation_gates` against vendored `*-double.obj`:
+  structural classifier: single-face write_obj ∞-omit chords; engine still
+  returns kinetic only). Gated in `skip_inf_count_equation_gates` against
+  vendored `*-double.obj`:
   - `spoke-1`: 22 = 26 − 4
   - `collinear-split-event`: 17 = 19 − 2
   - `srpg0000025`: 73 = 81 − 8
-  - `srpg0000028`: 87 = 97 − 10
+  - `srpg0000028`: 87 public + 2 runaway-filtered = 97 − 8
   - `same-speed-convex-hull-000`: 9 = 13 − 4
   - `issue2-minimal1`: 23 = 25 − 2
 - Additive GraphML `edge-weight-additive` is unsupported (upstream parses

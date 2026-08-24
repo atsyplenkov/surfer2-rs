@@ -278,19 +278,21 @@ fn degree_one_oracle_bits_gates() {
     }
 }
 
-/// Always-on skip-∞ accounting: kinetic == OBJ finite_nonzero − classified skip-∞.
+/// Always-on skip-∞ accounting against vendored C++ double OBJs.
 ///
-/// Kinetic from bits → PSLG → `straight_skeleton(AllSequential)`. OBJ from
-/// vendored `fixtures/oracle/obj/*-double.obj` (C++ double, `--component=-1`,
-/// stream precision 17). Classifier in `support::skip_inf`.
+/// Classifier is OBJ-intrinsic (`structural_skip_inf_chords`: single-face
+/// write_obj ∞-omit gaps). Equation:
+/// `segment_count + runaway_excluded == obj_finite_nonzero − skip_inf`,
+/// where `runaway_excluded` counts stored finite-looking arcs dropped only by
+/// the public length cutoff (0 on five fixtures; 2 on `srpg0000028`).
 #[test]
 fn skip_inf_count_equation_gates() {
     use support::oracle::ObjSkeleton;
-    use support::skip_inf::{count_skip_inf_chords, structural_skip_inf_chords};
+    use support::skip_inf::{classify_skip_inf_chords, count_skip_inf_chords};
 
     let bits_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("fixtures/oracle/bits");
     let obj_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("fixtures/oracle/obj");
-    // (bits, obj, kinetic, obj_finite_nonzero, skip_inf)
+    // (bits, obj, public_kinetic, obj_finite_nonzero, structural_skip_inf, runaway)
     let cases = [
         (
             "special-cases__spoke-1.json",
@@ -298,6 +300,7 @@ fn skip_inf_count_equation_gates() {
             22,
             26,
             4,
+            0,
         ),
         (
             "special-cases__collinear-split-event.json",
@@ -305,15 +308,17 @@ fn skip_inf_count_equation_gates() {
             17,
             19,
             2,
+            0,
         ),
-        ("srpg0000025.json", "srpg0000025-double.obj", 73, 81, 8),
-        ("srpg0000028.json", "srpg0000028-double.obj", 87, 97, 10),
+        ("srpg0000025.json", "srpg0000025-double.obj", 73, 81, 8, 0),
+        ("srpg0000028.json", "srpg0000028-double.obj", 87, 97, 8, 2),
         (
             "special-cases__same-speed-convex-hull-000.json",
             "same-speed-convex-hull-000-double.obj",
             9,
             13,
             4,
+            0,
         ),
         (
             "issue2__issue2-minimal1.json",
@@ -321,9 +326,10 @@ fn skip_inf_count_equation_gates() {
             23,
             25,
             2,
+            0,
         ),
     ];
-    for (bits_name, obj_name, want_k, want_o, want_s) in cases {
+    for (bits_name, obj_name, want_k, want_o, want_s, want_runaway) in cases {
         let bits: BitsRecord = serde_json::from_str(
             &std::fs::read_to_string(bits_root.join(bits_name))
                 .unwrap_or_else(|e| panic!("{bits_name}: {e}")),
@@ -339,8 +345,7 @@ fn skip_inf_count_equation_gates() {
             },
         )
         .unwrap_or_else(|e| panic!("{bits_name}: {e}"));
-        let kinetic: Vec<_> = sk.finite_segments().map(|s| (s.start, s.end)).collect();
-        assert_eq!(kinetic.len(), want_k, "{bits_name} kinetic");
+        assert_eq!(sk.segment_count(), want_k, "{bits_name} public kinetic");
 
         let obj_path = obj_root.join(obj_name);
         let obj = ObjSkeleton::parse(
@@ -350,24 +355,39 @@ fn skip_inf_count_equation_gates() {
         let obj_n = obj.finite_nonzero_segments().len();
         assert_eq!(obj_n, want_o, "{obj_name} finite_nonzero");
 
-        let skip_n = count_skip_inf_chords(&obj, &kinetic);
-        assert_eq!(skip_n, want_s, "{bits_name} classified skip-∞");
+        let skip_n = count_skip_inf_chords(&obj);
+        assert_eq!(skip_n, want_s, "{bits_name} structural skip-∞");
         assert_eq!(
-            want_k,
-            want_o - want_s,
-            "{bits_name} equation kinetic == obj − skip_inf"
-        );
-        assert_eq!(
-            kinetic.len(),
-            obj_n - skip_n,
-            "{bits_name} live equation kinetic == obj − classified_skip_inf"
+            classify_skip_inf_chords(&obj).len(),
+            skip_n,
+            "{bits_name}: classify == structural"
         );
 
-        // Structural omit-gap chords are always a subset of the classified set.
-        let structural = structural_skip_inf_chords(&obj).len();
-        assert!(
-            structural <= skip_n,
-            "{bits_name}: structural skip-∞ {structural} > classified {skip_n}"
+        // Stored finite-looking arcs: public filter without the length cutoff.
+        let stored_finite = sk
+            .stored_segments()
+            .iter()
+            .filter(|s| {
+                s.start.is_finite()
+                    && s.end.is_finite()
+                    && s.start_time.is_finite()
+                    && s.end_time.is_finite()
+                    && s.end_time >= s.start_time
+                    && s.start_time >= 0.0
+                    && s.start.distance_to(s.end) > 1e-15
+            })
+            .count();
+        let runaway = stored_finite - sk.segment_count();
+        assert_eq!(runaway, want_runaway, "{bits_name} runaway_excluded");
+        assert_eq!(
+            stored_finite,
+            obj_n - skip_n,
+            "{bits_name}: stored_finite == obj − structural_skip_inf"
+        );
+        assert_eq!(
+            sk.segment_count() + runaway,
+            obj_n - skip_n,
+            "{bits_name}: segment_count + runaway == obj − skip_inf"
         );
         assert_dcel_contract(&sk, bits_name);
     }

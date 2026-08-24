@@ -2,25 +2,21 @@
 //!
 //! C++ `SkeletonDCEL::write_obj` omits the infinite vertex from each face
 //! cycle. That inserts a face-cycle edge between the two finite neighbors of
-//! ∞. Those omit-gap edges are the structural skip-∞ chords: finite-nonzero
-//! face-cycle edges that appear in exactly one OBJ face.
+//! ∞. Those omit-gap edges are the skip-∞ chords: finite-nonzero face-cycle
+//! edges that appear in exactly one OBJ face (intrinsic OBJ structure; no
+//! kinetic set-difference, no runaway-length arcs).
 //!
-//! Count gates compare Rust kinetic segments to C++ OBJ via
-//! `kinetic == obj_finite_nonzero − classified_skip_inf`. Classification is
-//! the OBJ−kinetic difference restricted to chords whose endpoints lie on
-//! ∞-terminating faces (faces that contain a structural omit-gap edge). On
-//! most fixtures that set equals the structural singles; on `srpg0000028` it
-//! also includes two long arcs present in OBJ and in Rust `stored_segments`
-//! but excluded from `segment_count` by the runaway length cutoff.
+//! Count gates use `structural_skip_inf_chords`. On most fixtures
+//! `segment_count == obj_finite_nonzero − skip_inf`. On `srpg0000028`, two
+//! stored arcs exceed the public runaway length cutoff, so
+//! `segment_count + runaway_excluded == obj − skip_inf` with
+//! `runaway_excluded` measured from `stored_segments` (not labeled skip-∞).
 
 use std::collections::{HashMap, HashSet};
 
 use surfer2::Point2;
 
 use super::oracle::{ObjSkeleton, OracleSegment};
-
-/// Endpoint match tolerance for OBJ↔kinetic identity (not an equation fudge).
-const ENDPOINT_TOL: f64 = 1e-7;
 
 fn edge_key(a: [f64; 3], b: [f64; 3]) -> (u64, u64, u64, u64, u64, u64) {
     if (a[0], a[1], a[2]) <= (b[0], b[1], b[2]) {
@@ -42,16 +38,6 @@ fn edge_key(a: [f64; 3], b: [f64; 3]) -> (u64, u64, u64, u64, u64, u64) {
             a[2].to_bits(),
         )
     }
-}
-
-fn near(a: Point2, b: Point2) -> bool {
-    (a.x - b.x).abs() <= ENDPOINT_TOL && (a.y - b.y).abs() <= ENDPOINT_TOL
-}
-
-fn matches_kinetic(seg: &OracleSegment, kinetic: &[(Point2, Point2)]) -> bool {
-    kinetic.iter().any(|(a, b)| {
-        (near(seg.start, *a) && near(seg.end, *b)) || (near(seg.start, *b) && near(seg.end, *a))
-    })
 }
 
 /// Face-cycle edges keyed by endpoint coordinates, with the faces they appear on.
@@ -82,16 +68,7 @@ fn nonzero_edge_faces(obj: &ObjSkeleton) -> HashMap<(u64, u64, u64, u64, u64, u6
     edge_faces
 }
 
-/// Faces that contain a structural write_obj ∞-omit gap edge.
-pub fn infinite_terminating_faces(obj: &ObjSkeleton) -> HashSet<usize> {
-    nonzero_edge_faces(obj)
-        .into_iter()
-        .filter(|(_, faces)| faces.len() == 1)
-        .flat_map(|(_, faces)| faces)
-        .collect()
-}
-
-/// Structural skip-∞ chords: finite-nonzero face-cycle edges in exactly one face.
+/// Skip-∞ chords: finite-nonzero face-cycle edges in exactly one OBJ face.
 pub fn structural_skip_inf_chords(obj: &ObjSkeleton) -> Vec<OracleSegment> {
     let edge_faces = nonzero_edge_faces(obj);
     let mut out = Vec::new();
@@ -133,46 +110,12 @@ pub fn structural_skip_inf_chords(obj: &ObjSkeleton) -> Vec<OracleSegment> {
     out
 }
 
-/// Classified skip-∞ accounting chords for the kinetic count equation.
-///
-/// Returns OBJ finite-nonzero segments that do not match `kinetic` and whose
-/// endpoints both lie on ∞-terminating faces (see module docs).
-pub fn classify_skip_inf_chords(
-    obj: &ObjSkeleton,
-    kinetic: &[(Point2, Point2)],
-) -> Vec<OracleSegment> {
-    let inf_faces = infinite_terminating_faces(obj);
-    let mut verts_on_inf: HashSet<(u64, u64, u64)> = HashSet::new();
-    for &fi in &inf_faces {
-        for &vi in &obj.faces[fi] {
-            let v = obj.vertices[vi];
-            verts_on_inf.insert((v[0].to_bits(), v[1].to_bits(), v[2].to_bits()));
-        }
-    }
-
-    let mut out = Vec::new();
-    for seg in obj.finite_nonzero_segments() {
-        if matches_kinetic(&seg, kinetic) {
-            continue;
-        }
-        let a_on = verts_on_inf.contains(&(
-            seg.start.x.to_bits(),
-            seg.start.y.to_bits(),
-            seg.start_time.to_bits(),
-        ));
-        let b_on = verts_on_inf.contains(&(
-            seg.end.x.to_bits(),
-            seg.end.y.to_bits(),
-            seg.end_time.to_bits(),
-        ));
-        if a_on && b_on {
-            out.push(seg);
-        }
-    }
-    out
+/// Accounting classifier: same as [`structural_skip_inf_chords`] (OBJ-intrinsic).
+pub fn classify_skip_inf_chords(obj: &ObjSkeleton) -> Vec<OracleSegment> {
+    structural_skip_inf_chords(obj)
 }
 
-/// Convenience: number of classified skip-∞ chords.
-pub fn count_skip_inf_chords(obj: &ObjSkeleton, kinetic: &[(Point2, Point2)]) -> usize {
-    classify_skip_inf_chords(obj, kinetic).len()
+/// Number of classified skip-∞ chords.
+pub fn count_skip_inf_chords(obj: &ObjSkeleton) -> usize {
+    classify_skip_inf_chords(obj).len()
 }

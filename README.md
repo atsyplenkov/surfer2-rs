@@ -59,9 +59,14 @@ Known parity gaps:
   - `issue2-minimal1`: 23 = 25 − 2
 - Additive GraphML `edge-weight-additive` is unsupported (upstream parses
   it and never applies it). Multiplicative `edge-weight` is implemented.
-- Offset contours walk C++-style face cycles and are gated on a unit
-  square and a rectangle-with-hole. Broad C++ offset comparison (many
-  times, topology changes) is still open.
+- Offset contours walk C++-style face cycles. Current gates are named
+  property / API-contract smokes only (`unit_square_interior_skeleton_smoke`,
+  `rectangle_with_hole_skeleton_and_offset_smoke`,
+  `offset_rejects_bad_time_and_does_not_panic`) — no C++ offset artifacts are
+  vendored under `fixtures/` yet, so there are zero additional C++-backed
+  offset gates. Broader C++ offset conformance (many times, topology changes,
+  corpus geometries) is **blocked-on-oracle-generation**; see
+  `fixtures/gis/README.txt` “Producing C++ offset oracles”.
 - Do not force `tc ≥ now` CH-leave to chase OBJ extras on
   `same-speed-convex-hull-000` (`spoke-3` NonAdvancingLoop); skip-∞
   accounting already closes that fixture’s count equation.

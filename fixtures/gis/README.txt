@@ -37,3 +37,41 @@ OBJ precision.
 
 Optional differential tests discover binaries through `SURFER2_DOUBLE_BIN` and
 `SURFER2_EXACT_BIN`.
+
+## Producing C++ offset oracles
+
+No C++ offset oracles are vendored today. Offset gates in `tests/gis.rs` are
+named property / API-contract smokes only; broader C++ offset conformance is
+**blocked-on-oracle-generation** until artifacts from this procedure land.
+
+Rebuild the double (and optionally exact) binaries as in “Rebuilding the C++
+oracle binaries” above — same Surfer2 revision
+`c42f9a7f969cd661d060481cd3b8bac2bdfb8dfa`, `NT_USE_DOUBLE=ON` (or OFF for
+exact), `DEBUG_OUTPUT=OFF`.
+
+Offsets are drawn into the IPE `offsets` layer. Plain OBJ output is skeleton
+faces only and does **not** embed offset polylines, so use `--ipe`:
+
+```bash
+# GraphML already vendored under fixtures/graphml/, or emit from bits:
+#   GraphMlInput::from_bits_record(...).to_graphml()  (tests/support/graphml.rs)
+#   writes 17-digit vertex coordinates.
+
+/tmp/surfer2-build-double/cc/surfer \
+  --component=-1 \
+  --sk-offset='0.1+0.2' \
+  --ipe \
+  fixtures/graphml/convex03.graphml \
+  /tmp/convex03-offsets.ipe
+```
+
+`--sk-offset` grammar (from the binary help): comma-separated blocks,
+`+`-joined times within a block, optional `cnt*time` repeats — e.g.
+`0.01 + 3*0.025, 0.15` or `10 * 0.025`.
+
+Vendor the resulting IPE (or a parsed polyline extract) under
+`fixtures/oracle/offset/` using names that encode geometry, kernel, and
+offset-spec (e.g. `convex03-double-t0.1.ipe`). Preserve full stream
+precision (match the 17-digit OBJ practice when controlling formatting).
+After vendoring, add an always-on comparison gate in the same change and
+narrow the README Status “blocked-on-oracle-generation” note accordingly.

@@ -127,6 +127,11 @@ fn obj_ends(obj: &ObjSkeleton) -> (Vec<(Point2, Point2)>, Vec<Point2>, f64) {
 
 #[test]
 fn unit_square_interior_skeleton_smoke() {
+    // Provenance: documented internal geometric property of a 2×2 axis-aligned
+    // square — offset(0.5) is the closed [0.5,1.5]² inset. No C++ offset
+    // oracle is vendored for this geometry yet (see fixtures/gis/README.txt
+    // “Producing C++ offset oracles”); broader C++ conformance is
+    // blocked-on-oracle-generation.
     let poly = Polygon::from_flat(&[[0.0, 0.0], [2.0, 0.0], [2.0, 2.0], [0.0, 2.0]], &[0]).unwrap();
     let sk = interior_straight_skeleton(&poly).unwrap();
     assert_eq!(sk.segment_count(), 4);
@@ -148,6 +153,10 @@ fn unit_square_interior_skeleton_smoke() {
 
 #[test]
 fn offset_rejects_bad_time_and_does_not_panic() {
+    // Provenance: documented public API contract — negative / non-finite times
+    // reject; finite t ≥ 0 returns finite polylines tagged with that time. Not
+    // derived from a C++ offset artifact (none vendored; see
+    // fixtures/gis/README.txt “Producing C++ offset oracles”).
     let poly = Polygon::from_flat(&[[0.0, 0.0], [2.0, 0.0], [2.0, 2.0], [0.0, 2.0]], &[0]).unwrap();
     let sk = interior_straight_skeleton(&poly).unwrap();
     assert!(sk.offset(-1.0).is_err());
@@ -165,6 +174,11 @@ fn offset_rejects_bad_time_and_does_not_panic() {
 
 #[test]
 fn rectangle_with_hole_skeleton_and_offset_smoke() {
+    // Provenance: documented internal geometric property — at t=0.4 wavefronts
+    // have not met, so offset yields a closed outer 0.4-inset of the 6×6 and a
+    // closed 0.4-outset of the [2,4]² hole. No C++ offset oracle is vendored
+    // for this geometry yet (see fixtures/gis/README.txt “Producing C++ offset
+    // oracles”); broader C++ conformance is blocked-on-oracle-generation.
     let poly = Polygon::new(
         vec![
             Point2::new(0.0, 0.0),

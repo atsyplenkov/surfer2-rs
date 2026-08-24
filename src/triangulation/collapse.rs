@@ -187,9 +187,13 @@ fn collapse_bounded_constrained_1(
     ) else {
         return Ok(CollapseSpec::never(t.component));
     };
-    // After a late flip the opposite vertex can already sit on the new
-    // constraint while a later det root hides the split. Catch up only
-    // when the hit is on-segment and at most 1e-4 s in the past.
+    // Rust f64 catch-up, not upstream. C++ compute_split_or_flip_event_
+    // bounded_constrained_1 (c42f9a7): collapse_time > now → future SOF;
+    // == now → accept/sign; < now → NEVER; ALWAYS → SOF at now. No past
+    // window. After a late flip, f64 can leave the opposite vertex already
+    // on-segment with tc a few µs in the past while a later det root hides
+    // the split — emit now-time SOF only for on-segment ≤1e-4 s hits.
+    // Do not widen into a global near-miss→split rule.
     if missed_on_segment_split(kt, t, c_idx, time_now) {
         return Ok(CollapseSpec::with_edge(
             t.component,
@@ -303,9 +307,10 @@ fn line_hit_is_recent(tc: f64, time_now: f64, slop: f64) -> bool {
     tc.is_finite() && tc <= time_now && time_now - tc <= slop
 }
 
-/// Opposite vertex is on the constraint segment and the supporting-line
-/// hit was only a few microseconds earlier (lake south-reflex after the
-/// long-spoke flip).
+/// Narrow f64 late-flip catch-up: opposite vertex is on the constraint
+/// segment and the supporting-line hit was ≤1e-4 s earlier (lake
+/// south-reflex after the long-spoke flip). Upstream has no equivalent
+/// past window — see comment at the call site.
 fn missed_on_segment_split(
     kt: &KineticTriangulation,
     t: &KineticTriangle,

@@ -35,8 +35,14 @@ upstream kinetic triangulation / wavefront propagation engine.
 Known parity gaps:
 
 - `lake9706` and `lake10623` match the frozen C++ oracles (counts, nodes,
-  cyclomatic 0, topology). A global “near-miss is a split” rule is still
-  unsafe; the remaining catch-up is a 1e-4 s on-segment SOF after a late flip.
+  cyclomatic 0, topology). Late-flip SOF (ticket 04): upstream
+  `compute_split_or_flip_event_bounded_constrained_1` (c42f9a7) emits SOF
+  only for future / exact-now (accept/sign) / ALWAYS on-line — past line
+  hits are NEVER, with no catch-up window. Rust keeps a narrow f64-only
+  on-segment ≤1e-4 s catch-up (`missed_on_segment_split`) so late flips
+  that leave the vertex already on-segment still emit now-time SOF; a
+  global “near-miss is a split” rule stays disabled (widen only if a
+  fixture proves need and lakes+corpus stay green).
 - `convex10` is 17 (C++ double hub chords ~1e-11). Junction snap is 5 mm
   on metre-scale input and near-exact on unit GraphML.
 - Skip-∞ accounting is closed for the corpus fixtures below (test-support

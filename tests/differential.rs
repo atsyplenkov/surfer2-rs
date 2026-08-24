@@ -206,6 +206,51 @@ fn spoke1_interior_count() {
     assert_eq!(sk.segment_count(), 16, "nodes={}", sk.node_count());
 }
 
+/// Always-on pin for scale-aware junction snap on unit GraphML (`convex10`).
+///
+/// Footprint diagonal under 1 km → near-exact eps (1e-15), so C++ double's
+/// ~1e-11 hub chords stay unmerged → 17 kinetic segments. Metre GIS uses 5 mm.
+#[test]
+fn convex10_oracle_bits_gate() {
+    let name = "convex10.json";
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("fixtures/oracle/bits")
+        .join(name);
+    let bits: BitsRecord = serde_json::from_str(
+        &std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{name}: {e}")),
+    )
+    .unwrap_or_else(|e| panic!("{name}: {e}"));
+    // Fixture must remain on the unit-eps branch (no new public API).
+    let mut min_x = f64::INFINITY;
+    let mut min_y = f64::INFINITY;
+    let mut max_x = f64::NEG_INFINITY;
+    let mut max_y = f64::NEG_INFINITY;
+    for b in &bits.xy_bits {
+        let p = Point2::from_bits(*b);
+        min_x = min_x.min(p.x);
+        min_y = min_y.min(p.y);
+        max_x = max_x.max(p.x);
+        max_y = max_y.max(p.y);
+    }
+    let extent = (max_x - min_x).hypot(max_y - min_y);
+    assert!(
+        extent.is_finite() && extent < 1e3,
+        "{name}: expected unit-scale footprint (extent {extent}), not metre snap"
+    );
+    let pslg = support::graphml::GraphMlInput::from_bits_record(&bits, name)
+        .to_pslg()
+        .unwrap_or_else(|e| panic!("{name}: {e}"));
+    let sk = straight_skeleton(
+        &pslg,
+        &Options {
+            components: ComponentMode::AllSequential,
+        },
+    )
+    .unwrap_or_else(|e| panic!("{name}: {e}"));
+    assert_eq!(sk.segment_count(), 17, "{name}");
+    assert_dcel_contract(&sk, name);
+}
+
 #[test]
 fn weighted_oracle_bits_gates() {
     // Always-on public-API gates from vendored oracle-bit records (no GraphML).

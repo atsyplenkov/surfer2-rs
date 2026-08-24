@@ -43,8 +43,10 @@ Known parity gaps:
   that leave the vertex already on-segment still emit now-time SOF; a
   global “near-miss is a split” rule stays disabled (widen only if a
   fixture proves need and lakes+corpus stay green).
-- `convex10` is 17 (C++ double hub chords ~1e-11). Junction snap is 5 mm
-  on metre-scale input and near-exact on unit GraphML.
+- Junction snap is a pinned scale-aware decision (not an open gap): metre GIS
+  (footprint diagonal ≥ 1 km) snaps at 5 mm; unit GraphML uses near-exact eps
+  so C++ double's ~1e-11 hub chords are not merged. `convex10` is gated at 17
+  kinetic segments on the unit branch (`convex10_oracle_bits_gate`).
 - Skip-∞ accounting is closed for the corpus fixtures below (test-support
   structural classifier: single-face write_obj ∞-omit chords; engine still
   returns kinetic only). Gated in `skip_inf_count_equation_gates` against

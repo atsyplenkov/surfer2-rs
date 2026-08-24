@@ -1,7 +1,3 @@
-# Default: show available targets.
-default:
-    @just --list
-
 # Run cargo clippy and cargo fmt
 lint:
   cargo clippy \

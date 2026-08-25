@@ -1,14 +1,14 @@
 <h1 align="center"><code>surfer2</code></h1>
 
 <p align="center">
-    <a href="https://github.com/atsyplenkov/surfer2/actions/workflows/rust-ci.yml">
-        <img src="https://img.shields.io/github/actions/workflow/status/atsyplenkov/surfer2/rust-ci.yml?style=flat&labelColor=1C2C2E&color=dea584&logo=GitHub%20Actions&logoColor=white"></a>
-    <a href="https://github.com/atsyplenkov/surfer2/actions/workflows/rust-cd.yml">
-        <img src="https://img.shields.io/github/actions/workflow/status/atsyplenkov/surfer2/rust-cd.yml?style=flat&labelColor=1C2C2E&color=dea584&logo=GitHub%20Actions&logoColor=white&label=deploy"></a>
+    <a href="https://github.com/atsyplenkov/surfer2-rs/actions/workflows/rust-ci.yml">
+        <img src="https://img.shields.io/github/actions/workflow/status/atsyplenkov/surfer2-rs/rust-ci.yml?style=flat&labelColor=1C2C2E&color=dea584&logo=GitHub%20Actions&logoColor=white"></a>
+    <a href="https://github.com/atsyplenkov/surfer2-rs/actions/workflows/rust-cd.yml">
+        <img src="https://img.shields.io/github/actions/workflow/status/atsyplenkov/surfer2-rs/rust-cd.yml?style=flat&labelColor=1C2C2E&color=dea584&logo=GitHub%20Actions&logoColor=white&label=deploy"></a>
     <a href="https://crates.io/crates/surfer2/">
         <img src="https://img.shields.io/crates/v/surfer2?style=flat&labelColor=1C2C2E&color=dea584&logo=Rust&logoColor=white"></a>
-    <a href="https://codecov.io/gh/atsyplenkov/surfer2">
-        <img src="https://img.shields.io/codecov/c/gh/atsyplenkov/surfer2?style=flat&labelColor=1C2C2E&color=dea584&logo=Codecov&logoColor=white"></a>
+    <a href="https://codecov.io/gh/atsyplenkov/surfer2-rs">
+        <img src="https://img.shields.io/codecov/c/gh/atsyplenkov/surfer2-rs?style=flat&labelColor=1C2C2E&color=dea584&logo=Codecov&logoColor=white"></a>
     <a href="https://docs.rs/surfer2/">
         <img src="https://img.shields.io/docsrs/surfer2?style=flat&labelColor=1C2C2E&color=dea584&logo=Rust&logoColor=white"></a>
 </p>

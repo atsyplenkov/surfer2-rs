@@ -12,7 +12,7 @@ documentation = "https://docs.rs/surfer2"
 readme = "README.md"
 keywords = ["straight-skeleton", "computational-geometry", "polygon", "pslg"]
 categories = ["algorithms", "graphics", "mathematics"]
-exclude = ["fixtures/gis/*", "benches/data/*"]
+exclude = ["fixtures/gis/*", "benches/data/*", ".scratch/*", "exa-results/*"]
 
 [dependencies]
 slotmap = "=1.1.1"

@@ -64,9 +64,7 @@ impl<P: Ord + Clone> IndexedHeap<P> {
     pub fn clear(&mut self) {
         self.heap.clear();
         self.entries.clear();
-        for s in &mut self.by_payload {
-            *s = usize::MAX;
-        }
+        self.by_payload.fill(usize::MAX);
     }
 
     pub fn ensure_payload_capacity(&mut self, n: usize) {

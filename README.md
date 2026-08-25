@@ -73,6 +73,12 @@ cargo bench --bench magadan -- lake10623
 
 GPL-3.0-or-later, matching upstream Surfer2. See [`LICENSE`](LICENSE) and [`COPYRIGHT`](COPYRIGHT). Translated modules carry notices pointing at the corresponding Surfer2 sources under `surf/src/`. Numeric and topological semantics follow that codebase; serialization, logging, and pointer identity do not.
 
+## Acknowledgements
+
+`surfer2-rs` builds on the original Surfer2 engine by Günther Eder, Martin Held, and Peter Palfrader and the method description published in Eder et al. ([2021](https://www.sciencedirect.com/science/article/pii/S092577212100016X)).
+
+This project has made heavy use of AI-assisted pair programming (both GPT-5.6-Sol and Grok-4.5/4.6 via Pi as of Aug 2026). It is highly doubtful that we would be able to put this together without AI help.
+
 ## See also
 
 * [cgalab/surfer2](https://github.com/cgalab/surfer2) — the original C++/CGAL implementation;

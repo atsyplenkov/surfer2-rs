@@ -1,5 +1,4 @@
-
-<p align="center"><code>surfer2</code></p>
+<h1 align="center"><code>surfer2</code></h1>
 
 <p align="center">
     <a href="https://github.com/atsyplenkov/surfer2/actions/workflows/rust-ci.yml">

@@ -11,7 +11,7 @@ homepage = "https://github.com/atsyplenkov/surfer2-rs"
 documentation = "https://docs.rs/surfer2"
 readme = "README.md"
 keywords = ["straight-skeleton", "geometry", "polygon", "offset"]
-categories = ["algorithms", "graphics", "mathematics", "images"]
+categories = ["algorithms", "graphics", "mathematics"]
 exclude = ["fixtures/gis/*", "benches/data/*", ".scratch/*", "exa-results/*"]
 
 # Clippy runs with `-D warnings` in CI. These are the documented exceptions:

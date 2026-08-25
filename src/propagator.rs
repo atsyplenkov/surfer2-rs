@@ -957,7 +957,8 @@ impl Propagator {
                     }
                 })?;
                 let natural = compute_collapse(&self.kt, tr, time)?;
-                if leftover_resolve(nconst, motion, natural.type_) != LeftoverSchedule::CollapseNow {
+                if leftover_resolve(nconst, motion, natural.type_) != LeftoverSchedule::CollapseNow
+                {
                     return Ok(());
                 }
             }

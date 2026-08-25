@@ -106,3 +106,44 @@ jobs:
 
       - name: Publish dry run
         run: cargo publish --dry-run --locked
+
+  msrv:
+    name: MSRV (1.81)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.81
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build
+        run: cargo build --locked --verbose
+
+      - name: Test
+        run: cargo test --release --locked --verbose -- --test-threads=2
+
+  semver-checks:
+    name: Semantic version check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Find the baseline tag
+        id: baseline
+        run: echo "tag=$(git describe --tags --abbrev=0 2>/dev/null || true)" >> "$GITHUB_OUTPUT"
+
+      - name: Install Rust toolchain
+        if: steps.baseline.outputs.tag != ''
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-semver-checks
+        if: steps.baseline.outputs.tag != ''
+        uses: taiki-e/install-action@cargo-semver-checks
+
+      - name: Check the semver compatibility
+        if: steps.baseline.outputs.tag != ''
+        run: cargo semver-checks --baseline-rev "${{ steps.baseline.outputs.tag }}"

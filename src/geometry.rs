@@ -24,11 +24,6 @@ impl Point2 {
     }
 
     #[inline]
-    pub fn to_array(self) -> [f64; 2] {
-        [self.x, self.y]
-    }
-
-    #[inline]
     pub fn is_finite(self) -> bool {
         self.x.is_finite() && self.y.is_finite()
     }
@@ -38,14 +33,6 @@ impl Point2 {
         let dx = self.x - other.x;
         let dy = self.y - other.y;
         dx.hypot(dy)
-    }
-
-    #[inline]
-    pub fn midpoint(self, other: Point2) -> Point2 {
-        Point2 {
-            x: (self.x + other.x) * 0.5,
-            y: (self.y + other.y) * 0.5,
-        }
     }
 
     /// Exact bit pattern for fixture round-trips (not decimal).

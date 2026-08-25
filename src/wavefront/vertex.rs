@@ -130,42 +130,6 @@ pub fn infinite_speed_type(
     }
 }
 
-/// Angle type from three points a-b-c (at b), wavefront left-interior orientation.
-pub fn angle_type_at(a: Point2, b: Point2, c: Point2) -> AngleType {
-    let ux = a.x - b.x;
-    let uy = a.y - b.y;
-    let vx = c.x - b.x;
-    let vy = c.y - b.y;
-    let cross = ux * vy - uy * vx;
-    let dot = ux * vx + uy * vy;
-    let lu = ux.hypot(uy);
-    let lv = vx.hypot(vy);
-    if lu == 0.0 || lv == 0.0 {
-        return AngleType::Straight;
-    }
-    // collinear?
-    let scale = lu * lv;
-    if cross.abs() <= 1e-14 * scale {
-        // straight or 180
-        if dot < 0.0 {
-            return AngleType::Straight;
-        }
-        return AngleType::Reflex; // folded back
-    }
-    // Interior to the left of wavefront chain a→b→c means cross > 0 for CCW polygon left.
-    // Reflex if interior angle > π, i.e. cross has the opposite sign of the polygon orientation.
-    // For standard left-of-edge propagation (CCW rings), reflex when cross < 0.
-    if cross < 0.0 {
-        AngleType::Reflex
-    } else if dot < 0.0 {
-        AngleType::Obtuse
-    } else if dot == 0.0 {
-        AngleType::Right
-    } else {
-        AngleType::Acute
-    }
-}
-
 /// C++ `WavefrontVertex`: orientation of `a.direction` then `b.direction`.
 /// LEFT_TURN → convex, COLLINEAR → straight, RIGHT_TURN → reflex.
 pub(crate) fn vertex_angle_from_lines(a: SupportingLine, b: SupportingLine) -> AngleType {

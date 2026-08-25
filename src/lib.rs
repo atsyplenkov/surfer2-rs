@@ -46,17 +46,9 @@ pub enum ComponentMode {
 /// Propagation options. Additive GraphML `edge-weight-additive` is not a
 /// field: upstream parses that attribute and never applies it. Only
 /// multiplicative `InputEdge::weight` (`edge-weight`) affects speed.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Options {
     pub components: ComponentMode,
-}
-
-impl Default for Options {
-    fn default() -> Self {
-        Self {
-            components: ComponentMode::AllSequential,
-        }
-    }
 }
 
 /// One-shot straight skeleton of a PSLG.

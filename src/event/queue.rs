@@ -57,9 +57,10 @@ impl EventQueue {
         Ok(self.heap.peak().map(|e| &e.priority))
     }
 
-    pub fn peak_tidx(&self) -> Result<Option<u32>, PropagationError> {
+    /// Peak payload and priority in one heap look.
+    pub fn peak_event(&self) -> Result<Option<(u32, CollapseSpec)>, PropagationError> {
         self.assert_no_pending()?;
-        Ok(self.heap.peak().map(|e| e.payload))
+        Ok(self.heap.peak().map(|e| (e.payload, e.priority)))
     }
 
     pub fn needs_update(&mut self, tidx: u32) -> Result<(), PropagationError> {
@@ -101,17 +102,12 @@ impl EventQueue {
             self.heap.remove_payload(tidx);
         }
 
-        // Update phase
+        // Update phase — push always upserts, including NEVER (so peak can see termination).
         let updating = std::mem::take(&mut self.need_update);
         for tidx in updating {
             self.in_need_update[tidx as usize] = false;
             let spec = recompute(tidx)?;
-            if spec.type_ == CollapseType::Never && !self.heap.contains_payload(tidx) {
-                // Keep NEVER entries so peak can detect termination consistently.
-                self.heap.push(spec, tidx);
-            } else {
-                self.heap.push(spec, tidx);
-            }
+            self.heap.push(spec, tidx);
         }
         Ok(())
     }
@@ -125,8 +121,10 @@ impl EventQueue {
         Ok(())
     }
 
-    /// Drop all NEVER entries from the top until a real event or empty.
+    /// True when the peak event is `Never` (or the queue reports a Never peak).
     pub fn peak_is_never(&self) -> Result<bool, PropagationError> {
-        Ok(self.peak()?.is_some_and(|s| s.type_ == CollapseType::Never))
+        Ok(self
+            .peak_event()?
+            .is_some_and(|(_, s)| s.type_ == CollapseType::Never))
     }
 }

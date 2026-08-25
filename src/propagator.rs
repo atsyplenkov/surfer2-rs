@@ -31,7 +31,7 @@ const JUNCTION_EPS_METRE: f64 = 5e-3;
 const JUNCTION_EPS_UNIT: f64 = 1e-15;
 const JUNCTION_METRE_SCALE: f64 = 1e3;
 
-/// Incremental propagator with step/advance_to/finish.
+/// Incremental propagator with step/finish.
 pub struct Propagator {
     pub kt: KineticTriangulation,
     pub queue: EventQueue,
@@ -135,8 +135,8 @@ impl Propagator {
         if self.finalized {
             return Ok(false);
         }
-        let (tidx, spec) = match (self.queue.peak_tidx()?, self.queue.peak()?) {
-            (Some(t), Some(s)) if s.type_ != CollapseType::Never => (t, *s),
+        let (tidx, spec) = match self.queue.peak_event()? {
+            Some((t, s)) if s.type_ != CollapseType::Never => (t, s),
             _ => {
                 self.finish()?;
                 return Ok(false);
@@ -196,19 +196,6 @@ impl Propagator {
             return Ok(false);
         }
         Ok(true)
-    }
-
-    pub fn advance_to(&mut self, t: f64) -> Result<(), SkeletonError> {
-        while let Some(nt) = self.next_event_time()? {
-            if nt > t {
-                break;
-            }
-            if !self.step()? {
-                break;
-            }
-        }
-        self.time = self.time.max(t);
-        Ok(())
     }
 
     pub fn finish(&mut self) -> Result<(), SkeletonError> {

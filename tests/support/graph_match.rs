@@ -232,23 +232,6 @@ pub fn match_segments(
     match_graphs(&aa, &bb, tol)
 }
 
-/// Distance from `p` to the interior of `a--b`. `None` if the nearest
-/// point on the line is an endpoint.
-pub fn interior_segment_distance(a: Point2, b: Point2, p: Point2) -> Option<f64> {
-    let abx = b.x - a.x;
-    let aby = b.y - a.y;
-    let ab2 = abx * abx + aby * aby;
-    if !(ab2 > 0.0) {
-        return None;
-    }
-    let t = ((p.x - a.x) * abx + (p.y - a.y) * aby) / ab2;
-    if t <= 0.0 || t >= 1.0 {
-        return None;
-    }
-    let q = Point2::new(a.x + t * abx, a.y + t * aby);
-    Some(p.distance_to(q))
-}
-
 /// Locate segment endpoints onto `nodes` and return undirected index pairs.
 /// Fails if any endpoint is farther than `tol` from every node.
 pub fn edges_on_nodes(

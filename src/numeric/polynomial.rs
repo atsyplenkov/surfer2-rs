@@ -9,14 +9,6 @@ pub struct Poly2 {
 }
 
 impl Poly2 {
-    pub fn constant(a0: f64) -> Self {
-        Self { c: [a0, 0.0, 0.0] }
-    }
-
-    pub fn linear(a0: f64, a1: f64) -> Self {
-        Self { c: [a0, a1, 0.0] }
-    }
-
     pub fn quadratic(a0: f64, a1: f64, a2: f64) -> Self {
         Self { c: [a0, a1, a2] }
     }
@@ -29,10 +21,6 @@ impl Poly2 {
         } else {
             0
         }
-    }
-
-    pub fn eval(self, t: f64) -> f64 {
-        self.c[0] + t * (self.c[1] + t * self.c[2])
     }
 
     /// First root at or after `now`. Degree 2 prefers x1 when the leading

@@ -170,7 +170,6 @@ impl Propagator {
 
         self.time = spec.time;
         self.stats.events_processed += 1;
-        self.stats.count_event(spec.type_);
 
         // Absolute safety bound (independent of time advance).
         if self.stats.events_processed > 5_000_000 {

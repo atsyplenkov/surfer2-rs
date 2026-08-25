@@ -9,15 +9,17 @@
 
 pub mod dcel;
 pub mod error;
+/// Event queue and collapse keys. Integration tests use [`event::CollapseType`].
 pub mod event;
 pub mod geometry;
 pub mod input;
-pub mod numeric;
-pub mod offset;
-pub mod propagator;
-pub mod stats;
+pub(crate) mod numeric;
+pub(crate) mod offset;
+pub(crate) mod propagator;
+pub(crate) mod stats;
+/// CDT + kinetic triangulation. Integration tests use [`triangulation::build_basic_triangulation`].
 pub mod triangulation;
-pub mod wavefront;
+pub(crate) mod wavefront;
 
 pub use dcel::{
     ArcGeometry, Face, FaceId, HalfEdge, HalfEdgeId, Node, NodeId, Skeleton, SkeletonSegment,

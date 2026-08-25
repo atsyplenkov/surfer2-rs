@@ -4,4 +4,4 @@
 
 mod polynomial;
 
-pub use polynomial::{determinant_poly_f64, solve_quadratic_f64, Poly2, QuadraticRoots};
+pub(crate) use polynomial::{determinant_poly_f64, Poly2};

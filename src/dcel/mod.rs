@@ -193,7 +193,7 @@ impl Skeleton {
 /// // Unchecked emission without bounded-face validation is not public.
 /// use surfer2::dcel::emit_skeleton;
 /// ```
-pub fn build_dcel(kt: &KineticTriangulation) -> Result<Skeleton, SkeletonError> {
+pub(crate) fn build_dcel(kt: &KineticTriangulation) -> Result<Skeleton, SkeletonError> {
     let (sk, walk_failures) = emit_skeleton_with_diagnostics(kt)?;
     let unbounded = FaceId(sk.faces.len().saturating_sub(1) as u32);
     match validate_bounded_face_cycles(&sk.halfedges, &sk.faces, unbounded) {

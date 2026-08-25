@@ -20,10 +20,7 @@ impl Point2 {
 
     #[inline]
     pub fn from_array(xy: [f64; 2]) -> Self {
-        Self {
-            x: xy[0],
-            y: xy[1],
-        }
+        Self { x: xy[0], y: xy[1] }
     }
 
     #[inline]

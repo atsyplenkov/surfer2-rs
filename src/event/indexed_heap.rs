@@ -209,9 +209,8 @@ impl<P: Ord + Clone> IndexedHeap<P> {
                 break;
             }
             let right = Self::right(root);
-            let smallest = if right >= len {
-                left
-            } else if self.less_or_eq(left, right) {
+            // No right child: left wins without comparison.
+            let smallest = if right >= len || self.less_or_eq(left, right) {
                 left
             } else {
                 right
@@ -229,7 +228,10 @@ impl<P: Ord + Clone> IndexedHeap<P> {
     }
 
     fn less_or_eq(&self, i: usize, j: usize) -> bool {
-        matches!(self.prio(i).cmp(self.prio(j)), Ordering::Less | Ordering::Equal)
+        matches!(
+            self.prio(i).cmp(self.prio(j)),
+            Ordering::Less | Ordering::Equal
+        )
     }
 
     fn prio(&self, heap_idx: usize) -> &P {
@@ -289,7 +291,10 @@ mod tests {
     fn push_pop_sorted() {
         let mut h = IndexedHeap::new();
         for (i, t) in [3.0, 1.0, 2.0, 0.5].iter().enumerate() {
-            h.push(CollapseSpec::new(0, CollapseType::TriangleCollapse, *t), i as u32);
+            h.push(
+                CollapseSpec::new(0, CollapseType::TriangleCollapse, *t),
+                i as u32,
+            );
         }
         assert!(h.is_heap());
         let mut times = Vec::new();

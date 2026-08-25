@@ -104,10 +104,8 @@ fn graphml_bit_roundtrip_and_cdt() {
                     // Constraints preserved: every input edge appears on some triangle side
                     let mut seen = vec![false; pslg.edge_count()];
                     for c in &basic.constraints {
-                        for s in c {
-                            if let Some(e) = s {
-                                seen[*e as usize] = true;
-                            }
+                        for e in c.iter().flatten() {
+                            seen[*e as usize] = true;
                         }
                     }
                     // Degree-one / dangling may still mark; require no split losses at least

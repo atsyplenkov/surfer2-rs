@@ -90,10 +90,7 @@ impl EventQueue {
     }
 
     /// Drop pending first, then recompute priorities via `recompute(tidx) -> CollapseSpec`.
-    pub fn process_pending_updates<F>(
-        &mut self,
-        mut recompute: F,
-    ) -> Result<(), PropagationError>
+    pub fn process_pending_updates<F>(&mut self, mut recompute: F) -> Result<(), PropagationError>
     where
         F: FnMut(u32) -> Result<CollapseSpec, PropagationError>,
     {
@@ -130,8 +127,6 @@ impl EventQueue {
 
     /// Drop all NEVER entries from the top until a real event or empty.
     pub fn peak_is_never(&self) -> Result<bool, PropagationError> {
-        Ok(self
-            .peak()?
-            .is_some_and(|s| s.type_ == CollapseType::Never))
+        Ok(self.peak()?.is_some_and(|s| s.type_ == CollapseType::Never))
     }
 }

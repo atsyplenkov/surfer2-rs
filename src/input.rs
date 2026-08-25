@@ -5,9 +5,7 @@
 //! applies them to propagation).
 
 use crate::error::InputError;
-use crate::geometry::{
-    require_finite_point, segments_properly_intersect, Point2,
-};
+use crate::geometry::{require_finite_point, segments_properly_intersect, Point2};
 
 /// Undirected input constraint with multiplicative positive weight.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -180,7 +178,10 @@ impl Polygon {
 
     /// View as a PSLG (shared topology; weight 1 on every edge).
     pub fn as_pslg(&self) -> Result<Pslg, InputError> {
-        Ok(Pslg::from_validated(self.vertices.clone(), self.edges.clone()))
+        Ok(Pslg::from_validated(
+            self.vertices.clone(),
+            self.edges.clone(),
+        ))
     }
 }
 
@@ -287,7 +288,10 @@ fn validate_pslg(vertices: &[Point2], edges: &[InputEdge]) -> Result<(), InputEr
         }
         let key = e.normalized_endpoints();
         if !seen.insert(key) {
-            return Err(InputError::DuplicateEdge { v0: key.0, v1: key.1 });
+            return Err(InputError::DuplicateEdge {
+                v0: key.0,
+                v1: key.1,
+            });
         }
     }
 
@@ -324,8 +328,7 @@ fn point_in_ring_odd_even(p: Point2, ring: &[Point2]) -> bool {
         let pi = ring[i];
         let pj = ring[j];
         let intersect = ((pi.y > p.y) != (pj.y > p.y))
-            && (p.x
-                < (pj.x - pi.x) * (p.y - pi.y) / (pj.y - pi.y) + pi.x);
+            && (p.x < (pj.x - pi.x) * (p.y - pi.y) / (pj.y - pi.y) + pi.x);
         if intersect {
             inside = !inside;
         }
@@ -364,13 +367,7 @@ mod tests {
     #[test]
     fn closing_duplicate_stripped() {
         let poly = Polygon::from_flat(
-            &[
-                [0.0, 0.0],
-                [2.0, 0.0],
-                [2.0, 2.0],
-                [0.0, 2.0],
-                [0.0, 0.0],
-            ],
+            &[[0.0, 0.0], [2.0, 0.0], [2.0, 2.0], [0.0, 2.0], [0.0, 0.0]],
             &[0],
         )
         .unwrap();
@@ -379,12 +376,7 @@ mod tests {
 
     #[test]
     fn rejects_zero_weight() {
-        let err = Pslg::from_flat(
-            &[[0.0, 0.0], [1.0, 0.0]],
-            &[[0, 1]],
-            Some(&[0.0]),
-        )
-        .unwrap_err();
+        let err = Pslg::from_flat(&[[0.0, 0.0], [1.0, 0.0]], &[[0, 1]], Some(&[0.0])).unwrap_err();
         assert!(matches!(err, InputError::NonPositiveWeight { .. }));
     }
 

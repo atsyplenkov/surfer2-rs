@@ -67,8 +67,7 @@ impl CollapseType {
     pub fn requires_secondary_key(self) -> bool {
         matches!(
             self,
-            CollapseType::FaceHasInfinitelyFastVertexWeighted
-                | CollapseType::VertexMovesOverSpoke
+            CollapseType::FaceHasInfinitelyFastVertexWeighted | CollapseType::VertexMovesOverSpoke
         )
     }
 }
@@ -241,26 +240,18 @@ mod tests {
     #[test]
     fn type_order_matches_upstream() {
         assert!(CollapseType::FaceHasInfinitelyFastVertexOpposing < CollapseType::TriangleCollapse);
-        assert!(CollapseType::SplitOrFlipRefine < CollapseType::FaceHasInfinitelyFastVertexWeighted);
+        assert!(
+            CollapseType::SplitOrFlipRefine < CollapseType::FaceHasInfinitelyFastVertexWeighted
+        );
         assert!(CollapseType::VertexMovesOverSpoke < CollapseType::CcwVertexLeavesCh);
     }
 
     #[test]
     fn secondary_key_descending() {
-        let a = CollapseSpec::with_edge_secondary(
-            0,
-            CollapseType::VertexMovesOverSpoke,
-            1.0,
-            0,
-            10.0,
-        );
-        let b = CollapseSpec::with_edge_secondary(
-            0,
-            CollapseType::VertexMovesOverSpoke,
-            1.0,
-            0,
-            3.0,
-        );
+        let a =
+            CollapseSpec::with_edge_secondary(0, CollapseType::VertexMovesOverSpoke, 1.0, 0, 10.0);
+        let b =
+            CollapseSpec::with_edge_secondary(0, CollapseType::VertexMovesOverSpoke, 1.0, 0, 3.0);
         // Higher secondary key first
         assert!(a < b);
     }

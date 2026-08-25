@@ -375,13 +375,13 @@ pub fn raw_flip(
     {
         let t = kt.triangles.get_mut(tid).unwrap();
         t.vertices[ccw(side)] = Some(o);
-        t.is_unbounded = inf.is_some() && t.vertices.iter().any(|x| *x == inf);
+        t.is_unbounded = inf.is_some() && t.vertices.contains(&inf);
         t.invalidate_collapse();
     }
     {
         let n = kt.triangles.get_mut(ntid).unwrap();
         n.vertices[ccw(nidx)] = Some(v);
-        n.is_unbounded = inf.is_some() && n.vertices.iter().any(|x| *x == inf);
+        n.is_unbounded = inf.is_some() && n.vertices.contains(&inf);
         n.invalidate_collapse();
     }
 

@@ -79,9 +79,10 @@ impl ObjSkeleton {
         let mut out = Vec::new();
         let mut seen = std::collections::BTreeSet::new();
         for face in &self.faces {
-            for w in face.windows(2).chain(std::iter::once(
-                [face[face.len() - 1], face[0]].as_slice(),
-            )) {
+            for w in face
+                .windows(2)
+                .chain(std::iter::once([face[face.len() - 1], face[0]].as_slice()))
+            {
                 let i = w[0];
                 let j = w[1];
                 let a = self.vertices[i];
@@ -94,9 +95,23 @@ impl ObjSkeleton {
                     continue;
                 }
                 let key = if (a[0], a[1], a[2]) <= (b[0], b[1], b[2]) {
-                    (a[0].to_bits(), a[1].to_bits(), a[2].to_bits(), b[0].to_bits(), b[1].to_bits(), b[2].to_bits())
+                    (
+                        a[0].to_bits(),
+                        a[1].to_bits(),
+                        a[2].to_bits(),
+                        b[0].to_bits(),
+                        b[1].to_bits(),
+                        b[2].to_bits(),
+                    )
                 } else {
-                    (b[0].to_bits(), b[1].to_bits(), b[2].to_bits(), a[0].to_bits(), a[1].to_bits(), a[2].to_bits())
+                    (
+                        b[0].to_bits(),
+                        b[1].to_bits(),
+                        b[2].to_bits(),
+                        a[0].to_bits(),
+                        a[1].to_bits(),
+                        a[2].to_bits(),
+                    )
                 };
                 if !seen.insert(key) {
                     continue;
@@ -126,24 +141,24 @@ impl ObjSkeleton {
 }
 
 pub fn double_bin() -> Option<PathBuf> {
-    std::env::var_os("SURFER2_DOUBLE_BIN").map(PathBuf::from).or_else(|| {
-        let p = PathBuf::from("/tmp/surfer2/build-double/cc/surfer");
-        p.exists().then_some(p)
-    })
+    std::env::var_os("SURFER2_DOUBLE_BIN")
+        .map(PathBuf::from)
+        .or_else(|| {
+            let p = PathBuf::from("/tmp/surfer2/build-double/cc/surfer");
+            p.exists().then_some(p)
+        })
 }
 
 pub fn exact_bin() -> Option<PathBuf> {
-    std::env::var_os("SURFER2_EXACT_BIN").map(PathBuf::from).or_else(|| {
-        let p = PathBuf::from("/tmp/surfer2/build-exact/cc/surfer");
-        p.exists().then_some(p)
-    })
+    std::env::var_os("SURFER2_EXACT_BIN")
+        .map(PathBuf::from)
+        .or_else(|| {
+            let p = PathBuf::from("/tmp/surfer2/build-exact/cc/surfer");
+            p.exists().then_some(p)
+        })
 }
 
-pub fn run_surfer(
-    bin: &Path,
-    graphml: &Path,
-    component: &str,
-) -> Result<ObjSkeleton, String> {
+pub fn run_surfer(bin: &Path, graphml: &Path, component: &str) -> Result<ObjSkeleton, String> {
     let out = tempfile_obj_path();
     let status = Command::new(bin)
         .arg(format!("--component={component}"))

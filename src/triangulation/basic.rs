@@ -73,8 +73,7 @@ pub fn build_basic_triangulation(pslg: &Pslg) -> Result<BasicTriangulation, Tria
     }
 
     // Map canonical endpoint pair → input edge id and insert constraints.
-    let mut edge_lookup: HashMap<(usize, usize), u32> =
-        HashMap::with_capacity(pslg.edges().len());
+    let mut edge_lookup: HashMap<(usize, usize), u32> = HashMap::with_capacity(pslg.edges().len());
     for (ei, e) in pslg.edges().iter().enumerate() {
         let (a, b) = e.normalized_endpoints();
         edge_lookup.insert((a, b), ei as u32);
@@ -140,7 +139,10 @@ pub fn build_basic_triangulation(pslg: &Pslg) -> Result<BasicTriangulation, Tria
     let (aug_neighbors, aug_constraints, hull, n_aug) =
         augment_with_infinite_ring(pslg.vertices(), &triangles, &neighbors, &constraints);
 
-    let first = pslg.edges().first().ok_or(TriangulationError::RegionClassification)?;
+    let first = pslg
+        .edges()
+        .first()
+        .ok_or(TriangulationError::RegionClassification)?;
     let u = first.vertices[0];
     let v = first.vertices[1];
     // Seed only the face left of the first input edge (v ccw of u). The
@@ -211,22 +213,16 @@ pub fn build_basic_triangulation(pslg: &Pslg) -> Result<BasicTriangulation, Tria
     let infinite_hull: Vec<(usize, usize, u32)> = hull
         .iter()
         .enumerate()
-        .filter_map(|(k, &(ti, s, _, _))| {
-            assigned[n + k].map(|c| (ti, s, c))
-        })
+        .filter_map(|(k, &(ti, s, _, _))| assigned[n + k].map(|c| (ti, s, c)))
         .collect();
 
-    let input_edge_endpoints = pslg
-        .edges()
-        .iter()
-        .map(|e| e.vertices)
-        .collect();
+    let input_edge_endpoints = pslg.edges().iter().map(|e| e.vertices).collect();
 
     Ok(BasicTriangulation {
         vertices: pslg.vertices().to_vec(),
         triangles,
         neighbors,
-        constraints: constraints,
+        constraints,
         components,
         max_component,
         infinite_hull,
@@ -361,7 +357,7 @@ pub fn select_polygon_interior(
 
     // Mark all triangles with a missing neighbor as adjacent to exterior with
     // parity = (constraint on that side ? 1 : 0)
-    for ti in 0..n {
+    for (ti, slot) in parity.iter_mut().enumerate() {
         for s in 0..3 {
             if basic.neighbors[ti][s].is_none() {
                 let p = if basic.constraints[ti][s].is_some() {
@@ -369,9 +365,9 @@ pub fn select_polygon_interior(
                 } else {
                     0u8
                 };
-                match parity[ti] {
+                match *slot {
                     None => {
-                        parity[ti] = Some(p);
+                        *slot = Some(p);
                         q.push_back(ti);
                     }
                     Some(old) => {

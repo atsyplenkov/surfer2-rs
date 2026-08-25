@@ -472,7 +472,7 @@ fn lake9706_load_and_skeleton() {
     eprintln!("lake9706 segs={nseg} nodes={nnode} len={len}");
     assert_eq!(nseg, 4372);
     assert_eq!(nnode, 4344);
-    assert!((len - 342587.19566660019).abs() < 1.0);
+    assert!((len - 342_587.195_666_600_2).abs() < 1.0);
     assert_eq!(cyclomatic(&sk, 29), 0);
 }
 
@@ -485,7 +485,7 @@ fn lake9706_cpp_double_node_progress() {
     let (cpp, cpp_nodes, cpp_len) = obj_ends(&obj);
     assert_eq!(cpp.len(), 4372);
     assert_eq!(cpp_nodes.len(), 4344);
-    assert!((cpp_len - 342587.19566660019).abs() < 1.0);
+    assert!((cpp_len - 342_587.195_666_600_2).abs() < 1.0);
 
     let poly = load_geojson_polygon(&gis_root().join("lake9706.json")).expect("load");
     let sk = skeleton_graph(&poly);
@@ -499,7 +499,7 @@ fn lake9706_cpp_double_node_progress() {
         rust_edges.len()
     );
     assert!(
-        (rust_len - 342587.19566660019).abs() < 1.0,
+        (rust_len - 342_587.195_666_600_2).abs() < 1.0,
         "rust len {rust_len} vs cpp {cpp_len}"
     );
 

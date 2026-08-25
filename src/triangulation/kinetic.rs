@@ -319,7 +319,7 @@ impl KineticTriangulation {
                 return;
             };
             tr.vertices[i] = Some(v);
-            tr.is_unbounded = inf.is_some() && tr.vertices.iter().any(|x| *x == inf);
+            tr.is_unbounded = inf.is_some() && tr.vertices.contains(&inf);
             tr.invalidate_collapse();
             (tr.wavefronts[cw(i)], tr.wavefronts[ccw(i)])
         };
@@ -360,7 +360,7 @@ impl KineticTriangulation {
             }
         }
         for t in self.triangles.values() {
-            if t.live() && t.vertices.iter().any(|&x| x == Some(v)) {
+            if t.live() && t.vertices.contains(&Some(v)) {
                 return t.component;
             }
         }
@@ -535,7 +535,7 @@ impl KineticTriangulation {
                         }
                     })?;
                     let tid = self.triangle_by_tidx(t.tidx);
-                    if !other.neighbors.iter().any(|n| *n == tid) {
+                    if !other.neighbors.contains(&tid) {
                         return Err(PropagationError::TopologyInvariant {
                             detail: format!("neighbor reciprocity failed tidx {}", t.tidx),
                         });

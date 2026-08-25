@@ -79,9 +79,9 @@ pub fn compute_collapse(
     // Count constraints
     let mut n_const = 0;
     let mut const_sides = [false; 3];
-    for s in 0..3 {
+    for (s, is_const) in const_sides.iter_mut().enumerate() {
         if t.wavefronts[s].is_some() {
-            const_sides[s] = true;
+            *is_const = true;
             n_const += 1;
         }
     }
@@ -89,7 +89,7 @@ pub fn compute_collapse(
     let unbounded = t.is_unbounded
         || kt
             .infinite_vertex
-            .is_some_and(|inf| t.vertices.iter().any(|v| *v == Some(inf)));
+            .is_some_and(|inf| t.vertices.contains(&Some(inf)));
     if unbounded {
         return compute_unbounded_fast(kt, t, time_now);
     }
@@ -473,25 +473,21 @@ fn classify_at_time(
     time: f64,
 ) -> Result<CollapseSpec, PropagationError> {
     let mut pts = [Point2::new(0.0, 0.0); 3];
-    for i in 0..3 {
-        let vid = t.vertices[i].unwrap();
-        pts[i] = kt.vertices[vid].position_at(time);
+    for (pt, vid) in pts.iter_mut().zip(t.vertices) {
+        *pt = kt.vertices[vid.unwrap()].position_at(time);
     }
     let mut zero_edges = 0;
     let mut zero_side = 0;
     let mut lengths = [0.0; 3];
-    for s in 0..3 {
-        let a = pts[ccw(s)];
-        let b = pts[cw(s)];
-        let len = a.distance_to(b);
-        lengths[s] = len;
+    for (s, length) in lengths.iter_mut().enumerate() {
+        *length = pts[ccw(s)].distance_to(pts[cw(s)]);
     }
     let max_l = lengths[0].max(lengths[1]).max(lengths[2]);
     // Fast kernel: det root is not exact; treat a collapsed spoke as zero
     // when it is tiny vs the other sides (C++ uses exact NT == 0).
     let eps = 1e-9 * (1.0 + max_l);
-    for s in 0..3 {
-        if lengths[s] <= eps {
+    for (s, &length) in lengths.iter().enumerate() {
+        if length <= eps {
             zero_edges += 1;
             zero_side = s;
         }

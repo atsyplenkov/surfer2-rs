@@ -260,8 +260,11 @@ fn emit_skeleton_with_diagnostics(
         }
     };
 
-    let mut halfedges: Vec<HalfEdge> =
-        Vec::with_capacity(n_skel_faces.saturating_mul(2).saturating_add(n_arcs.saturating_mul(2)));
+    let mut halfedges: Vec<HalfEdge> = Vec::with_capacity(
+        n_skel_faces
+            .saturating_mul(2)
+            .saturating_add(n_arcs.saturating_mul(2)),
+    );
     let mut segments: Vec<SkeletonSegment> = Vec::with_capacity(n_arcs);
     let mut face_base: HashMap<u32, u32> = sewing_map(n_skel_faces);
     let mut vertex_left_he: HashMap<VertexId, u32> = sewing_map(n_vert);

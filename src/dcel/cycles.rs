@@ -22,9 +22,10 @@ pub(super) fn connect_face_cycles(
     if n == 0 {
         return Ok(Vec::new());
     }
-    for i in 0..n {
-        halfedges[i].next = HalfEdgeId(i as u32);
-        halfedges[i].prev = HalfEdgeId(i as u32);
+    for (i, he) in halfedges.iter_mut().enumerate() {
+        let id = HalfEdgeId(i as u32);
+        he.next = id;
+        he.prev = id;
     }
     link_ridge_pieces(halfedges, ridge_pieces);
 
@@ -119,11 +120,7 @@ pub(super) fn connect_face_cycles(
 /// starts a fully reciprocal next/prev cycle that covers every halfedge on
 /// that face. When true, incomplete-face rebuild and infinity-gap closure are
 /// no-ops for the current halfedge set.
-fn bounded_cycles_look_complete(
-    halfedges: &[HalfEdge],
-    faces: &[Face],
-    unbounded: FaceId,
-) -> bool {
+fn bounded_cycles_look_complete(halfedges: &[HalfEdge], faces: &[Face], unbounded: FaceId) -> bool {
     let n = halfedges.len();
     if n == 0 {
         return true;
@@ -600,7 +597,7 @@ fn rebuild_incomplete_faces(
             let Some(outs) = outgoing.get(node) else {
                 continue;
             };
-            for (from, to) in pair_at_vertex(halfedges, nodes, &dest, *node, ins, outs) {
+            for (from, to) in pair_at_vertex(halfedges, nodes, dest, *node, ins, outs) {
                 halfedges[from].next = HalfEdgeId(to as u32);
                 halfedges[to].prev = HalfEdgeId(from as u32);
             }
@@ -927,7 +924,7 @@ fn pair_remaining_by_dest(halfedges: &mut [HalfEdge], nodes: &[Node], dest: &[u3
             Some(v) if !v.is_empty() => v.clone(),
             _ => continue,
         };
-        let pairs = pair_at_vertex(halfedges, nodes, &dest, key.1, &ins, &outs);
+        let pairs = pair_at_vertex(halfedges, nodes, dest, key.1, &ins, &outs);
         for (i, j) in pairs {
             if i == j {
                 continue;

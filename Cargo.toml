@@ -14,9 +14,25 @@ keywords = ["straight-skeleton", "computational-geometry", "polygon", "pslg"]
 categories = ["algorithms", "graphics", "mathematics"]
 exclude = ["fixtures/gis/*", "benches/data/*", ".scratch/*", "exa-results/*"]
 
+# Clippy runs with `-D warnings` in CI. These are the documented exceptions:
+# places where the port deliberately keeps upstream Surfer2's shape.
+[lints.clippy]
+# `!(a > b)` on f64 is not `a <= b` when NaN is involved; upstream predicates
+# rely on this exact guard shape (see src/dcel/mod.rs, src/dcel/endpoints.rs,
+# src/triangulation/collapse.rs, src/triangulation/kinetic.rs).
+neg_cmp_op_on_partial_ord = "allow"
+# Argument lists mirror the corresponding upstream functions; splitting them
+# into structs would break line-level traceability against cgalab/surfer2
+# (src/dcel/cycles.rs, src/triangulation/kinetic.rs carry translation notices).
+too_many_arguments = "allow"
+# Port-internal plumbing signatures (sewing-map buckets in src/dcel/cycles.rs,
+# augmented hull ring in src/triangulation/basic.rs); no upstream equivalent
+# type worth naming.
+type_complexity = "allow"
+
 [dependencies]
 slotmap = "=1.1.1"
-spade = "=2.15.1"
+spade = "=2.13.1"
 robust = "=1.2.0"
 thiserror = "2.0"
 rustc-hash = "2"

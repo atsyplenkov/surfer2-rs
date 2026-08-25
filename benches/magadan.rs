@@ -66,8 +66,7 @@ fn bench_skeleton(c: &mut Criterion, id: &str, poly: &Polygon) {
 }
 
 fn bench_unit_square(c: &mut Criterion) {
-    let poly =
-        Polygon::from_flat(&[[0.0, 0.0], [2.0, 0.0], [2.0, 2.0], [0.0, 2.0]], &[0]).unwrap();
+    let poly = Polygon::from_flat(&[[0.0, 0.0], [2.0, 0.0], [2.0, 2.0], [0.0, 2.0]], &[0]).unwrap();
     bench_skeleton(c, "unit_square", &poly);
 }
 

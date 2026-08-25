@@ -48,7 +48,7 @@ fn attrs(e: &BytesStart<'_>) -> Result<BTreeMap<Vec<u8>, String>, String> {
     for a in e.attributes() {
         let a = a.map_err(|err| err.to_string())?;
         let k = a.key.local_name().as_ref().to_vec();
-        let v = match a.unescape_value() {
+        let v = match a.normalized_value(quick_xml::XmlVersion::Implicit1_0) {
             Ok(c) => c.into_owned(),
             Err(_) => String::from_utf8_lossy(&a.value).into_owned(),
         };
@@ -60,10 +60,7 @@ fn attrs(e: &BytesStart<'_>) -> Result<BTreeMap<Vec<u8>, String>, String> {
 fn handle_key(e: &BytesStart<'_>, key_names: &mut BTreeMap<String, String>) -> Result<(), String> {
     let a = attrs(e)?;
     let id = a.get(b"id".as_slice()).cloned().unwrap_or_default();
-    let nm = a
-        .get(b"attr.name".as_slice())
-        .cloned()
-        .unwrap_or_default();
+    let nm = a.get(b"attr.name".as_slice()).cloned().unwrap_or_default();
     if !id.is_empty() {
         key_names.insert(id, nm);
     }
@@ -91,7 +88,9 @@ pub fn read_graphml_bytes(bytes: &[u8]) -> Result<GraphMlInput, String> {
     let mut data_text = String::new();
 
     loop {
-        let event = reader.read_event_into(&mut buf).map_err(|e| e.to_string())?;
+        let event = reader
+            .read_event_into(&mut buf)
+            .map_err(|e| e.to_string())?;
         match &event {
             Event::Start(e) => {
                 let raw = e.name().as_ref().to_vec();
@@ -135,11 +134,9 @@ pub fn read_graphml_bytes(bytes: &[u8]) -> Result<GraphMlInput, String> {
                     _ => {}
                 }
             }
-            Event::Text(t) => {
-                if in_data {
-                    let cow = t.decode().map_err(|e| e.to_string())?;
-                    data_text.push_str(&cow);
-                }
+            Event::Text(t) if in_data => {
+                let cow = t.decode().map_err(|e| e.to_string())?;
+                data_text.push_str(&cow);
             }
             Event::End(e) => {
                 let raw = e.name().as_ref().to_vec();
@@ -150,12 +147,12 @@ pub fn read_graphml_bytes(bytes: &[u8]) -> Result<GraphMlInput, String> {
                             .cloned()
                             .unwrap_or_else(|| data_key.clone());
                         if in_node {
-                            let entry = vertex_xy.get_mut(&current_node).ok_or_else(|| {
-                                format!("data for unknown node {current_node}")
-                            })?;
-                            let val: f64 = data_text.parse().map_err(|err| {
-                                format!("bad coordinate '{data_text}': {err}")
-                            })?;
+                            let entry = vertex_xy
+                                .get_mut(&current_node)
+                                .ok_or_else(|| format!("data for unknown node {current_node}"))?;
+                            let val: f64 = data_text
+                                .parse()
+                                .map_err(|err| format!("bad coordinate '{data_text}': {err}"))?;
                             match attr.as_str() {
                                 "vertex-coordinate-x" | "x" => entry.0 = Some(val),
                                 "vertex-coordinate-y" | "y" => entry.1 = Some(val),

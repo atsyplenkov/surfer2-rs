@@ -30,20 +30,15 @@ pub use propagator::Propagator;
 pub use stats::Stats;
 
 /// Which planar component(s) to propagate.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ComponentMode {
     /// Single component index (0 = left of first input edge, 1 = right, …).
     Index(usize),
     /// All components on separate time axes (upstream `-1`).
+    #[default]
     AllSequential,
     /// All components sharing one time axis (upstream `-2`).
     AllSimultaneous,
-}
-
-impl Default for ComponentMode {
-    fn default() -> Self {
-        Self::AllSequential
-    }
 }
 
 /// Propagation options. Additive GraphML `edge-weight-additive` is not a

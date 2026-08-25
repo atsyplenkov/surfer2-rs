@@ -250,14 +250,7 @@ impl Propagator {
                 self.kt
                     .arcs
                     .push(crate::triangulation::kinetic::ArcRecord::traced(
-                        vid,
-                        start,
-                        None,
-                        time_start,
-                        None,
-                        faces[0],
-                        faces[1],
-                        component,
+                        vid, start, None, time_start, None, faces[0], faces[1], component,
                     ));
                 if let Some(vv) = self.kt.vertices.get_mut(vid) {
                     vv.time_stop = Some(f64::INFINITY);
@@ -296,7 +289,7 @@ impl Propagator {
     }
 
     fn handle_event(&mut self, tidx: u32, spec: CollapseSpec) -> Result<(), SkeletonError> {
-        let tid = self.kt.triangle_by_tidx(tidx).ok_or_else(|| {
+        let tid = self.kt.triangle_by_tidx(tidx).ok_or({
             crate::error::PropagationError::InconsistentEvent {
                 triangle: tidx as u64,
                 time: spec.time,
@@ -716,8 +709,7 @@ impl Propagator {
         if self.kt.triangles[tid].is_unbounded
             || self.kt.triangles[tid]
                 .vertices
-                .iter()
-                .any(|v| *v == self.kt.infinite_vertex)
+                .contains(&self.kt.infinite_vertex)
         {
             return self.handle_ccw_leaves(tid, spec);
         }
@@ -1068,13 +1060,13 @@ impl Propagator {
                     return None;
                 }
                 let v = self.kt.vertices.get(id)?;
-                if v.time_stop
-                    .is_some_and(|t| (t - time).abs() <= 1e-9 * (1.0 + time.abs()))
-                    && v.pos_stop.is_some()
-                {
-                    Some((id, v.pos_stop.unwrap()))
-                } else {
-                    None
+                match (v.time_stop, v.pos_stop) {
+                    (Some(stop_t), Some(pos))
+                        if (stop_t - time).abs() <= 1e-9 * (1.0 + time.abs()) =>
+                    {
+                        Some((id, pos))
+                    }
+                    _ => None,
                 }
             })
             .collect();
@@ -1500,11 +1492,11 @@ impl Propagator {
                         detail: "weighted inf-fast: missing other incident edge".into(),
                     }
                 })?;
-                let most_cw = self.kt.edges[other_eid]
-                    .incident_triangle
-                    .ok_or_else(|| crate::error::PropagationError::TopologyInvariant {
+                let most_cw = self.kt.edges[other_eid].incident_triangle.ok_or_else(|| {
+                    crate::error::PropagationError::TopologyInvariant {
                         detail: "weighted inf-fast: other edge has no incident triangle".into(),
-                    })?;
+                    }
+                })?;
                 let idx_fast = (0..3)
                     .find(|&i| self.kt.triangles[most_cw].vertices[i] == Some(v_fast))
                     .ok_or_else(|| crate::error::PropagationError::TopologyInvariant {
@@ -1630,8 +1622,8 @@ impl Propagator {
                 };
                 let delay = orientation_sign(pos_v0, pos_v1, pos_v2) < 0;
                 let delay_hits_constraint = delay && {
-                    let v_in_n = (0..3)
-                        .find(|&i| self.kt.triangles[nid].vertices[i] == Some(v_fast));
+                    let v_in_n =
+                        (0..3).find(|&i| self.kt.triangles[nid].vertices[i] == Some(v_fast));
                     v_in_n.is_some_and(|i| self.kt.triangles[nid].wavefronts[ccw(i)].is_some())
                 };
                 if delay && !delay_hits_constraint {
@@ -1786,19 +1778,19 @@ fn recompute_collapse(
     tidx: u32,
     now: f64,
 ) -> Result<CollapseSpec, crate::error::PropagationError> {
-    let tid = kt.triangle_by_tidx(tidx).ok_or_else(|| {
+    let tid = kt.triangle_by_tidx(tidx).ok_or({
         crate::error::PropagationError::InconsistentEvent {
             triangle: tidx as u64,
             time: now,
         }
     })?;
-    let t =
-        kt.triangles
-            .get(tid)
-            .ok_or_else(|| crate::error::PropagationError::InconsistentEvent {
-                triangle: tidx as u64,
-                time: now,
-            })?;
+    let t = kt
+        .triangles
+        .get(tid)
+        .ok_or(crate::error::PropagationError::InconsistentEvent {
+            triangle: tidx as u64,
+            time: now,
+        })?;
     if !t.live() {
         return Ok(CollapseSpec::never(t.component));
     }

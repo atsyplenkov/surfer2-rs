@@ -39,7 +39,7 @@ pub struct WavefrontVertex {
     pub time_start: f64,
     pub time_stop: Option<f64>,
     pub pos_stop: Option<Point2>,
-    /// Ancestry links for DCEL emission: next_vertex[side].
+    /// Ancestry links for DCEL emission: next_vertex\[side\].
     pub next_vertex: [Option<VertexId>; 2],
     pub prev_vertex: [Option<VertexId>; 2],
     pub angle: AngleType,

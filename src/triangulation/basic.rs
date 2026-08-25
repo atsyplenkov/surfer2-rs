@@ -20,7 +20,7 @@ pub struct BasicTriangulation {
     /// Finite triangles as vertex index triples (CCW).
     pub triangles: Vec<[usize; 3]>,
     /// For each triangle side i (opposite vertex i? we store side as edge opposite
-    /// to vertices[i] standard: side i connects vertices[(i+1)%3]–[(i+2)%3]).
+    /// to vertices\[i\] standard: side i connects vertices\[(i+1)%3\]–\[(i+2)%3\]).
     /// Neighbor triangle index or `None` if boundary/wavefront constraint.
     pub neighbors: Vec<[Option<usize>; 3]>,
     /// If side is constrained, Some(input_edge_id).

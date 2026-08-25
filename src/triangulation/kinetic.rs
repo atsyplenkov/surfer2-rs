@@ -93,7 +93,7 @@ impl KineticTriangle {
         !self.is_dead && !self.is_dying
     }
 
-    /// Exactly one of neighbor[i] or wavefront[i] for each side (when live).
+    /// Exactly one of neighbor\[i\] or wavefront\[i\] for each side (when live).
     pub fn check_side_xor(&self) -> Result<(), PropagationError> {
         for i in 0..3 {
             let n = self.neighbors[i].is_some();

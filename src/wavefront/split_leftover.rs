@@ -29,22 +29,14 @@ pub enum SuccessorMotion {
     Degenerate,
 }
 
-/// Whether the leftover face should keep its natural collapse or die now.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum LeftoverAction {
-    LeaveNatural,
-    CollapseNow,
-    /// Override is defined only for two-constraint leftovers.
-    Unsupported,
-}
-
-/// Scheduling plan before any `compute_collapse` call.
+/// Scheduling / residual decision for a leftover face after a split.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LeftoverSchedule {
     LeaveNatural,
     CollapseNow,
     /// Two-constraint degenerate: compute the natural collapse, then decide.
     ComputeNatural,
+    /// Override is defined only for two-constraint leftovers.
     Unsupported,
 }
 
@@ -108,20 +100,18 @@ pub fn leftover_schedule(constraint_count: usize, motion: SuccessorMotion) -> Le
     }
 }
 
-/// Decide whether to cache a same-time ConstraintCollapse on the leftover face.
-pub fn leftover_action(
+/// Resolve [`LeftoverSchedule::ComputeNatural`] against the natural collapse type.
+pub fn leftover_resolve(
     constraint_count: usize,
     motion: SuccessorMotion,
     natural: CollapseType,
-) -> LeftoverAction {
+) -> LeftoverSchedule {
     match leftover_schedule(constraint_count, motion) {
-        LeftoverSchedule::LeaveNatural => LeftoverAction::LeaveNatural,
-        LeftoverSchedule::CollapseNow => LeftoverAction::CollapseNow,
-        LeftoverSchedule::Unsupported => LeftoverAction::Unsupported,
         LeftoverSchedule::ComputeNatural if natural == CollapseType::Never => {
-            LeftoverAction::CollapseNow
+            LeftoverSchedule::CollapseNow
         }
-        LeftoverSchedule::ComputeNatural => LeftoverAction::LeaveNatural,
+        LeftoverSchedule::ComputeNatural => LeftoverSchedule::LeaveNatural,
+        other => other,
     }
 }
 
@@ -204,47 +194,46 @@ mod tests {
     }
 
     #[test]
-    fn leftover_schedule_and_action_table() {
+    fn leftover_schedule_and_resolve_table() {
         use CollapseType::*;
-        use LeftoverAction::*;
-        use LeftoverSchedule as S;
+        use LeftoverSchedule::*;
         use SuccessorMotion::*;
         let cases = [
-            (3, Finite, TriangleCollapse, S::LeaveNatural, LeaveNatural),
-            (3, Degenerate, Never, S::LeaveNatural, LeaveNatural),
-            (3, NonIntersecting, Never, S::LeaveNatural, LeaveNatural),
-            (2, Degenerate, Never, S::ComputeNatural, CollapseNow),
+            (3, Finite, TriangleCollapse, LeaveNatural, LeaveNatural),
+            (3, Degenerate, Never, LeaveNatural, LeaveNatural),
+            (3, NonIntersecting, Never, LeaveNatural, LeaveNatural),
+            (2, Degenerate, Never, ComputeNatural, CollapseNow),
             (
                 2,
                 NonIntersecting,
                 ConstraintCollapse,
-                S::CollapseNow,
+                CollapseNow,
                 CollapseNow,
             ),
-            (2, NonIntersecting, Never, S::CollapseNow, CollapseNow),
-            (2, Finite, ConstraintCollapse, S::LeaveNatural, LeaveNatural),
-            (2, Finite, Never, S::LeaveNatural, LeaveNatural),
+            (2, NonIntersecting, Never, CollapseNow, CollapseNow),
+            (2, Finite, ConstraintCollapse, LeaveNatural, LeaveNatural),
+            (2, Finite, Never, LeaveNatural, LeaveNatural),
             (
                 2,
                 Degenerate,
                 ConstraintCollapse,
-                S::ComputeNatural,
+                ComputeNatural,
                 LeaveNatural,
             ),
-            (1, Degenerate, Never, S::Unsupported, Unsupported),
-            (1, NonIntersecting, Never, S::Unsupported, Unsupported),
-            (0, Finite, Never, S::Unsupported, Unsupported),
+            (1, Degenerate, Never, Unsupported, Unsupported),
+            (1, NonIntersecting, Never, Unsupported, Unsupported),
+            (0, Finite, Never, Unsupported, Unsupported),
         ];
-        for (n, motion, natural, want_sched, want_act) in cases {
+        for (n, motion, natural, want_sched, want_resolved) in cases {
             assert_eq!(
                 leftover_schedule(n, motion),
                 want_sched,
                 "schedule nconst={n} motion={motion:?}"
             );
             assert_eq!(
-                leftover_action(n, motion, natural),
-                want_act,
-                "action nconst={n} motion={motion:?} natural={natural:?}"
+                leftover_resolve(n, motion, natural),
+                want_resolved,
+                "resolve nconst={n} motion={motion:?} natural={natural:?}"
             );
         }
     }

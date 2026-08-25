@@ -16,8 +16,8 @@ use crate::triangulation::refine::{apply_event_refinement, do_flip, mark_modifie
 use crate::triangulation::{initialize_kinetic, KineticTriangulation, TriangleId};
 use crate::wavefront::edge::WavefrontEdge;
 use crate::wavefront::split_leftover::{
-    classify_successor_motion, leftover_action, leftover_schedule, LeftoverAction,
-    LeftoverSchedule, SuccessorMotion,
+    classify_successor_motion, leftover_resolve, leftover_schedule, LeftoverSchedule,
+    SuccessorMotion,
 };
 use crate::wavefront::supporting_line::{wavefront_vertex_motion, SupportingLine};
 use crate::wavefront::vertex::{
@@ -970,7 +970,7 @@ impl Propagator {
                     }
                 })?;
                 let natural = compute_collapse(&self.kt, tr, time)?;
-                if leftover_action(nconst, motion, natural.type_) != LeftoverAction::CollapseNow {
+                if leftover_resolve(nconst, motion, natural.type_) != LeftoverSchedule::CollapseNow {
                     return Ok(());
                 }
             }

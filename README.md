@@ -57,10 +57,10 @@ Work in progress toward source-level behavioral compatibility with the upstream 
 
 ## Performance
 
-| Fixture | This crate | Upstream Surfer2 `c42f9a7`, quiet `NT_USE_DOUBLE` Release |
-|---|---|---:|
-| lake9706 | **~17.6 ms** (`interior_straight_skeleton`) | ~81 ms (full process: GraphML in, OBJ out) |
-| lake10623 | **~0.47 s** | crashes while building the DCEL |
+| Polygon geometry (number of segments) | This crate (Rust) | Upstream Surfer2 (Cpp) | [lizelive/straight-skeleton](https://github.com/lizelive/straight-skeleton) (Rust) |
+|---|---|---|---:|
+| lake9706 (4372 segs) | **~17.6 ms** | ~81 ms (full process: GraphML in, OBJ out) | ~35.6 ms |
+| lake10623 (31330 segs) | **~0.47 s** | crashes while building the DCEL | ~1675 ms|
 
 Timed on one host (Intel Core i7-10875H, 2026-08-23). Reproduce with:
 

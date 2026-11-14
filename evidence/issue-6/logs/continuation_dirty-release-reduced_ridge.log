@@ -1,6 +1,5 @@
     Blocking waiting for file lock on package cache
-    Blocking waiting for file lock on package cache
-    Finished `release` profile [optimized] target(s) in 0.05s
+    Finished `release` profile [optimized] target(s) in 0.06s
      Running tests/projected_polygons.rs (target/release/deps/projected_polygons-7c7d7ee88c2c916c)
 
 running 1 test

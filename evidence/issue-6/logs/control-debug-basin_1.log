@@ -1,0 +1,18 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.06s
+     Running tests/projected_polygons.rs (target/debug/deps/projected_polygons-ccf60e7a7329240b)
+
+running 1 test
+test projected_basin_1_has_connected_finite_skeleton ... 
+thread 'projected_basin_1_has_connected_finite_skeleton' (1024052) panicked at tests/projected_polygons.rs:229:51:
+basin 1: IncompleteFaceCycle { detail: "stage=bounded-validation face=277: owns 25 halfedges but has no root" }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+
+failures:
+
+failures:
+    projected_basin_1_has_connected_finite_skeleton
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 6 filtered out; finished in 4.03s
+
+error: test failed, to rerun pass `--test projected_polygons`

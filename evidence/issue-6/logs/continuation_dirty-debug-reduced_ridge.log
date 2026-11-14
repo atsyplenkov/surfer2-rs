@@ -1,4 +1,4 @@
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.04s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.05s
      Running tests/projected_polygons.rs (target/debug/deps/projected_polygons-ccf60e7a7329240b)
 
 running 1 test

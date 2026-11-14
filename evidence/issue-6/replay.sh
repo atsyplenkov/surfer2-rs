@@ -28,7 +28,8 @@ for rev in manifest["revisions"]:
         "true" if rev["captured_diff"]["includes_untracked"] else "false",
         rev["captured_diff"]["path"],
         "true" if rev["run_tests"] else "false",
-        rev.get("skip_reason") or "",
+        rev.get("skip_reason") or "-",
+        rev["bundle_ref"],
     ]
     print("\t".join(fields))
 PY
@@ -58,21 +59,24 @@ check_revision() {
     local id="$1" checkout="$2" expect="$3" include="$4" diffrel="$5" run_tests="$6" skip_reason="$7"
     local frag="$FRAG/$id.json"
     local diffabs="$DIR/$diffrel"
-    local head porcelain
-    head=$(git -C "$checkout" rev-parse HEAD)
-    porcelain=$(git -C "$checkout" status --porcelain)
-    local tmp
-    tmp=$(mktemp -d)
-    capture_now "$checkout" "$include" "$tmp/now.diff"
-    local source_ok=yes source_note=""
-    if [ "$head" != "$expect" ]; then
-        source_ok=no
-        source_note="HEAD is $head, expected $expect"
-    elif ! cmp -s "$tmp/now.diff" "$diffabs"; then
-        source_ok=no
-        source_note="captured diff no longer matches the checkout"
+    local head="" porcelain="" source_ok=yes source_note=""
+    if [ ! -e "$checkout/.git" ]; then
+        source_note="provenance checkout absent; using the bundle"
+    else
+        head=$(git -C "$checkout" rev-parse HEAD)
+        porcelain=$(git -C "$checkout" status --porcelain)
+        local tmp
+        tmp=$(mktemp -d)
+        capture_now "$checkout" "$include" "$tmp/now.diff"
+        if [ "$head" != "$expect" ]; then
+            source_ok=no
+            source_note="HEAD is $head, expected $expect"
+        elif ! cmp -s "$tmp/now.diff" "$diffabs"; then
+            source_ok=no
+            source_note="captured diff no longer matches the checkout"
+        fi
+        rm -rf "$tmp"
     fi
-    rm -rf "$tmp"
 
     python3 - "$frag" "$id" "$head" "$porcelain" "$source_ok" "$source_note" "$run_tests" "$skip_reason" "$checkout" << 'PY'
 import json, sys
@@ -84,7 +88,7 @@ open(frag, "w").write(json.dumps({
     "source_ok": source_ok == "yes",
     "source_note": source_note,
     "run_tests": run_tests == "true",
-    "skip_reason": skip_reason or None,
+    "skip_reason": None if skip_reason in ("", "-") else skip_reason,
     "checkout": checkout,
     "profiles": {},
 }))
@@ -180,13 +184,13 @@ PY
             if [ "$profile" = release ]; then
                 release_flag="--release "
             fi
-            cmd="cd $checkout && CARGO_TERM_COLOR=never cargo test ${release_flag}--test projected_polygons --locked -- $test -- --exact --test-threads=1 --nocapture"
+            cmd="cd $checkout && CARGO_TERM_COLOR=never cargo test ${release_flag}--test projected_polygons --locked -- $test --exact --test-threads=1 --nocapture"
             set +e
             (
                 cd "$checkout" || exit 97
                 CARGO_TERM_COLOR=never timeout -k 20 "$CASE_TIMEOUT_S" \
                     cargo test "${cargo_profile[@]}" --test projected_polygons --locked -- \
-                    "$test" -- --exact --test-threads=1 --nocapture
+                    "$test" --exact --test-threads=1 --nocapture
             ) > "$log" 2>&1
             rc=$?
             set -e
@@ -241,10 +245,32 @@ PY
     done
 }
 
+materialize() {
+    local id="$1" ref="$2"
+    local repo="$DIR/work/repo"
+    local dest="$DIR/work/$id"
+    if [ ! -d "$repo/.git" ]; then
+        mkdir -p "$DIR/work"
+        git clone -q "$DIR/sources/revisions.bundle" "$repo"
+    fi
+    if [ -e "$dest" ]; then
+        git -C "$repo" worktree remove --force "$dest" >/dev/null 2>&1 || rm -rf "$dest"
+    fi
+    git -C "$repo" worktree add -q --detach "$dest" "origin/$ref"
+    python3 - "$FRAG/$id.json" "$dest" << 'PY'
+import json, sys
+path, dest = sys.argv[1:]
+doc = json.load(open(path))
+doc["provenance_checkout"] = doc["checkout"]
+doc["checkout"] = dest
+json.dump(doc, open(path, "w"))
+PY
+}
+
 mapfile -t plan_rows < <(plan_tsv)
 pids=()
 for row in "${plan_rows[@]}"; do
-    IFS=$'\t' read -r id checkout commit include diffrel run_tests skip_reason <<< "$row"
+    IFS=$'\t' read -r id checkout commit include diffrel run_tests skip_reason bundle_ref <<< "$row"
     [ -n "$id" ] || continue
     check_revision "$id" "$checkout" "$commit" "$include" "$diffrel" "$run_tests" "$skip_reason" &
     pids+=($!)
@@ -258,9 +284,10 @@ done
 if [ "$fail" -eq 0 ]; then
     pids=()
     for row in "${plan_rows[@]}"; do
-        IFS=$'\t' read -r id checkout commit include diffrel run_tests skip_reason <<< "$row"
+        IFS=$'\t' read -r id checkout commit include diffrel run_tests skip_reason bundle_ref <<< "$row"
         [ -n "$id" ] || continue
-        run_tests "$id" "$checkout" "$run_tests" &
+        materialize "$id" "$bundle_ref"
+        run_tests "$id" "$DIR/work/$id" "$run_tests" &
         pids+=($!)
     done
     fail=0

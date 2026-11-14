@@ -1,0 +1,8 @@
+    Finished `release` profile [optimized] target(s) in 0.04s
+     Running tests/projected_polygons.rs (target/release/deps/projected_polygons-7c7d7ee88c2c916c)
+
+running 1 test
+test indi_pol_river_keeps_connected_tree ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 11.06s
+

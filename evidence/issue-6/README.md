@@ -1,6 +1,6 @@
 # Projected-basin evidence for issue 6
 
-This directory records four source revisions and one replay of their public basin tests. It does not say why a basin fails, and it does not recommend a patch.
+This directory records four source revisions and one replay of their public basin tests, including a throwaway Arm A harness on the control commit and on the dirty Arm B engine. It does not say why a basin fails, and it does not recommend a patch.
 
 The registry is `manifest.json`. The patches are under `diffs/`. `replay.sh` rebuilds each checkout and writes the observation rows back into the manifest. Logs from the run below are under `logs/`.
 
@@ -8,15 +8,30 @@ The registry is `manifest.json`. The patches are under `diffs/`. `replay.sh` reb
 
 From any working directory, run `evidence/issue-6/replay.sh`.
 
-The script compares every checkout's `HEAD` and captured diff before it builds. Cargo starts only after all four match. A mismatch exits 1 and does not open the log files, so the `observations` array and the logs it cites stay as they were. It does not stage, commit, or edit source files. It does write `target/` inside a checkout whose tests it runs. A second run that still matches overwrites `logs/` and the `observations` array.
+The script compares every provenance checkout's `HEAD` and captured diff before it builds. Cargo starts only after every present checkout matches. A mismatch exits 1 and does not open the log files, so the `observations` array and the logs it cites stay as they were. It does not stage, commit, or edit the provenance checkouts. It writes `target/` under `work/`, which is the checkout reconstructed from the bundle. A second run that still matches overwrites `logs/` and the `observations` array. If a provenance path is absent, the script uses the bundle alone.
 
 Each test uses one command of this shape, with `--release` only for the release profile.
 
 ```text
-cd <checkout> && CARGO_TERM_COLOR=never cargo test --release --test projected_polygons --locked -- <test> -- --exact --test-threads=1 --nocapture
+cd <checkout> && CARGO_TERM_COLOR=never cargo test --release --test projected_polygons --locked -- <test> --exact --test-threads=1 --nocapture
 ```
 
 A single test stops at 600 seconds. That ceiling is `CASE_TIMEOUT_S`. Raise it and run the script again if you need a result that hit the ceiling. None of the tests below hit it.
+
+## Reconstruct the sources
+
+`sources/revisions.bundle` is a complete git bundle, sha256 `6a1d007a1b65c0220126846c55c91a5db62f3a819a7607eebe734ebc853957cd`. A fresh clone does not need the original worktrees.
+
+```text
+git clone evidence/issue-6/sources/revisions.bundle reconstructed
+git -C reconstructed switch --detach origin/evidence/control-harness
+```
+
+The refs are `origin/evidence/control`, `origin/evidence/arm-a`, `origin/evidence/arm-b-base`, `origin/evidence/arm-b-dirty`, `origin/evidence/continuation-dirty`, `origin/evidence/control-harness`, and `origin/evidence/arm-b-arm-a-harness`. `replay.sh` checks those refs out under `work/` and runs there. `sources/build-bundle.sh` is the command that read the original checkouts. It does not edit them.
+
+`evidence/control-harness` is `d1a89fd` plus Arm A's `tests/projected_polygons.rs` and `fixtures/projected`. `evidence/arm-b-arm-a-harness` is the dirty Arm B engine with that same harness. `evidence/arm-b-dirty` keeps Arm B's own tests, including the `assert_dcel_contract` call in the reduced-ridge test.
+
+Copied reports are under `assets/`. The manifest records each file's original path.
 
 ## Revisions
 
@@ -44,9 +59,10 @@ Test file sha256 (`sha256sum` of the bytes that belong to the revision).
 
 | revision | sha256 of `tests/projected_polygons.rs` |
 | --- | --- |
-| control | absent from `HEAD`. `git cat-file -e HEAD:tests/projected_polygons.rs` failed. |
+| control | absent from `d1a89fd`. The run uses `evidence/control-harness`, which adds Arm A's file, sha256 `b15af0682850b71cd288f05c02a5518f7d3c629b30371dafc0d2b938f16c56a5`. |
 | `arm_a` | `b15af0682850b71cd288f05c02a5518f7d3c629b30371dafc0d2b938f16c56a5` |
-| `arm_b_dirty` | `802b45c4a14698f7506a8b76b25c8723d368bd15c1d93d37f0bbbb1789a08cf0` (dirty file). The file at `HEAD` hashes to `7ff91b7a24384e08e0ab6ae448c952ececb8b38dff52ac7ed20c7634d66165ed` and does not define the full-basin or river tests. |
+| `arm_b_dirty` | `802b45c4a14698f7506a8b76b25c8723d368bd15c1d93d37f0bbbb1789a08cf0` (dirty file). The file at `HEAD` hashes to `7ff91b7a24384e08e0ab6ae448c952ececb8b38dff52ac7ed20c7634d66165ed` and does not define the full-basin or river tests. Its reduced-ridge test calls `assert_dcel_contract`. |
+| `arm_b_arm_a_harness` | `b15af0682850b71cd288f05c02a5518f7d3c629b30371dafc0d2b938f16c56a5`, Arm A's file on the dirty Arm B engine. That reduced-ridge test does not call `assert_dcel_contract`. |
 | `continuation_dirty` | `b15af0682850b71cd288f05c02a5518f7d3c629b30371dafc0d2b938f16c56a5`, same bytes as Arm A. |
 
 The untracked `tests/projected_polygons.rs` on master hashes to `65537ce4e2b367a9b55e53d6ff5225d6c5bc2cddc89e822c8d6841c712a54052`. That is a different file from Arm A's committed test. Replay does not compile it.
@@ -65,17 +81,17 @@ Those counts come from the JSON arrays. Basin 1 is feature 1. Basin 2 is feature
 
 The reduced ridge is the nine literals in `basin_spoke_collapse_keeps_leftover_ridge`, not a separate JSON file. All nine are exact binary64 points of basin feature 2, ring 0, at indices 1273, 1274, 1279, 1320, 1321, 1322, 1323, 1324, and 1325. None of them occur in `pl_basins-1.json`.
 
-The audit at `/tmp/opencode/surfer2-basin-oracle-research/docs/research/2026-11-14-projected-basin-oracle-contract.md` lines 313 to 314 says the four original binary64 points match basin 2 ring-0 vertices 1321, 1322, 1323, and 1324. Those four are vertices 4 through 7 of the nine, which are the audit's edges 4 to 5 and 6 to 7. The audit does not itself claim all nine. The nine-point check is the count above.
+The audit copied at `assets/2026-11-14-projected-basin-oracle-contract.md` lines 313 to 314 says the four original binary64 points match basin 2 ring-0 vertices 1321, 1322, 1323, and 1324. Those four are vertices 4 through 7 of the nine, which are the audit's edges 4 to 5 and 6 to 7. The audit does not itself claim all nine. The nine-point check is the count above.
 
-Arm A's prose at `docs/diagnostics/issue-1-projected-basins.md` line 3, sha256 `e7018fc364bdab80f0e3dc2a13fb7da43a5bdc31cc19c30c3a2b057d7a22b7b1`, calls the same polygon "the nine-vertex reduction of basin feature 1". That label does not match the vertices.
+Arm A's prose, copied at `assets/arm-a-issue-1-projected-basins.md` line 3, sha256 `e7018fc364bdab80f0e3dc2a13fb7da43a5bdc31cc19c30c3a2b057d7a22b7b1`, calls the same polygon "the nine-vertex reduction of basin feature 1". That label does not match the vertices.
 
 ## Reconciliation
 
 Status `unrecoverable` for one arc and node count.
 
-`/tmp/swarm-issue1/continue.md` line 15, sha256 `6fc6f1dc4450a9e1e87474db03e2a077d44b40ab31bd1c2b85fbf489eab3fbfd`, says feature 1 failed with 58 components, edges 5679, nodes 5730, rank 7.
+`assets/continue.md` line 15, sha256 `6fc6f1dc4450a9e1e87474db03e2a077d44b40ab31bd1c2b85fbf489eab3fbfd`, says feature 1 failed with 58 components, edges 5679, nodes 5730, rank 7. The copy is the file that was at `/tmp/swarm-issue1/continue.md`.
 
-The dirty continuation file `docs/diagnostics/issue-1-projected-basins.md` line 19, sha256 `92c8aa39fd16494bf2cfec4137f92c0ca4292414623e22fcf57f56d48fe6c8b1`, says 58 coordinate components, 5643 arcs, 5694 nodes, rank 7. That sentence is not in the committed blob at `1b6ed8e`.
+The dirty continuation diagnostic, copied at `assets/continuation-issue-1-projected-basins.md` line 19, sha256 `92c8aa39fd16494bf2cfec4137f92c0ca4292414623e22fcf57f56d48fe6c8b1`, says 58 coordinate components, 5643 arcs, 5694 nodes, rank 7. That sentence is not in the committed blob at `1b6ed8e`.
 
 Both files say 58 components. The arc and node counts disagree. This package does not pick one.
 
@@ -85,23 +101,23 @@ The command runs one named test in `tests/projected_polygons.rs`. It does not bu
 
 `SURFER2_TEST_DATA` was unset. `/tmp/surfer2/test-data` was absent. `SURFER2_GIS_DATA` was unset. The C++ surfer binaries were not invoked. Replay does not start the corpus, differential, or gis targets.
 
-The four tests named below have no `#[ignore]` on Arm A, on the continuation tree, or in the dirty Arm B file. No `#[cfg(feature)]` gate was found in the Arm A tree. Debug and release both apply. Both were run.
+The Arm A tests have no `#[ignore]` on the control harness, Arm A, the continuation, or the Arm B harness. Arm B's historical tests have no `#[ignore]` either. No `#[cfg(feature)]` gate was found in the Arm A tree. Debug and release both ran. Each log says `running 1 test`.
 
 `.scratch/issues-1-2/baseline-release`, `current-release`, and the minimizer were not used.
 
 ## Observed results
 
-`evidence/issue-6/replay.sh` exited 0 at `2026-11-14T12:23:21Z`. `rustc 1.95.0 (59807616e 2026-04-14)`. `runner_failed` is false. Where a profile ran, debug printed the same public signal as release. Exit codes below are the `cargo test` process codes. Control was not compiled, so those rows have no exit code.
+`evidence/issue-6/replay.sh` exited 0 at `2026-11-14T14:38:44Z`. `rustc 1.95.0 (59807616e 2026-04-14)`. `runner_failed` is false. Debug printed the same public signal as release for every case. Exit codes below are the `cargo test` process codes. Control ran from `evidence/control-harness`, not from the main checkout.
 
 ```text
-control release basin_1 exit=None projected_basin_1_has_connected_finite_skeleton: test source absent
-control release basin_2 exit=None projected_basin_2_is_one_tree: test source absent
-control release reduced_ridge exit=None basin_spoke_collapse_keeps_leftover_ridge: test source absent
-control release river exit=None indi_pol_river_keeps_connected_tree: test source absent
-control debug basin_1 exit=None projected_basin_1_has_connected_finite_skeleton: test source absent
-control debug basin_2 exit=None projected_basin_2_is_one_tree: test source absent
-control debug reduced_ridge exit=None basin_spoke_collapse_keeps_leftover_ridge: test source absent
-control debug river exit=None indi_pol_river_keeps_connected_tree: test source absent
+control release basin_1 exit=101 projected_basin_1_has_connected_finite_skeleton: basin 1: IncompleteFaceCycle { detail: "stage=bounded-validation face=277: owns 25 halfedges but has no root" }
+control release basin_2 exit=101 projected_basin_2_is_one_tree: basin 2: IncompleteFaceCycle { detail: "stage=bounded-validation face=18: owns 12 halfedges but has no root" }
+control release reduced_ridge exit=101 basin_spoke_collapse_keeps_leftover_ridge: assertion `left == right` failed: exported coordinates must form one component   left: 2  right: 1
+control release river exit=0 indi_pol_river_keeps_connected_tree: ok
+control debug basin_1 exit=101 projected_basin_1_has_connected_finite_skeleton: basin 1: IncompleteFaceCycle { detail: "stage=bounded-validation face=277: owns 25 halfedges but has no root" }
+control debug basin_2 exit=101 projected_basin_2_is_one_tree: basin 2: IncompleteFaceCycle { detail: "stage=bounded-validation face=18: owns 12 halfedges but has no root" }
+control debug reduced_ridge exit=101 basin_spoke_collapse_keeps_leftover_ridge: assertion `left == right` failed: exported coordinates must form one component   left: 2  right: 1
+control debug river exit=0 indi_pol_river_keeps_connected_tree: ok
 arm_a release basin_1 exit=101 projected_basin_1_has_connected_finite_skeleton: basin 1: IncompleteFaceCycle { detail: "stage=bounded-validation face=13: owns 5 halfedges but has no root" }
 arm_a release basin_2 exit=101 projected_basin_2_is_one_tree: basin 2: IncompleteFaceCycle { detail: "stage=bounded-validation face=600: owns 10 halfedges but has no root" }
 arm_a release reduced_ridge exit=0 basin_spoke_collapse_keeps_leftover_ridge: ok
@@ -118,6 +134,14 @@ arm_b_dirty debug basin_1 exit=101 basin_feature_1_point_contacts_have_connected
 arm_b_dirty debug basin_2 exit=101 basin_feature_2_is_one_tree: basin 2 skeleton: IncompleteFaceCycle { detail: "stage=bounded-validation face=346: owns 7 halfedges but has no root" }
 arm_b_dirty debug reduced_ridge exit=0 basin_spoke_collapse_keeps_leftover_ridge: ok
 arm_b_dirty debug river exit=0 river_polygon_keeps_connected_tree_counts: ok
+arm_b_arm_a_harness release basin_1 exit=101 projected_basin_1_has_connected_finite_skeleton: basin 1: IncompleteFaceCycle { detail: "stage=bounded-validation face=1137: owns 71 halfedges but has no root" }
+arm_b_arm_a_harness release basin_2 exit=101 projected_basin_2_is_one_tree: basin 2: IncompleteFaceCycle { detail: "stage=bounded-validation face=346: owns 7 halfedges but has no root" }
+arm_b_arm_a_harness release reduced_ridge exit=0 basin_spoke_collapse_keeps_leftover_ridge: ok
+arm_b_arm_a_harness release river exit=0 indi_pol_river_keeps_connected_tree: ok
+arm_b_arm_a_harness debug basin_1 exit=101 projected_basin_1_has_connected_finite_skeleton: basin 1: IncompleteFaceCycle { detail: "stage=bounded-validation face=1137: owns 71 halfedges but has no root" }
+arm_b_arm_a_harness debug basin_2 exit=101 projected_basin_2_is_one_tree: basin 2: IncompleteFaceCycle { detail: "stage=bounded-validation face=346: owns 7 halfedges but has no root" }
+arm_b_arm_a_harness debug reduced_ridge exit=0 basin_spoke_collapse_keeps_leftover_ridge: ok
+arm_b_arm_a_harness debug river exit=0 indi_pol_river_keeps_connected_tree: ok
 continuation_dirty release basin_1 exit=101 projected_basin_1_has_connected_finite_skeleton: assertion `left == right` failed: edges=5679 nodes=5730 rank=7   left: 58  right: 1
 continuation_dirty release basin_2 exit=101 projected_basin_2_is_one_tree: basin 2: IncompleteFaceCycle { detail: "stage=bounded-validation face=2268: owns 78 halfedges but has no root" }
 continuation_dirty release reduced_ridge exit=0 basin_spoke_collapse_keeps_leftover_ridge: ok
@@ -128,24 +152,28 @@ continuation_dirty debug reduced_ridge exit=0 basin_spoke_collapse_keeps_leftove
 continuation_dirty debug river exit=0 indi_pol_river_keeps_connected_tree: ok
 ```
 
-Arm B does not define `projected_basin_1_has_connected_finite_skeleton`, `projected_basin_2_is_one_tree`, or `indi_pol_river_keeps_connected_tree`. The rows above use the tests that dirty file does define for the same four cases.
+`arm_b_dirty` runs Arm B's own tests. `arm_b_arm_a_harness` runs Arm A's names on that same engine. The reduced-ridge test passes in both. Only the historical test calls `assert_dcel_contract`.
 
-This run's continuation failure string says 5679 edges and 5730 nodes. That matches `continue.md` and not the dirty diagnostic's 5643 and 5694. The diagnostic file was not edited by the replay. The disagreement recorded above stays unresolved.
+This run's continuation failure string says 5679 edges and 5730 nodes. That matches `assets/continue.md` and not the copied diagnostic's 5643 and 5694. The diagnostic file was not edited by the replay. The disagreement stays unresolved.
 
-Debug river tests finished in 183.44s on Arm A, 180.83s on Arm B, and 179.78s on the continuation. Those times are the `finished in` lines in the matching logs.
+Debug river tests finished in 233.43s on control, 233.96s on Arm A, 234.77s on Arm B, 235.85s on the Arm B harness, and 234.85s on the continuation. Those times are the `finished in` lines in the matching logs.
 
 Executables are the `projected_polygons` test binaries cargo printed for `--no-run` in that checkout. The filename suffix is the same across checkouts. The file sha256 is not. Scratch binaries were not used.
 
-| revision | profile | sha256 | path |
-| --- | --- | --- | --- |
-| `arm_a` | release | `c832dca69a52bc4a20e3c66e5867db2fff54bc737ffff1ebfb676965b9232a5d` | `.../subagent-01a1d91d-ffd1-7df2-a99d-28189dfa59ae/target/release/deps/projected_polygons-7c7d7ee88c2c916c` |
-| `arm_a` | debug | `96ab7b3bfd62c305a0361119eec98d3099c50740d8aa82cbe461476d2916c2c4` | `.../28189dfa59ae/target/debug/deps/projected_polygons-ccf60e7a7329240b` |
-| `arm_b_dirty` | release | `a92ab0d670dcde76ca862af4228c2d37dba6d52446f5cfd880869af6246be71f` | `.../subagent-01a1d91d-ffd1-7df2-a99d-282f7bdcc9ba/target/release/deps/projected_polygons-7c7d7ee88c2c916c` |
-| `arm_b_dirty` | debug | `6d47c90672bbc82fe194caa039f4c8d8da812d0d73b4775a85614209d7ee083b` | `.../282f7bdcc9ba/target/debug/deps/projected_polygons-ccf60e7a7329240b` |
-| `continuation_dirty` | release | `8c5e5c1014672cca3f7a83c87acd6632d7548f1c0d82201ff4abc96c99ada7a0` | `.../subagent-01a1d970-f5c4-7cc3-8bfd-7ec922c43176/target/release/deps/projected_polygons-7c7d7ee88c2c916c` |
-| `continuation_dirty` | debug | `8c17facda69dbf742bc80e093590dbd0cae35359cdfed5a6493ac5bd9c2d34c5` | `.../7ec922c43176/target/debug/deps/projected_polygons-ccf60e7a7329240b` |
+| revision | profile | sha256 |
+| --- | --- | --- |
+| `control` | release | `b143ce5e28e1d6731d9c8468c965dbf572781450401665e1b708826a25f0b02a` |
+| `control` | debug | `159ad92225ba6ee1f207b6297023ca74f3ebbd80a305b9704beec3d1fdf6e678` |
+| `arm_a` | release | `ea842d40e86e2658ff1ee6d75e152de4cee2f35b40cf21dfde15b153ed80f90f` |
+| `arm_a` | debug | `5fcc0ef1c0b86e5e1912a875c0289e232caa0f054502fb2d965fb20163b72d7a` |
+| `arm_b_dirty` | release | `529f937d2c36d68a8427de08290435299b179d9c793e4d8cc141e0af44d26e63` |
+| `arm_b_dirty` | debug | `f0977c394e3285bfd6bae7810f89d57675c5bc7e75d2fb72cbdab4fa826d92d4` |
+| `arm_b_arm_a_harness` | release | `ef4c9ff2a2a4484c6ba44a66c1a33ea333fe12b57653ea1fb5fef1e277798719` |
+| `arm_b_arm_a_harness` | debug | `b6737d933e7bf802e436cce56f719a2454f214bd39fbf7189c3bccaa84b68054` |
+| `continuation_dirty` | release | `3c42dda5e51b827574c69c02b178aacdb916650c6a6fb3aa009a43fb29890668` |
+| `continuation_dirty` | debug | `41ed1c0518da518cce23080dc57c9f99c8fd56e22e67f578e44da1fd971beb50` |
 
-The `...` prefixes are `/home/ats/.grok/worktrees/development-surfer2-rs/`. Full paths are in `manifest.json`.
+Full paths are in `manifest.json`. They point at `evidence/issue-6/work/`, which `replay.sh` creates from the bundle.
 
 ## Git status around this package
 
@@ -157,9 +185,9 @@ Worktree `git rev-parse HEAD` and `git status --porcelain` after the replay matc
 
 ## Access gaps that remain
 
-Control has no tracked `tests/projected_polygons.rs`. The observation is test source absent.
+`d1a89fd` still has no tracked `tests/projected_polygons.rs`. The control rows are that commit plus the Arm A overlay in the bundle, not an edit of the main checkout.
 
-Arm B's dirty tests use different names from Arm A for three of the four cases. Arm B has no `fixtures/projected/PROVENANCE.txt`.
+Arm B's historical tests keep their own names and the extra `assert_dcel_contract` call. The same engine was also run with Arm A's harness. The historical tree has no `fixtures/projected/PROVENANCE.txt`. The harness commit adds Arm A's copy.
 
 One arc and node count for the old continuation write-up is unrecoverable, as recorded above.
 

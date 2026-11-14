@@ -2,20 +2,17 @@
      Running tests/projected_polygons.rs (target/debug/deps/projected_polygons-ccf60e7a7329240b)
 
 running 1 test
-test basin_feature_2_is_one_tree ... FAILED
-
-failures:
-
----- basin_feature_2_is_one_tree stdout ----
-
-thread 'basin_feature_2_is_one_tree' (639132) panicked at tests/projected_polygons.rs:271:51:
+test basin_feature_2_is_one_tree ... 
+thread 'basin_feature_2_is_one_tree' (1024252) panicked at tests/projected_polygons.rs:271:51:
 basin 2 skeleton: IncompleteFaceCycle { detail: "stage=bounded-validation face=346: owns 7 halfedges but has no root" }
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
 
+failures:
 
 failures:
     basin_feature_2_is_one_tree
 
-test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 6 filtered out; finished in 4.65s
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 6 filtered out; finished in 5.41s
 
 error: test failed, to rerun pass `--test projected_polygons`

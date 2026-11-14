@@ -1,21 +1,18 @@
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.12s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s
      Running tests/projected_polygons.rs (target/debug/deps/projected_polygons-ccf60e7a7329240b)
 
 running 1 test
-test basin_feature_1_point_contacts_have_connected_skeleton ... FAILED
-
-failures:
-
----- basin_feature_1_point_contacts_have_connected_skeleton stdout ----
-
-thread 'basin_feature_1_point_contacts_have_connected_skeleton' (637891) panicked at tests/projected_polygons.rs:259:51:
+test basin_feature_1_point_contacts_have_connected_skeleton ... 
+thread 'basin_feature_1_point_contacts_have_connected_skeleton' (1023850) panicked at tests/projected_polygons.rs:259:51:
 basin 1 skeleton: IncompleteFaceCycle { detail: "stage=bounded-validation face=1137: owns 71 halfedges but has no root" }
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
 
+failures:
 
 failures:
     basin_feature_1_point_contacts_have_connected_skeleton
 
-test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 6 filtered out; finished in 5.83s
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 6 filtered out; finished in 4.57s
 
 error: test failed, to rerun pass `--test projected_polygons`

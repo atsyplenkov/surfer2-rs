@@ -1,0 +1,19 @@
+   Compiling surfer2 v0.1.0 (/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-28189dfa59ae)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.54s
+     Running tests/projected_polygons.rs (target/debug/deps/projected_polygons-ccf60e7a7329240b)
+
+running 1 test
+test projected_basin_2_is_one_tree ... 
+thread 'projected_basin_2_is_one_tree' (232366) panicked at tests/projected_polygons.rs:244:51:
+basin 2: IncompleteFaceCycle { detail: "stage=bounded-validation face=600: owns 10 halfedges but has no root [1200 o=604 n=13146 p=15579 next_ok=true prev_ok=true (464353.1540,6271759.7261)->(464455.5126,6271758.8618)] [13145 o=4967 n=14512 p=13145 next_ok=true prev_ok=false (464087.6323,6272133.0107)->(464087.6250,6272133.0107)] [13146 o=605 n=13146 p=1200 next_ok=false prev_ok=true (464455.5126,6271758.8618)->(464087.6251,6272133.0107)] [14511 o=5321 n=15534 p=14511 next_ok=true prev_ok=false (463811.2036,6272413.6311)->(463760.5338,6272414.0588)] [14512 o=4966 n=14512 p=13145 next_ok=false prev_ok=true (464087.6250,6272133.0107)->(463811.7053,6272413.6268)] [15534 o=5319 n=15539 p=14511 next_ok=true prev_ok=true (463760.5338,6272414.0588)->(463392.6534,6272788.2055)] [15539 o=5585 n=15574 p=15534 next_ok=true prev_ok=true (463392.6534,6272788.2055)->(463341.4865,6272788.6371)] [15574 o=5584 n=15580 p=15539 next_ok=true prev_ok=true (463341.4865,6272788.6371)->(463295.4791,6272835.4288)] [15579 o=5595 n=1200 p=15580 next_ok=true prev_ok=true (463295.4790,6272835.4288)->(464353.1540,6271759.7261)] [15580 o=5594 n=15579 p=15574 next_ok=true prev_ok=true (463295.4791,6272835.4288)->(463295.4790,6272835.4288)]" }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+
+failures:
+
+failures:
+    projected_basin_2_is_one_tree
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 6 filtered out; finished in 4.22s
+
+error: test failed, to rerun pass `--test projected_polygons`

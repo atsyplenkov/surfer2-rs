@@ -462,11 +462,12 @@
     ]
   },
   "access_gaps": [
-    "Control commit d1a89fd has no tests/projected_polygons.rs. The observation is test source absent. The untracked file in that checkout was not copied in and was not compiled.",
+    "Control commit d1a89fd has no tracked tests/projected_polygons.rs. The control rows ran from evidence/control-harness, which adds Arm A's tests and fixtures. The untracked test file on master was not compiled.",
     "Arm B dirty test file does not define projected_basin_1_has_connected_finite_skeleton, projected_basin_2_is_one_tree, or indi_pol_river_keeps_connected_tree. Replay runs the four case tests that file does define.",
     "Arm B has no fixtures/projected/PROVENANCE.txt. The three JSON fixtures are present and match the scratch hashes.",
     "A single arc and node count for the continuation feature-1 result is unrecoverable. See reconciliation.",
-    "/tmp/surfer2/test-data is absent. That matters for corpus and differential tests, which this replay does not start."
+    "/tmp/surfer2/test-data is absent. That matters for corpus and differential tests, which this replay does not start.",
+    "assets/basin2.txt preserves the expanded face-600 halfedge trace from /tmp/basin2.txt. The compile line names the Arm A worktree. The instrumented source revision is unknown."
   ],
   "git_status_before": {
     "command": "git status --porcelain and git rev-parse HEAD",
@@ -1145,6 +1146,14 @@
       "path": "assets/2026-11-14-projected-basin-oracle-contract.md",
       "sha256": "7cf940879bc9a53f181c2717f436428bc6ad74e427c2383b4a2d5eb24c8b17e5",
       "original_path": "/tmp/opencode/surfer2-basin-oracle-research/docs/research/2026-11-14-projected-basin-oracle-contract.md"
+    },
+    {
+      "path": "assets/basin2.txt",
+      "sha256": "17d973ace94bafbe3a21eb406235b8c280ed4589d23c3b91e44618a4035efdd8",
+      "original_path": "/tmp/basin2.txt",
+      "bytes": 1981,
+      "instrumented_source_revision": "unknown",
+      "note": "Debug log of projected_basin_2_is_one_tree. Panic at tests/projected_polygons.rs:244:51 is expect(\"basin 2\") displaying IncompleteFaceCycle. The detail lists ten halfedges of face 600 with next_ok and prev_ok. The compile line names the Arm A worktree. No preserved commit contains next_ok."
     }
   ],
   "source_bundle": {

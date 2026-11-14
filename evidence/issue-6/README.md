@@ -8,7 +8,7 @@ The registry is `manifest.json`. The patches are under `diffs/`. `replay.sh` reb
 
 From any working directory, run `evidence/issue-6/replay.sh`.
 
-The script compares every provenance checkout's `HEAD` and captured diff before it builds. Cargo starts only after every present checkout matches. A mismatch exits 1 and does not open the log files, so the `observations` array and the logs it cites stay as they were. It does not stage, commit, or edit the provenance checkouts. It writes `target/` under `work/`, which is the checkout reconstructed from the bundle. A second run that still matches overwrites `logs/` and the `observations` array. If a provenance path is absent, the script uses the bundle alone.
+The script checks the bundle sha256, checks out each `bundle_ref` under `work/`, and builds only when that commit is the one recorded in `source_bundle.refs`. A mismatch exits 1 and does not open the log files, so the `observations` array and the logs it cites stay as they were. `REPLAY_CHECK_LIVE=1` also compares each provenance checkout's `HEAD` and captured diff, and the same refusal applies. Without that setting, a moved or missing provenance checkout does not stop the run. The script does not stage, commit, or edit the provenance checkouts. A second run that still matches overwrites `logs/` and the `observations` array.
 
 Each test uses one command of this shape, with `--release` only for the release profile.
 
@@ -32,6 +32,8 @@ The refs are `origin/evidence/control`, `origin/evidence/arm-a`, `origin/evidenc
 `evidence/control-harness` is `d1a89fd` plus Arm A's `tests/projected_polygons.rs` and `fixtures/projected`. `evidence/arm-b-arm-a-harness` is the dirty Arm B engine with that same harness. `evidence/arm-b-dirty` keeps Arm B's own tests, including the `assert_dcel_contract` call in the reduced-ridge test.
 
 Copied reports are under `assets/`. The manifest records each file's original path.
+
+`assets/basin2.txt` is the debug log that was at `/tmp/basin2.txt`, sha256 `17d973ace94bafbe3a21eb406235b8c280ed4589d23c3b91e44618a4035efdd8`. It is `projected_basin_2_is_one_tree` panicking at `expect` on line 244. The `IncompleteFaceCycle` detail lists the ten halfedges of face 600, including `next_ok` and `prev_ok`. The compile line names the Arm A worktree. No preserved commit contains `next_ok`. The instrumented source revision is unknown.
 
 ## Revisions
 
@@ -192,3 +194,5 @@ Arm B's historical tests keep their own names and the extra `assert_dcel_contrac
 One arc and node count for the old continuation write-up is unrecoverable, as recorded above.
 
 `/tmp/surfer2/test-data` is absent. The replay command does not read it.
+
+The expanded face-600 trace is in `assets/basin2.txt`. The revision that printed those halfedge fields is unknown.

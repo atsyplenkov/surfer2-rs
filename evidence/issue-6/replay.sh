@@ -30,6 +30,7 @@ for rev in manifest["revisions"]:
         "true" if rev["run_tests"] else "false",
         rev.get("skip_reason") or "-",
         rev["bundle_ref"],
+        manifest["source_bundle"]["refs"][rev["bundle_ref"]],
     ]
     print("\t".join(fields))
 PY
@@ -59,23 +60,27 @@ check_revision() {
     local id="$1" checkout="$2" expect="$3" include="$4" diffrel="$5" run_tests="$6" skip_reason="$7"
     local frag="$FRAG/$id.json"
     local diffabs="$DIR/$diffrel"
-    local head="" porcelain="" source_ok=yes source_note=""
-    if [ ! -e "$checkout/.git" ]; then
-        source_note="provenance checkout absent; using the bundle"
-    else
-        head=$(git -C "$checkout" rev-parse HEAD)
-        porcelain=$(git -C "$checkout" status --porcelain)
-        local tmp
-        tmp=$(mktemp -d)
-        capture_now "$checkout" "$include" "$tmp/now.diff"
-        if [ "$head" != "$expect" ]; then
-            source_ok=no
-            source_note="HEAD is $head, expected $expect"
-        elif ! cmp -s "$tmp/now.diff" "$diffabs"; then
-            source_ok=no
-            source_note="captured diff no longer matches the checkout"
+    local head="" porcelain="" source_ok=yes source_note="live checkout not compared"
+    # REPLAY_CHECK_LIVE=1 compares the original checkout. The bundle is the replay source.
+    if [ "${REPLAY_CHECK_LIVE:-}" = 1 ]; then
+        source_note=""
+        if [ ! -e "$checkout/.git" ]; then
+            source_note="provenance checkout absent"
+        else
+            head=$(git -C "$checkout" rev-parse HEAD)
+            porcelain=$(git -C "$checkout" status --porcelain)
+            local tmp
+            tmp=$(mktemp -d)
+            capture_now "$checkout" "$include" "$tmp/now.diff"
+            if [ "$head" != "$expect" ]; then
+                source_ok=no
+                source_note="HEAD is $head, expected $expect"
+            elif ! cmp -s "$tmp/now.diff" "$diffabs"; then
+                source_ok=no
+                source_note="captured diff no longer matches the checkout"
+            fi
+            rm -rf "$tmp"
         fi
-        rm -rf "$tmp"
     fi
 
     python3 - "$frag" "$id" "$head" "$porcelain" "$source_ok" "$source_note" "$run_tests" "$skip_reason" "$checkout" << 'PY'
@@ -267,10 +272,41 @@ json.dump(doc, open(path, "w"))
 PY
 }
 
+validate_reconstructed() {
+    local id="$1" dest="$2" ref="$3" expect="$4"
+    local head
+    head=$(git -C "$dest" rev-parse HEAD)
+    python3 - "$FRAG/$id.json" "$head" "$ref" "$expect" << 'PY'
+import json, sys
+path, head, ref, expect = sys.argv[1:]
+doc = json.load(open(path))
+doc["reconstructed_head"] = head
+doc["reconstructed_ref"] = ref
+if head != expect:
+    doc["source_ok"] = False
+    doc["source_note"] = f"reconstructed HEAD {head}, manifest {ref} is {expect}"
+else:
+    note = doc.get("source_note") or ""
+    extra = f"reconstructed {ref} at {head}"
+    doc["source_note"] = extra if not note else f"{note}; {extra}"
+json.dump(doc, open(path, "w"))
+PY
+    [ "$head" = "$expect" ]
+}
+
+python3 - "$MANIFEST" "$DIR/sources/revisions.bundle" << 'PY'
+import hashlib, json, sys
+manifest = json.load(open(sys.argv[1]))
+got = hashlib.sha256(open(sys.argv[2], "rb").read()).hexdigest()
+want = manifest["source_bundle"]["sha256"]
+if got != want:
+    raise SystemExit(f"bundle sha256 {got}, manifest records {want}")
+PY
+
 mapfile -t plan_rows < <(plan_tsv)
 pids=()
 for row in "${plan_rows[@]}"; do
-    IFS=$'\t' read -r id checkout commit include diffrel run_tests skip_reason bundle_ref <<< "$row"
+    IFS=$'\t' read -r id checkout commit include diffrel run_tests skip_reason bundle_ref bundle_commit <<< "$row"
     [ -n "$id" ] || continue
     check_revision "$id" "$checkout" "$commit" "$include" "$diffrel" "$run_tests" "$skip_reason" &
     pids+=($!)
@@ -282,11 +318,19 @@ for pid in "${pids[@]}"; do
 done
 
 if [ "$fail" -eq 0 ]; then
-    pids=()
     for row in "${plan_rows[@]}"; do
-        IFS=$'\t' read -r id checkout commit include diffrel run_tests skip_reason bundle_ref <<< "$row"
+        IFS=$'\t' read -r id checkout commit include diffrel run_tests skip_reason bundle_ref bundle_commit <<< "$row"
         [ -n "$id" ] || continue
         materialize "$id" "$bundle_ref"
+        validate_reconstructed "$id" "$DIR/work/$id" "$bundle_ref" "$bundle_commit" || fail=1
+    done
+fi
+
+if [ "$fail" -eq 0 ]; then
+    pids=()
+    for row in "${plan_rows[@]}"; do
+        IFS=$'\t' read -r id checkout commit include diffrel run_tests skip_reason bundle_ref bundle_commit <<< "$row"
+        [ -n "$id" ] || continue
         run_tests "$id" "$DIR/work/$id" "$run_tests" &
         pids+=($!)
     done

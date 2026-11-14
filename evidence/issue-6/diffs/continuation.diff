@@ -1,0 +1,284 @@
+diff --git c/docs/diagnostics/issue-1-projected-basins.md w/docs/diagnostics/issue-1-projected-basins.md
+index 0b4b318..4d953da 100644
+--- c/docs/diagnostics/issue-1-projected-basins.md
++++ w/docs/diagnostics/issue-1-projected-basins.md
+@@ -11,3 +11,11 @@ Using the normal formula for every intersection was tried and rejected. It conne
+ The topology change is separate and has to travel with the numerical one. Once a projected collapse resolves, two kinetic records can name one directed pair of DCEL nodes. Emitting both halfedges leaves the second one as an unreachable 2-cycle after the infinity-chord pass (lake 10623, face 11004, halfedge 50738 duplicating 50734). The first directed pair is kept. Coordinates are not snapped, and no oracle expected value was lowered to make that pass.
+ 
+ That pair of changes makes the nine-vertex polygon one tree, with finite positive-length arcs, all nine input corners, and endpoints joined by exact binary64 bits. Debug and the earlier release check agree. Both original basins still fail bounded-face validation. On feature 2 the remaining event is a 3-constraint triangle whose edge times differ by about `1.24e-6` s. The earliest edge has already met. The third vertex, speed about `4.05e5`, is still `0.50 m` short. Stopping the whole triangle there freezes that ridge (face 600 has halfedges but no root). Feature 1 fails the same validation on face 13, including a halfedge that runs out to about `(613157, 13048303)`. Splitting only the short edge, rejecting unit-weight collapse times past the input diagonal, and refusing degenerate snaps longer than the footprint were tried. Each one moved the failure. None of them produced a valid connected skeleton for both basins, so they are not in the tree. The direct-normal experiment stays rejected.
++
++## Continuation, still red
++
++Printed halfedges on `1b6ed8e` match that account. Face 13 includes the halfedge out to about `(613157, 13048303)`. Face 600's open ends are about `(463811.705, 6272413.627)` and `(463811.204, 6272413.631)`, `0.502 m` apart, plus a `7.3 mm` stub. The `0.502 m` is one fast vertex (`4.05e5`) stopped `1.24e-6 s` before the other two edges meet. A second family is a birth whose stored origin does not replay the birth point: `position_at(time_start)` misses `pos_start` by centimetres to megametres when the normal velocity is paired with the far intersection origin. A third is a 1-constraint split successor with `|sin|` about `5.6e-6` (classified `Degenerate`, speed about `3.6e5`) whose natural collapse is `Never`, so it runs for hundreds of seconds.
++
++Uncommitted experiments on top of `1b6ed8e` (birth replay pinned when the miss exceeds `1 mm`, a 3-constraint collapse only when the endpoints actually meet, 1-constraint `Degenerate` allowed to collapse now when the natural event is `Never`, and edge-collapse time taken from the planar closest approach when the residual is at most a centimetre) remove face 13 and face 600. Spoke and the river tree stay on their old counts. Feature 1 then passes bounded validation and still has 58 coordinate components (`5643` arcs, `5694` nodes, rank 7). The gaps between those pieces have median length `51.67 m`, which is the dominant input edge, not a rounding gap. Feature 2 still fails validation: face 2268 owns 78 halfedges and does not close. Its open ends near `(437345, 6284236)` and `(437372, 6284235)` are `27 m` apart, and one halfedge is a `30 km` self-loop.
++
++Stopping every fast `Degenerate` constraint-collapse child (speed above `1e3`) splits the river into 4 components. The river's four such children are real ridges: opposite vertex `3.2 m` and `14.7 m` away, `|sin|` `2.9e-5` and `6.9e-5`, opposing directions. The basin's bad children are the same classification with the opposite vertex `92.8 m` away (the other dominant input edge) at `t ≈ 25.8`, which is half of a `51.7 m` corridor. Zeroing only those far children keeps the river and reopens feature 1's face cycle. Widening the same-time spoke repair from about `7 m` to `200 m` also reopens that cycle. Neither is in the committed tree. The velocity rule is unchanged: a finite fast intersection is not made stationary because its speed exceeds `1e6`.
+diff --git c/src/triangulation/collapse.rs w/src/triangulation/collapse.rs
+index 144ce36..9a970d2 100644
+--- c/src/triangulation/collapse.rs
++++ w/src/triangulation/collapse.rs
+@@ -95,21 +95,7 @@ pub fn compute_collapse(
+     }
+ 
+     match n_const {
+-        3 => {
+-            // C++ compute_collapse_bounded_constrained_3: 3-const is always
+-            // a triangle collapse (asserts all three edges collapse together).
+-            let mut tmin = f64::INFINITY;
+-            for s in 0..3 {
+-                if let Some(tc) = constraint_collapse_time(kt, t, s, time_now) {
+-                    tmin = tmin.min(tc);
+-                }
+-            }
+-            Ok(CollapseSpec::new(
+-                t.component,
+-                CollapseType::TriangleCollapse,
+-                if tmin.is_finite() { tmin } else { time_now },
+-            ))
+-        }
++        3 => bounded_constrained_3(kt, t, time_now),
+         2 => collapse_bounded_constrained_2(kt, t, time_now),
+         1 => collapse_bounded_constrained_1(kt, t, time_now),
+         0 => compute_flip_event_fast(kt, t, time_now),
+@@ -387,6 +373,136 @@ fn signed_area_at(kt: &KineticTriangulation, t: &KineticTriangle, time: f64) ->
+     (pb.x - pa.x) * (pc.y - pa.y) - (pb.y - pa.y) * (pc.x - pa.x)
+ }
+ 
++/// Three constraints collapse together only when every edge actually meets.
++///
++/// The earliest single-axis time can be a closest approach of tens of metres,
++/// or a slow edge's meet a few microseconds before a fast vertex arrives.
++/// When the early time still leaves an open side, wait for the later real
++/// meet. When only one side meets, collapse that edge and leave the third
++/// vertex moving.
++fn bounded_constrained_3(
++    kt: &KineticTriangulation,
++    t: &KineticTriangle,
++    time_now: f64,
++) -> Result<CollapseSpec, PropagationError> {
++    let eps = three_const_meet_eps(kt, t);
++    let mut real = Vec::new();
++    for s in 0..3 {
++        let Some(tc) = constraint_meet_time(kt, t, s, time_now) else {
++            continue;
++        };
++        if constraint_endpoint_distance(kt, t, s, tc) <= eps {
++            real.push((tc, s));
++        }
++    }
++    if real.len() == 3 {
++        let t_early = real.iter().map(|r| r.0).fold(f64::INFINITY, f64::min);
++        let t_late = real.iter().map(|r| r.0).fold(f64::NEG_INFINITY, f64::max);
++        let early_ok = (0..3).all(|s| constraint_endpoint_distance(kt, t, s, t_early) <= eps);
++        if early_ok {
++            return Ok(CollapseSpec::new(
++                t.component,
++                CollapseType::TriangleCollapse,
++                t_early,
++            ));
++        }
++        let late_ok = (0..3).all(|s| constraint_endpoint_distance(kt, t, s, t_late) <= eps);
++        if late_ok {
++            return Ok(CollapseSpec::new(
++                t.component,
++                CollapseType::TriangleCollapse,
++                t_late,
++            ));
++        }
++    }
++    if let Some(&(tc, s)) = real.iter().min_by(|a, b| a.0.total_cmp(&b.0)) {
++        return Ok(CollapseSpec::with_edge(
++            t.component,
++            CollapseType::ConstraintCollapse,
++            tc,
++            s as i8,
++        ));
++    }
++    let mut tmin = f64::INFINITY;
++    for s in 0..3 {
++        if let Some(tc) = constraint_collapse_time(kt, t, s, time_now) {
++            tmin = tmin.min(tc);
++        }
++    }
++    Ok(CollapseSpec::new(
++        t.component,
++        CollapseType::TriangleCollapse,
++        if tmin.is_finite() { tmin } else { time_now },
++    ))
++}
++
++fn three_const_meet_eps(kt: &KineticTriangulation, t: &KineticTriangle) -> f64 {
++    let mut scale: f64 = 1.0;
++    for vid in t.vertices.into_iter().flatten() {
++        if let Some(v) = kt.vertices.get(vid) {
++            // Birth point, not the back-projected origin. A fast vertex's
++            // origin can sit 1e8 away and would inflate the tolerance.
++            scale = scale
++                .max(v.pos_start.x.abs())
++                .max(v.pos_start.y.abs());
++        }
++    }
++    // About 6 mm on a projected basin, and far below a unit-polygon edge.
++    (1e-9 * scale).clamp(1e-12, 1e-2)
++}
++
++fn constraint_endpoint_distance(
++    kt: &KineticTriangulation,
++    t: &KineticTriangle,
++    side: usize,
++    time: f64,
++) -> f64 {
++    let Some(eid) = t.wavefronts[side] else {
++        return f64::INFINITY;
++    };
++    let Some(e) = kt.edges.get(eid) else {
++        return f64::INFINITY;
++    };
++    let (Some(v0), Some(v1)) = (
++        kt.vertices.get(e.endpoints[0]),
++        kt.vertices.get(e.endpoints[1]),
++    ) else {
++        return f64::INFINITY;
++    };
++    v0.position_at(time).distance_to(v1.position_at(time))
++}
++
++/// Future time at which the two endpoints are closest in the plane.
++///
++/// `compute_edge_collapse_f64` divides by one axis and treats an edge as
++/// vertical only when that axis is exactly zero. A projected edge whose
++/// relative velocity is almost parallel to the other axis then reports a
++/// meet before the points coincide. The least-squares time matches the
++/// single-axis time when the motion lies on the edge.
++fn constraint_meet_time(
++    kt: &KineticTriangulation,
++    t: &KineticTriangle,
++    side: usize,
++    now: f64,
++) -> Option<f64> {
++    let eid = t.wavefronts[side]?;
++    let e = kt.edges.get(eid)?;
++    let v0 = kt.vertices.get(e.endpoints[0])?;
++    let v1 = kt.vertices.get(e.endpoints[1])?;
++    let dx = v1.pos_zero.x - v0.pos_zero.x;
++    let dy = v1.pos_zero.y - v0.pos_zero.y;
++    let vx = v0.velocity.x - v1.velocity.x;
++    let vy = v0.velocity.y - v1.velocity.y;
++    let den = vx * vx + vy * vy;
++    if den > 0.0 {
++        let tc = (dx * vx + dy * vy) / den;
++        if tc.is_finite() && tc > now {
++            return Some(tc);
++        }
++    }
++    constraint_collapse_time(kt, t, side, now)
++}
++
+ fn constraint_collapse_time(
+     kt: &KineticTriangulation,
+     t: &KineticTriangle,
+diff --git c/src/wavefront/edge.rs w/src/wavefront/edge.rs
+index e9c9563..6c24c9c 100644
+--- c/src/wavefront/edge.rs
++++ w/src/wavefront/edge.rs
+@@ -93,21 +93,33 @@ pub fn compute_edge_collapse_f64(
+         };
+     }
+ 
+-    // LEFT_TURN: endpoints approach along the edge.
+-    // time = d·d / ((v0-v1)·d) projected; use x unless vertical.
+-    let edge_vertical = (p1.x - p0.x).abs() == 0.0 && (v0.x - v1.x).abs() == 0.0;
+-    let (edge_delta, wfvs_delta) = if !edge_vertical {
+-        (p1.x - p0.x, v0.x - v1.x)
+-    } else {
+-        (p1.y - p0.y, v0.y - v1.y)
+-    };
+-    if wfvs_delta == 0.0 {
++    // LEFT_TURN: time of closest approach in the plane.
++    // C++ divides by x unless that component is exactly zero. A near-zero
++    // component at projected scale is microseconds to seconds off, and a
++    // fast vertex is then metres short of the other endpoint. The two
++    // one-axis quotients agree with this time when the motion lies on the
++    // edge. A closest approach that is still metres apart is not a meet.
++    let (dx, dy) = (p1.x - p0.x, p1.y - p0.y);
++    let (dvx, dvy) = (v0.x - v1.x, v0.y - v1.y);
++    let den = dvx * dvx + dvy * dvy;
++    if den == 0.0 {
++        return EdgeCollapseSpec {
++            type_: EdgeCollapseType::Never,
++            time: f64::INFINITY,
++        };
++    }
++    let time = (dx * dvx + dy * dvy) / den;
++    let rx = dx - time * dvx;
++    let ry = dy - time * dvy;
++    let resid = rx.hypot(ry);
++    let scale = p0.x.abs().max(p0.y.abs()).max(p1.x.abs()).max(p1.y.abs());
++    let meet = (1e-9 * scale).clamp(1e-6, 1e-2);
++    if !time.is_finite() || resid > meet {
+         return EdgeCollapseSpec {
+             type_: EdgeCollapseType::Never,
+             time: f64::INFINITY,
+         };
+     }
+-    let time = edge_delta / wfvs_delta;
+     if time < now {
+         return EdgeCollapseSpec {
+             type_: EdgeCollapseType::Past,
+diff --git c/src/wavefront/split_leftover.rs w/src/wavefront/split_leftover.rs
+index ce187c0..a8f3b8f 100644
+--- c/src/wavefront/split_leftover.rs
++++ w/src/wavefront/split_leftover.rs
+@@ -91,6 +91,11 @@ pub fn leftover_schedule(constraint_count: usize, motion: SuccessorMotion) -> Le
+         // outgoing ridge). `schedule_leftover_collapse` still emits a
+         // DCEL spoke when motion is NonIntersecting.
+         3 => LeftoverSchedule::LeaveNatural,
++        // A 1-const opposing sliver (|sin| just above the missing-line
++        // cutoff) has a finite speed of 1e5 and a natural event of Never.
++        // Leaving it runs the vertex out of the basin. Same decision as
++        // the 2-const degenerate row: collapse now only when natural is Never.
++        1 if motion == SuccessorMotion::Degenerate => LeftoverSchedule::ComputeNatural,
+         2 => match motion {
+             SuccessorMotion::Finite => LeftoverSchedule::LeaveNatural,
+             SuccessorMotion::NonIntersecting => LeftoverSchedule::CollapseNow,
+@@ -220,7 +225,7 @@ mod tests {
+                 ComputeNatural,
+                 LeaveNatural,
+             ),
+-            (1, Degenerate, Never, Unsupported, Unsupported),
++            (1, Degenerate, Never, ComputeNatural, CollapseNow),
+             (1, NonIntersecting, Never, Unsupported, Unsupported),
+             (0, Finite, Never, Unsupported, Unsupported),
+         ];
+diff --git c/src/wavefront/supporting_line.rs w/src/wavefront/supporting_line.rs
+index 42ad7ff..fdb87b3 100644
+--- c/src/wavefront/supporting_line.rs
++++ w/src/wavefront/supporting_line.rs
+@@ -87,8 +87,13 @@ pub fn wavefront_vertex_motion(
+ ) -> (Point2, Point2) {
+     if let Some((p0, vel)) = intersection_velocity(a, b) {
+         // A fast intersection's t=0 point is too far to replay `pos` at
+-        // `time` in f64. Pin the same velocity on the known birth point.
+-        if vel.x.hypot(vel.y) > SUBTRACTION_SPEED_LIMIT {
++        // `time` in f64. The same pin applies when the normal velocity is
++        // moderate but was paired with that far origin: replaying it misses
++        // the birth point by centimetres to megametres and the vertex
++        // teleports. Sub-millimetre replay error keeps the historical origin.
++        let at = Point2::new(p0.x + time * vel.x, p0.y + time * vel.y);
++        let replay_miss = !at.is_finite() || at.distance_to(pos) > BIRTH_REPLAY_ABS;
++        if vel.x.hypot(vel.y) > SUBTRACTION_SPEED_LIMIT || replay_miss {
+             let born = Point2::new(pos.x - time * vel.x, pos.y - time * vel.y);
+             if born.is_finite() {
+                 return (born, vel);
+@@ -113,6 +118,10 @@ pub fn wavefront_vertex_motion(
+ /// finite intersection is not treated as missing.
+ const SUBTRACTION_SPEED_LIMIT: f64 = 1e6;
+ 
++/// Replay error above which a finite velocity is pinned to the birth point.
++/// Smaller misses are subtraction noise and must keep the historical origin.
++const BIRTH_REPLAY_ABS: f64 = 1e-3;
++
+ /// `|p0|` below this keeps offset subtraction even when the formulas differ.
+ /// Unit-coordinate weighted and degree-one fixtures sit here. Projected
+ /// basins do not.

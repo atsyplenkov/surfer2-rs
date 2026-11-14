@@ -1,0 +1,9 @@
+ts	phase	decision	why	evidence	result
+2026-11-14T12:13:57Z	capture	Stored git diffs for the four checkouts without staging	The dirty trees are the identified sources, and an empty diff still needs a hash	evidence/issue-6/diffs	control and arm_a empty, arm_b and continuation hashed
+2026-11-14T12:16:00Z	registry	Kept revisions, observations, fixtures, coverage, and reconciliation as separate records	A boolean on the revision cannot say which run failed	evidence/issue-6/manifest.json	registry written before the replay
+2026-11-14T12:16:00Z	provenance	Marked the nine-vertex literals as basin feature 2	Counted all nine points against both scratch JSON files, and read the audit instead of copying the handoff sentence	evidence/issue-6/manifest.json provenance_correction	corrected, audit found
+2026-11-14T12:16:00Z	reconciliation	Left the arc and node count unrecoverable	continue.md says 5679/5730 and the dirty diagnostic says 5643/5694, both with 58 components	evidence/issue-6/manifest.json reconciliation	unrecoverable
+2026-11-14T12:19:50Z	replay	Wrote replay.sh to build in each checkout and stop one test at 600s	A reviewer reruns the comparison, and a hang must not become a pass	evidence/issue-6/replay.sh	script ready
+2026-11-14T12:23:21Z	replay	Ran replay.sh once	The package is not done until the exit codes are from this machine	evidence/issue-6/manifest.json replay.finished_utc	exit 0, 32 observations, runner_failed false
+2026-11-14T12:24:24Z	review	Did not spawn a second model to read the trail	The parent forbade subagents	this file	cross-model review not run
+2026-11-14T12:25:00Z	log	The 12:16 rows were stamped by hand, not from a clock reading	Those decisions happened between the 12:13 diff capture and the 12:19 script, and the exact minute was not recorded	evidence/issue-6/decisions.tsv	stamps on the registry, provenance, and reconciliation rows are approximate

@@ -1,0 +1,9 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.04s
+     Running tests/projected_polygons.rs (target/debug/deps/projected_polygons-ccf60e7a7329240b)
+
+running 1 test
+test indi_pol_river_keeps_connected_tree has been running for over 60 seconds
+test indi_pol_river_keeps_connected_tree ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 179.78s
+

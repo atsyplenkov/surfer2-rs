@@ -1,0 +1,941 @@
+{
+  "issue": 6,
+  "purpose": "Revision registry for the projected-basin experiments. Observations are separate rows filled by replay.sh. This file does not say why a basin fails.",
+  "revisions": [
+    {
+      "id": "control",
+      "commit": "d1a89fd66795f537b034f220ed4f838bd0fdea3b",
+      "dirty_against": null,
+      "branch": "master",
+      "checkout": "/home/ats/Development/surfer2-rs",
+      "run_tests": false,
+      "skip_reason": "test source absent",
+      "captured_diff": {
+        "path": "diffs/control.diff",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "includes_untracked": false,
+        "note": "git diff HEAD and git diff --cached were empty. The file is zero bytes. Untracked docs/ and tests/projected_polygons.rs in this checkout are not part of this revision."
+      },
+      "test_file": {
+        "relative_path": "tests/projected_polygons.rs",
+        "in_revision": false,
+        "sha256": null,
+        "note": "git cat-file -e HEAD:tests/projected_polygons.rs failed. The path exists on disk and is untracked."
+      },
+      "cases": [
+        {
+          "case": "basin_1",
+          "test": "projected_basin_1_has_connected_finite_skeleton"
+        },
+        {
+          "case": "basin_2",
+          "test": "projected_basin_2_is_one_tree"
+        },
+        {
+          "case": "reduced_ridge",
+          "test": "basin_spoke_collapse_keeps_leftover_ridge"
+        },
+        {
+          "case": "river",
+          "test": "indi_pol_river_keeps_connected_tree"
+        }
+      ]
+    },
+    {
+      "id": "arm_a",
+      "commit": "1b6ed8ea9af51ed9f82f99d56306abc6f6359c7c",
+      "dirty_against": null,
+      "branch": "fix/issue-1-arm-a",
+      "checkout": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-28189dfa59ae",
+      "run_tests": true,
+      "skip_reason": null,
+      "captured_diff": {
+        "path": "diffs/arm-a.diff",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "includes_untracked": false,
+        "note": "Tracked and cached diffs are empty. Untracked docs/diagnostics/issues-1-2.md is not part of this commit and is not in the captured diff."
+      },
+      "test_file": {
+        "relative_path": "tests/projected_polygons.rs",
+        "in_revision": true,
+        "sha256": "b15af0682850b71cd288f05c02a5518f7d3c629b30371dafc0d2b938f16c56a5",
+        "note": "Worktree bytes match git show HEAD:tests/projected_polygons.rs. This is the committed Arm A test, not the untracked file on master."
+      },
+      "cases": [
+        {
+          "case": "basin_1",
+          "test": "projected_basin_1_has_connected_finite_skeleton"
+        },
+        {
+          "case": "basin_2",
+          "test": "projected_basin_2_is_one_tree"
+        },
+        {
+          "case": "reduced_ridge",
+          "test": "basin_spoke_collapse_keeps_leftover_ridge"
+        },
+        {
+          "case": "river",
+          "test": "indi_pol_river_keeps_connected_tree"
+        }
+      ]
+    },
+    {
+      "id": "arm_b_dirty",
+      "commit": "7d3faf62ec7bd15f46365053922de2885dac87ca",
+      "dirty_against": "dirty against 7d3faf62ec7bd15f46365053922de2885dac87ca",
+      "branch": "fix/issue-1-arm-b",
+      "checkout": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-282f7bdcc9ba",
+      "run_tests": true,
+      "skip_reason": null,
+      "captured_diff": {
+        "path": "diffs/arm-b.diff",
+        "sha256": "1800a626b8b8f786702d00f81e4f4fd2b56ee983c3cb0a78db44ccbf3882f7f0",
+        "includes_untracked": true,
+        "tracked_sha256": "3eb75b950e94a1edcf9203e0d9486b28cbcbf88d255762a12bc41ac4ce172098",
+        "cached_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "untracked_sha256": "27ae6f4a6063fa0d6e18ad561cfc076bd02a4f47a480eb7a3ca28e0f756c21b0",
+        "note": "Concatenation of git diff HEAD, git diff --cached, then git diff --no-index for untracked src, tests, docs, and fixtures, sorted by path. The cached section is empty. Nothing was staged."
+      },
+      "test_file": {
+        "relative_path": "tests/projected_polygons.rs",
+        "in_revision": true,
+        "sha256": "802b45c4a14698f7506a8b76b25c8723d368bd15c1d93d37f0bbbb1789a08cf0",
+        "head_file_sha256": "7ff91b7a24384e08e0ab6ae448c952ececb8b38dff52ac7ed20c7634d66165ed",
+        "note": "The file that runs is the dirty worktree file. HEAD's file has the nine-vertex test and does not define the three full-input tests. Arm A's test names are not in the dirty file. The cases below use this file's names."
+      },
+      "cases": [
+        {
+          "case": "basin_1",
+          "test": "basin_feature_1_point_contacts_have_connected_skeleton",
+          "arm_a_test": "projected_basin_1_has_connected_finite_skeleton"
+        },
+        {
+          "case": "basin_2",
+          "test": "basin_feature_2_is_one_tree",
+          "arm_a_test": "projected_basin_2_is_one_tree"
+        },
+        {
+          "case": "reduced_ridge",
+          "test": "basin_spoke_collapse_keeps_leftover_ridge",
+          "arm_a_test": "basin_spoke_collapse_keeps_leftover_ridge"
+        },
+        {
+          "case": "river",
+          "test": "river_polygon_keeps_connected_tree_counts",
+          "arm_a_test": "indi_pol_river_keeps_connected_tree"
+        }
+      ]
+    },
+    {
+      "id": "continuation_dirty",
+      "commit": "1b6ed8ea9af51ed9f82f99d56306abc6f6359c7c",
+      "dirty_against": "dirty against 1b6ed8ea9af51ed9f82f99d56306abc6f6359c7c",
+      "branch": "fix/issue-1-continue",
+      "checkout": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d970-f5c4-7cc3-8bfd-7ec922c43176",
+      "run_tests": true,
+      "skip_reason": null,
+      "captured_diff": {
+        "path": "diffs/continuation.diff",
+        "sha256": "3df8d22eb16ac6807f04448c3386384b48e93d505e778cc4324bf6ed9c2f079d",
+        "includes_untracked": true,
+        "tracked_sha256": "3df8d22eb16ac6807f04448c3386384b48e93d505e778cc4324bf6ed9c2f079d",
+        "cached_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "untracked_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "note": "Same concatenation as arm_b_dirty. There were no untracked experiment files. The cached diff is empty. The tracked diff is 178 insertions and 28 deletions, matching git diff --stat HEAD."
+      },
+      "test_file": {
+        "relative_path": "tests/projected_polygons.rs",
+        "in_revision": true,
+        "sha256": "b15af0682850b71cd288f05c02a5518f7d3c629b30371dafc0d2b938f16c56a5",
+        "note": "Unmodified relative to HEAD, and byte-identical to Arm A's committed test."
+      },
+      "cases": [
+        {
+          "case": "basin_1",
+          "test": "projected_basin_1_has_connected_finite_skeleton"
+        },
+        {
+          "case": "basin_2",
+          "test": "projected_basin_2_is_one_tree"
+        },
+        {
+          "case": "reduced_ridge",
+          "test": "basin_spoke_collapse_keeps_leftover_ridge"
+        },
+        {
+          "case": "river",
+          "test": "indi_pol_river_keeps_connected_tree"
+        }
+      ]
+    }
+  ],
+  "excluded_untracked": [
+    {
+      "checkout": "/home/ats/Development/surfer2-rs",
+      "path": "docs/diagnostics/issues-1-2.md",
+      "sha256": "0b9ea0dad095d6ee8ba543287e0ce21f173064a291aba21bb36e276dcae1ef2f",
+      "why": "Present on master and not in d1a89fd. Not part of the control revision."
+    },
+    {
+      "checkout": "/home/ats/Development/surfer2-rs",
+      "path": "tests/projected_polygons.rs",
+      "sha256": "65537ce4e2b367a9b55e53d6ff5225d6c5bc2cddc89e822c8d6841c712a54052",
+      "why": "Untracked on master. Different bytes from Arm A's committed test b15af0682850b71cd288f05c02a5518f7d3c629b30371dafc0d2b938f16c56a5. basin_spoke_collapse_keeps_leftover_ridge is #[ignore] in this file. The full-basin tests are not in this file. Replay does not compile it."
+    },
+    {
+      "checkout": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-28189dfa59ae",
+      "path": "docs/diagnostics/issues-1-2.md",
+      "sha256": "0b9ea0dad095d6ee8ba543287e0ce21f173064a291aba21bb36e276dcae1ef2f",
+      "why": "Untracked on Arm A. Same bytes as the master untracked copy. Not part of 1b6ed8e."
+    }
+  ],
+  "fixtures": [
+    {
+      "role": "reference_extract",
+      "feature": "basin feature 1",
+      "path": "/home/ats/Development/surfer2-rs/.scratch/issues-1-2/pl_basins-1.json",
+      "sha256": "486185b932322440f0a773496b67c80bc238e453c83253ae9a20d2e91631bf77",
+      "ring_vertex_counts": [
+        2900,
+        4,
+        4
+      ]
+    },
+    {
+      "role": "reference_extract",
+      "feature": "basin feature 2",
+      "path": "/home/ats/Development/surfer2-rs/.scratch/issues-1-2/pl_basins-2.json",
+      "sha256": "1923b3261f191ba581bfca71d9a244dcc08dd769143a2bbce2506743cdb4e77a",
+      "ring_vertex_counts": [
+        3358
+      ]
+    },
+    {
+      "role": "reference_extract",
+      "feature": "river, issue 2",
+      "path": "/home/ats/Development/surfer2-rs/.scratch/issues-1-2/indi_pol-1.json",
+      "sha256": "7a03ea26d3709a8d7fde2c44d53dba472245900651b117a26fafc2df3c0f49e0",
+      "ring_vertex_counts": [
+        25963
+      ]
+    },
+    {
+      "role": "vendored",
+      "revision_id": "arm_a",
+      "feature": "basin feature 1",
+      "path": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-28189dfa59ae/fixtures/projected/pl_basins-1.json",
+      "sha256": "486185b932322440f0a773496b67c80bc238e453c83253ae9a20d2e91631bf77",
+      "bit_identical_to": "/home/ats/Development/surfer2-rs/.scratch/issues-1-2/pl_basins-1.json"
+    },
+    {
+      "role": "vendored",
+      "revision_id": "arm_a",
+      "feature": "basin feature 2",
+      "path": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-28189dfa59ae/fixtures/projected/pl_basins-2.json",
+      "sha256": "1923b3261f191ba581bfca71d9a244dcc08dd769143a2bbce2506743cdb4e77a",
+      "bit_identical_to": "/home/ats/Development/surfer2-rs/.scratch/issues-1-2/pl_basins-2.json"
+    },
+    {
+      "role": "vendored",
+      "revision_id": "arm_a",
+      "feature": "river, issue 2",
+      "path": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-28189dfa59ae/fixtures/projected/indi_pol-1.json",
+      "sha256": "7a03ea26d3709a8d7fde2c44d53dba472245900651b117a26fafc2df3c0f49e0",
+      "bit_identical_to": "/home/ats/Development/surfer2-rs/.scratch/issues-1-2/indi_pol-1.json"
+    },
+    {
+      "role": "provenance_text",
+      "revision_id": "arm_a",
+      "path": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-28189dfa59ae/fixtures/projected/PROVENANCE.txt",
+      "sha256": "2ad3bec3a7c48403d37c1440b67c1485a15556c474a0ae8dc52b5fb41bd95b0e"
+    },
+    {
+      "role": "vendored",
+      "revision_id": "arm_b_dirty",
+      "feature": "basin feature 1",
+      "path": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-282f7bdcc9ba/fixtures/projected/pl_basins-1.json",
+      "sha256": "486185b932322440f0a773496b67c80bc238e453c83253ae9a20d2e91631bf77",
+      "bit_identical_to": "/home/ats/Development/surfer2-rs/.scratch/issues-1-2/pl_basins-1.json"
+    },
+    {
+      "role": "vendored",
+      "revision_id": "arm_b_dirty",
+      "feature": "basin feature 2",
+      "path": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-282f7bdcc9ba/fixtures/projected/pl_basins-2.json",
+      "sha256": "1923b3261f191ba581bfca71d9a244dcc08dd769143a2bbce2506743cdb4e77a",
+      "bit_identical_to": "/home/ats/Development/surfer2-rs/.scratch/issues-1-2/pl_basins-2.json"
+    },
+    {
+      "role": "vendored",
+      "revision_id": "arm_b_dirty",
+      "feature": "river, issue 2",
+      "path": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-282f7bdcc9ba/fixtures/projected/indi_pol-1.json",
+      "sha256": "7a03ea26d3709a8d7fde2c44d53dba472245900651b117a26fafc2df3c0f49e0",
+      "bit_identical_to": "/home/ats/Development/surfer2-rs/.scratch/issues-1-2/indi_pol-1.json"
+    },
+    {
+      "role": "vendored",
+      "revision_id": "continuation_dirty",
+      "feature": "basin feature 1",
+      "path": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d970-f5c4-7cc3-8bfd-7ec922c43176/fixtures/projected/pl_basins-1.json",
+      "sha256": "486185b932322440f0a773496b67c80bc238e453c83253ae9a20d2e91631bf77",
+      "bit_identical_to": "/home/ats/Development/surfer2-rs/.scratch/issues-1-2/pl_basins-1.json"
+    },
+    {
+      "role": "vendored",
+      "revision_id": "continuation_dirty",
+      "feature": "basin feature 2",
+      "path": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d970-f5c4-7cc3-8bfd-7ec922c43176/fixtures/projected/pl_basins-2.json",
+      "sha256": "1923b3261f191ba581bfca71d9a244dcc08dd769143a2bbce2506743cdb4e77a",
+      "bit_identical_to": "/home/ats/Development/surfer2-rs/.scratch/issues-1-2/pl_basins-2.json"
+    },
+    {
+      "role": "vendored",
+      "revision_id": "continuation_dirty",
+      "feature": "river, issue 2",
+      "path": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d970-f5c4-7cc3-8bfd-7ec922c43176/fixtures/projected/indi_pol-1.json",
+      "sha256": "7a03ea26d3709a8d7fde2c44d53dba472245900651b117a26fafc2df3c0f49e0",
+      "bit_identical_to": "/home/ats/Development/surfer2-rs/.scratch/issues-1-2/indi_pol-1.json"
+    },
+    {
+      "role": "provenance_text",
+      "revision_id": "continuation_dirty",
+      "path": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d970-f5c4-7cc3-8bfd-7ec922c43176/fixtures/projected/PROVENANCE.txt",
+      "sha256": "2ad3bec3a7c48403d37c1440b67c1485a15556c474a0ae8dc52b5fb41bd95b0e"
+    },
+    {
+      "role": "inline_reduced_ridge",
+      "feature": "vertices match basin feature 2, not basin feature 1",
+      "where": "literal xy in basin_spoke_collapse_keeps_leftover_ridge",
+      "basin_2_ring0_indices": [
+        1273,
+        1274,
+        1279,
+        1320,
+        1321,
+        1322,
+        1323,
+        1324,
+        1325
+      ],
+      "basin_1_matches": 0
+    }
+  ],
+  "provenance_correction": {
+    "status": "corrected",
+    "claim": "The nine literal vertices of the reduced ridge are exact binary64 points of basin feature 2 (pl_basins-2.json ring 0). None of them occur in pl_basins-1.json.",
+    "audit_file": "/tmp/opencode/surfer2-basin-oracle-research/docs/research/2026-11-14-projected-basin-oracle-contract.md",
+    "audit_lines": "313-314",
+    "audit_says": "The four original binary64 points match basin 2 ring-0 vertices 1321, 1322, 1323, 1324 exactly.",
+    "audit_scope": "Those four points are vertices 4 through 7 of the nine-vertex literal, the support pair the audit names as edges 4 to 5 and 6 to 7. The audit does not itself say all nine vertices match.",
+    "checked_here": "All nine literals were decoded with struct.pack of their Python float bits and compared to f64::from_bits of both scratch JSON files. Nine matches in feature 2 at the indices above. Zero matches in feature 1.",
+    "prose_file": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-28189dfa59ae/docs/diagnostics/issue-1-projected-basins.md",
+    "prose_line": 3,
+    "prose_says": "Confirmed on the nine-vertex reduction of basin feature 1, EPSG:32637.",
+    "prose_sha256": "e7018fc364bdab80f0e3dc2a13fb7da43a5bdc31cc19c30c3a2b057d7a22b7b1"
+  },
+  "reconciliation": {
+    "status": "unrecoverable",
+    "component_count": {
+      "continuation_report": 58,
+      "diagnostic": 58,
+      "agree": true
+    },
+    "arc_node_counts": {
+      "continuation_report": {
+        "arcs": 5679,
+        "nodes": 5730,
+        "rank": 7
+      },
+      "diagnostic": {
+        "arcs": 5643,
+        "nodes": 5694,
+        "rank": 7
+      },
+      "agree": false
+    },
+    "files": [
+      {
+        "path": "/tmp/swarm-issue1/continue.md",
+        "sha256": "6fc6f1dc4450a9e1e87474db03e2a077d44b40ab31bd1c2b85fbf489eab3fbfd",
+        "line": 15,
+        "text": "projected_basin_1_has_connected_finite_skeleton FAILED: 58 components, edges=5679 nodes=5730 rank=7 (bounded validation passed)"
+      },
+      {
+        "path": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d970-f5c4-7cc3-8bfd-7ec922c43176/docs/diagnostics/issue-1-projected-basins.md",
+        "sha256": "92c8aa39fd16494bf2cfec4137f92c0ca4292414623e22fcf57f56d48fe6c8b1",
+        "line": 19,
+        "text": "58 coordinate components (`5643` arcs, `5694` nodes, rank 7)",
+        "in_head_blob": false
+      }
+    ],
+    "why": "Both files state 58 components for feature 1 after the uncommitted continuation experiment. The arc and node counts disagree. The committed diagnostic at 1b6ed8e does not contain either pair. No other file selects one pair, so this record does not invent a single arc or node count."
+  },
+  "coverage": {
+    "command": "cargo test [--release] --test projected_polygons --locked -- <one test name> -- --exact --test-threads=1 --nocapture",
+    "what_runs": "Only the one named test inside tests/projected_polygons.rs. The other tests in that file are filtered out by --exact.",
+    "not_started": [
+      "tests/upstream_corpus.rs",
+      "tests/differential.rs",
+      "tests/gis.rs",
+      "library unit tests"
+    ],
+    "absent_external_inputs": [
+      {
+        "name": "SURFER2_TEST_DATA",
+        "state": "unset"
+      },
+      {
+        "name": "/tmp/surfer2/test-data",
+        "state": "directory absent"
+      },
+      {
+        "name": "SURFER2_GIS_DATA",
+        "state": "unset"
+      },
+      {
+        "name": "C++ surfer binaries",
+        "state": "not invoked"
+      }
+    ],
+    "silently_skipped_by_replay": [],
+    "ignore_and_features": "The four tests replay names have no #[ignore] on Arm A, on the continuation tree, or in the dirty Arm B file. No #[cfg(feature)] and no required-features were found under the Arm A tree. Control does not compile a projected_polygons test. The untracked master test file, which replay does not compile, ignores basin_spoke_collapse_keeps_leftover_ridge.",
+    "fixtures_gis_present_on_arm_a": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-28189dfa59ae/fixtures/gis",
+    "historical_binaries_not_used": [
+      ".scratch/issues-1-2/baseline-release",
+      ".scratch/issues-1-2/current-release",
+      ".scratch/issues-1-2/target"
+    ]
+  },
+  "access_gaps": [
+    "Control commit d1a89fd has no tests/projected_polygons.rs. The observation is test source absent. The untracked file in that checkout was not copied in and was not compiled.",
+    "Arm B dirty test file does not define projected_basin_1_has_connected_finite_skeleton, projected_basin_2_is_one_tree, or indi_pol_river_keeps_connected_tree. Replay runs the four case tests that file does define.",
+    "Arm B has no fixtures/projected/PROVENANCE.txt. The three JSON fixtures are present and match the scratch hashes.",
+    "A single arc and node count for the continuation feature-1 result is unrecoverable. See reconciliation.",
+    "/tmp/surfer2/test-data is absent. That matters for corpus and differential tests, which this replay does not start."
+  ],
+  "git_status_before": {
+    "command": "git status --porcelain and git rev-parse HEAD",
+    "main": {
+      "head": "d1a89fd66795f537b034f220ed4f838bd0fdea3b",
+      "porcelain": [
+        "?? docs/",
+        "?? tests/projected_polygons.rs"
+      ]
+    },
+    "arm_a": {
+      "head": "1b6ed8ea9af51ed9f82f99d56306abc6f6359c7c",
+      "porcelain": [
+        "?? docs/diagnostics/issues-1-2.md"
+      ]
+    },
+    "arm_b_dirty": {
+      "head": "7d3faf62ec7bd15f46365053922de2885dac87ca",
+      "porcelain": [
+        " M src/triangulation/collapse.rs",
+        " M src/wavefront/supporting_line.rs",
+        " M tests/projected_polygons.rs",
+        "?? docs/",
+        "?? fixtures/projected/"
+      ]
+    },
+    "continuation_dirty": {
+      "head": "1b6ed8ea9af51ed9f82f99d56306abc6f6359c7c",
+      "porcelain": [
+        " M docs/diagnostics/issue-1-projected-basins.md",
+        " M src/triangulation/collapse.rs",
+        " M src/wavefront/edge.rs",
+        " M src/wavefront/split_leftover.rs",
+        " M src/wavefront/supporting_line.rs"
+      ]
+    }
+  },
+  "observations": [
+    {
+      "revision_id": "control",
+      "profile": "release",
+      "case": "basin_1",
+      "test": "projected_basin_1_has_connected_finite_skeleton",
+      "checkout": "/home/ats/Development/surfer2-rs",
+      "command": null,
+      "exit_code": null,
+      "signal": "projected_basin_1_has_connected_finite_skeleton: test source absent",
+      "executable": null,
+      "executable_sha256": null,
+      "log": null,
+      "ran": false
+    },
+    {
+      "revision_id": "control",
+      "profile": "release",
+      "case": "basin_2",
+      "test": "projected_basin_2_is_one_tree",
+      "checkout": "/home/ats/Development/surfer2-rs",
+      "command": null,
+      "exit_code": null,
+      "signal": "projected_basin_2_is_one_tree: test source absent",
+      "executable": null,
+      "executable_sha256": null,
+      "log": null,
+      "ran": false
+    },
+    {
+      "revision_id": "control",
+      "profile": "release",
+      "case": "reduced_ridge",
+      "test": "basin_spoke_collapse_keeps_leftover_ridge",
+      "checkout": "/home/ats/Development/surfer2-rs",
+      "command": null,
+      "exit_code": null,
+      "signal": "basin_spoke_collapse_keeps_leftover_ridge: test source absent",
+      "executable": null,
+      "executable_sha256": null,
+      "log": null,
+      "ran": false
+    },
+    {
+      "revision_id": "control",
+      "profile": "release",
+      "case": "river",
+      "test": "indi_pol_river_keeps_connected_tree",
+      "checkout": "/home/ats/Development/surfer2-rs",
+      "command": null,
+      "exit_code": null,
+      "signal": "indi_pol_river_keeps_connected_tree: test source absent",
+      "executable": null,
+      "executable_sha256": null,
+      "log": null,
+      "ran": false
+    },
+    {
+      "revision_id": "control",
+      "profile": "debug",
+      "case": "basin_1",
+      "test": "projected_basin_1_has_connected_finite_skeleton",
+      "checkout": "/home/ats/Development/surfer2-rs",
+      "command": null,
+      "exit_code": null,
+      "signal": "projected_basin_1_has_connected_finite_skeleton: test source absent",
+      "executable": null,
+      "executable_sha256": null,
+      "log": null,
+      "ran": false
+    },
+    {
+      "revision_id": "control",
+      "profile": "debug",
+      "case": "basin_2",
+      "test": "projected_basin_2_is_one_tree",
+      "checkout": "/home/ats/Development/surfer2-rs",
+      "command": null,
+      "exit_code": null,
+      "signal": "projected_basin_2_is_one_tree: test source absent",
+      "executable": null,
+      "executable_sha256": null,
+      "log": null,
+      "ran": false
+    },
+    {
+      "revision_id": "control",
+      "profile": "debug",
+      "case": "reduced_ridge",
+      "test": "basin_spoke_collapse_keeps_leftover_ridge",
+      "checkout": "/home/ats/Development/surfer2-rs",
+      "command": null,
+      "exit_code": null,
+      "signal": "basin_spoke_collapse_keeps_leftover_ridge: test source absent",
+      "executable": null,
+      "executable_sha256": null,
+      "log": null,
+      "ran": false
+    },
+    {
+      "revision_id": "control",
+      "profile": "debug",
+      "case": "river",
+      "test": "indi_pol_river_keeps_connected_tree",
+      "checkout": "/home/ats/Development/surfer2-rs",
+      "command": null,
+      "exit_code": null,
+      "signal": "indi_pol_river_keeps_connected_tree: test source absent",
+      "executable": null,
+      "executable_sha256": null,
+      "log": null,
+      "ran": false
+    },
+    {
+      "revision_id": "arm_a",
+      "profile": "release",
+      "case": "basin_1",
+      "test": "projected_basin_1_has_connected_finite_skeleton",
+      "checkout": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-28189dfa59ae",
+      "command": "cd /home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-28189dfa59ae && CARGO_TERM_COLOR=never cargo test --release --test projected_polygons --locked -- projected_basin_1_has_connected_finite_skeleton -- --exact --test-threads=1 --nocapture",
+      "exit_code": 101,
+      "signal": "projected_basin_1_has_connected_finite_skeleton: basin 1: IncompleteFaceCycle { detail: \"stage=bounded-validation face=13: owns 5 halfedges but has no root\" }",
+      "executable": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-28189dfa59ae/target/release/deps/projected_polygons-7c7d7ee88c2c916c",
+      "executable_sha256": "c832dca69a52bc4a20e3c66e5867db2fff54bc737ffff1ebfb676965b9232a5d",
+      "log": "/home/ats/Development/surfer2-rs/evidence/issue-6/logs/arm_a-release-basin_1.log",
+      "ran": true
+    },
+    {
+      "revision_id": "arm_a",
+      "profile": "release",
+      "case": "basin_2",
+      "test": "projected_basin_2_is_one_tree",
+      "checkout": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-28189dfa59ae",
+      "command": "cd /home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-28189dfa59ae && CARGO_TERM_COLOR=never cargo test --release --test projected_polygons --locked -- projected_basin_2_is_one_tree -- --exact --test-threads=1 --nocapture",
+      "exit_code": 101,
+      "signal": "projected_basin_2_is_one_tree: basin 2: IncompleteFaceCycle { detail: \"stage=bounded-validation face=600: owns 10 halfedges but has no root\" }",
+      "executable": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-28189dfa59ae/target/release/deps/projected_polygons-7c7d7ee88c2c916c",
+      "executable_sha256": "c832dca69a52bc4a20e3c66e5867db2fff54bc737ffff1ebfb676965b9232a5d",
+      "log": "/home/ats/Development/surfer2-rs/evidence/issue-6/logs/arm_a-release-basin_2.log",
+      "ran": true
+    },
+    {
+      "revision_id": "arm_a",
+      "profile": "release",
+      "case": "reduced_ridge",
+      "test": "basin_spoke_collapse_keeps_leftover_ridge",
+      "checkout": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-28189dfa59ae",
+      "command": "cd /home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-28189dfa59ae && CARGO_TERM_COLOR=never cargo test --release --test projected_polygons --locked -- basin_spoke_collapse_keeps_leftover_ridge -- --exact --test-threads=1 --nocapture",
+      "exit_code": 0,
+      "signal": "basin_spoke_collapse_keeps_leftover_ridge: ok",
+      "executable": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-28189dfa59ae/target/release/deps/projected_polygons-7c7d7ee88c2c916c",
+      "executable_sha256": "c832dca69a52bc4a20e3c66e5867db2fff54bc737ffff1ebfb676965b9232a5d",
+      "log": "/home/ats/Development/surfer2-rs/evidence/issue-6/logs/arm_a-release-reduced_ridge.log",
+      "ran": true
+    },
+    {
+      "revision_id": "arm_a",
+      "profile": "release",
+      "case": "river",
+      "test": "indi_pol_river_keeps_connected_tree",
+      "checkout": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-28189dfa59ae",
+      "command": "cd /home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-28189dfa59ae && CARGO_TERM_COLOR=never cargo test --release --test projected_polygons --locked -- indi_pol_river_keeps_connected_tree -- --exact --test-threads=1 --nocapture",
+      "exit_code": 0,
+      "signal": "indi_pol_river_keeps_connected_tree: ok",
+      "executable": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-28189dfa59ae/target/release/deps/projected_polygons-7c7d7ee88c2c916c",
+      "executable_sha256": "c832dca69a52bc4a20e3c66e5867db2fff54bc737ffff1ebfb676965b9232a5d",
+      "log": "/home/ats/Development/surfer2-rs/evidence/issue-6/logs/arm_a-release-river.log",
+      "ran": true
+    },
+    {
+      "revision_id": "arm_a",
+      "profile": "debug",
+      "case": "basin_1",
+      "test": "projected_basin_1_has_connected_finite_skeleton",
+      "checkout": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-28189dfa59ae",
+      "command": "cd /home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-28189dfa59ae && CARGO_TERM_COLOR=never cargo test --test projected_polygons --locked -- projected_basin_1_has_connected_finite_skeleton -- --exact --test-threads=1 --nocapture",
+      "exit_code": 101,
+      "signal": "projected_basin_1_has_connected_finite_skeleton: basin 1: IncompleteFaceCycle { detail: \"stage=bounded-validation face=13: owns 5 halfedges but has no root\" }",
+      "executable": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-28189dfa59ae/target/debug/deps/projected_polygons-ccf60e7a7329240b",
+      "executable_sha256": "96ab7b3bfd62c305a0361119eec98d3099c50740d8aa82cbe461476d2916c2c4",
+      "log": "/home/ats/Development/surfer2-rs/evidence/issue-6/logs/arm_a-debug-basin_1.log",
+      "ran": true
+    },
+    {
+      "revision_id": "arm_a",
+      "profile": "debug",
+      "case": "basin_2",
+      "test": "projected_basin_2_is_one_tree",
+      "checkout": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-28189dfa59ae",
+      "command": "cd /home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-28189dfa59ae && CARGO_TERM_COLOR=never cargo test --test projected_polygons --locked -- projected_basin_2_is_one_tree -- --exact --test-threads=1 --nocapture",
+      "exit_code": 101,
+      "signal": "projected_basin_2_is_one_tree: basin 2: IncompleteFaceCycle { detail: \"stage=bounded-validation face=600: owns 10 halfedges but has no root\" }",
+      "executable": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-28189dfa59ae/target/debug/deps/projected_polygons-ccf60e7a7329240b",
+      "executable_sha256": "96ab7b3bfd62c305a0361119eec98d3099c50740d8aa82cbe461476d2916c2c4",
+      "log": "/home/ats/Development/surfer2-rs/evidence/issue-6/logs/arm_a-debug-basin_2.log",
+      "ran": true
+    },
+    {
+      "revision_id": "arm_a",
+      "profile": "debug",
+      "case": "reduced_ridge",
+      "test": "basin_spoke_collapse_keeps_leftover_ridge",
+      "checkout": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-28189dfa59ae",
+      "command": "cd /home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-28189dfa59ae && CARGO_TERM_COLOR=never cargo test --test projected_polygons --locked -- basin_spoke_collapse_keeps_leftover_ridge -- --exact --test-threads=1 --nocapture",
+      "exit_code": 0,
+      "signal": "basin_spoke_collapse_keeps_leftover_ridge: ok",
+      "executable": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-28189dfa59ae/target/debug/deps/projected_polygons-ccf60e7a7329240b",
+      "executable_sha256": "96ab7b3bfd62c305a0361119eec98d3099c50740d8aa82cbe461476d2916c2c4",
+      "log": "/home/ats/Development/surfer2-rs/evidence/issue-6/logs/arm_a-debug-reduced_ridge.log",
+      "ran": true
+    },
+    {
+      "revision_id": "arm_a",
+      "profile": "debug",
+      "case": "river",
+      "test": "indi_pol_river_keeps_connected_tree",
+      "checkout": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-28189dfa59ae",
+      "command": "cd /home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-28189dfa59ae && CARGO_TERM_COLOR=never cargo test --test projected_polygons --locked -- indi_pol_river_keeps_connected_tree -- --exact --test-threads=1 --nocapture",
+      "exit_code": 0,
+      "signal": "indi_pol_river_keeps_connected_tree: ok",
+      "executable": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-28189dfa59ae/target/debug/deps/projected_polygons-ccf60e7a7329240b",
+      "executable_sha256": "96ab7b3bfd62c305a0361119eec98d3099c50740d8aa82cbe461476d2916c2c4",
+      "log": "/home/ats/Development/surfer2-rs/evidence/issue-6/logs/arm_a-debug-river.log",
+      "ran": true
+    },
+    {
+      "revision_id": "arm_b_dirty",
+      "profile": "release",
+      "case": "basin_1",
+      "test": "basin_feature_1_point_contacts_have_connected_skeleton",
+      "checkout": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-282f7bdcc9ba",
+      "command": "cd /home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-282f7bdcc9ba && CARGO_TERM_COLOR=never cargo test --release --test projected_polygons --locked -- basin_feature_1_point_contacts_have_connected_skeleton -- --exact --test-threads=1 --nocapture",
+      "exit_code": 101,
+      "signal": "basin_feature_1_point_contacts_have_connected_skeleton: basin 1 skeleton: IncompleteFaceCycle { detail: \"stage=bounded-validation face=1137: owns 71 halfedges but has no root\" }",
+      "executable": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-282f7bdcc9ba/target/release/deps/projected_polygons-7c7d7ee88c2c916c",
+      "executable_sha256": "a92ab0d670dcde76ca862af4228c2d37dba6d52446f5cfd880869af6246be71f",
+      "log": "/home/ats/Development/surfer2-rs/evidence/issue-6/logs/arm_b_dirty-release-basin_1.log",
+      "ran": true
+    },
+    {
+      "revision_id": "arm_b_dirty",
+      "profile": "release",
+      "case": "basin_2",
+      "test": "basin_feature_2_is_one_tree",
+      "checkout": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-282f7bdcc9ba",
+      "command": "cd /home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-282f7bdcc9ba && CARGO_TERM_COLOR=never cargo test --release --test projected_polygons --locked -- basin_feature_2_is_one_tree -- --exact --test-threads=1 --nocapture",
+      "exit_code": 101,
+      "signal": "basin_feature_2_is_one_tree: basin 2 skeleton: IncompleteFaceCycle { detail: \"stage=bounded-validation face=346: owns 7 halfedges but has no root\" }",
+      "executable": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-282f7bdcc9ba/target/release/deps/projected_polygons-7c7d7ee88c2c916c",
+      "executable_sha256": "a92ab0d670dcde76ca862af4228c2d37dba6d52446f5cfd880869af6246be71f",
+      "log": "/home/ats/Development/surfer2-rs/evidence/issue-6/logs/arm_b_dirty-release-basin_2.log",
+      "ran": true
+    },
+    {
+      "revision_id": "arm_b_dirty",
+      "profile": "release",
+      "case": "reduced_ridge",
+      "test": "basin_spoke_collapse_keeps_leftover_ridge",
+      "checkout": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-282f7bdcc9ba",
+      "command": "cd /home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-282f7bdcc9ba && CARGO_TERM_COLOR=never cargo test --release --test projected_polygons --locked -- basin_spoke_collapse_keeps_leftover_ridge -- --exact --test-threads=1 --nocapture",
+      "exit_code": 0,
+      "signal": "basin_spoke_collapse_keeps_leftover_ridge: ok",
+      "executable": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-282f7bdcc9ba/target/release/deps/projected_polygons-7c7d7ee88c2c916c",
+      "executable_sha256": "a92ab0d670dcde76ca862af4228c2d37dba6d52446f5cfd880869af6246be71f",
+      "log": "/home/ats/Development/surfer2-rs/evidence/issue-6/logs/arm_b_dirty-release-reduced_ridge.log",
+      "ran": true
+    },
+    {
+      "revision_id": "arm_b_dirty",
+      "profile": "release",
+      "case": "river",
+      "test": "river_polygon_keeps_connected_tree_counts",
+      "checkout": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-282f7bdcc9ba",
+      "command": "cd /home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-282f7bdcc9ba && CARGO_TERM_COLOR=never cargo test --release --test projected_polygons --locked -- river_polygon_keeps_connected_tree_counts -- --exact --test-threads=1 --nocapture",
+      "exit_code": 0,
+      "signal": "river_polygon_keeps_connected_tree_counts: ok",
+      "executable": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-282f7bdcc9ba/target/release/deps/projected_polygons-7c7d7ee88c2c916c",
+      "executable_sha256": "a92ab0d670dcde76ca862af4228c2d37dba6d52446f5cfd880869af6246be71f",
+      "log": "/home/ats/Development/surfer2-rs/evidence/issue-6/logs/arm_b_dirty-release-river.log",
+      "ran": true
+    },
+    {
+      "revision_id": "arm_b_dirty",
+      "profile": "debug",
+      "case": "basin_1",
+      "test": "basin_feature_1_point_contacts_have_connected_skeleton",
+      "checkout": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-282f7bdcc9ba",
+      "command": "cd /home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-282f7bdcc9ba && CARGO_TERM_COLOR=never cargo test --test projected_polygons --locked -- basin_feature_1_point_contacts_have_connected_skeleton -- --exact --test-threads=1 --nocapture",
+      "exit_code": 101,
+      "signal": "basin_feature_1_point_contacts_have_connected_skeleton: basin 1 skeleton: IncompleteFaceCycle { detail: \"stage=bounded-validation face=1137: owns 71 halfedges but has no root\" }",
+      "executable": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-282f7bdcc9ba/target/debug/deps/projected_polygons-ccf60e7a7329240b",
+      "executable_sha256": "6d47c90672bbc82fe194caa039f4c8d8da812d0d73b4775a85614209d7ee083b",
+      "log": "/home/ats/Development/surfer2-rs/evidence/issue-6/logs/arm_b_dirty-debug-basin_1.log",
+      "ran": true
+    },
+    {
+      "revision_id": "arm_b_dirty",
+      "profile": "debug",
+      "case": "basin_2",
+      "test": "basin_feature_2_is_one_tree",
+      "checkout": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-282f7bdcc9ba",
+      "command": "cd /home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-282f7bdcc9ba && CARGO_TERM_COLOR=never cargo test --test projected_polygons --locked -- basin_feature_2_is_one_tree -- --exact --test-threads=1 --nocapture",
+      "exit_code": 101,
+      "signal": "basin_feature_2_is_one_tree: basin 2 skeleton: IncompleteFaceCycle { detail: \"stage=bounded-validation face=346: owns 7 halfedges but has no root\" }",
+      "executable": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-282f7bdcc9ba/target/debug/deps/projected_polygons-ccf60e7a7329240b",
+      "executable_sha256": "6d47c90672bbc82fe194caa039f4c8d8da812d0d73b4775a85614209d7ee083b",
+      "log": "/home/ats/Development/surfer2-rs/evidence/issue-6/logs/arm_b_dirty-debug-basin_2.log",
+      "ran": true
+    },
+    {
+      "revision_id": "arm_b_dirty",
+      "profile": "debug",
+      "case": "reduced_ridge",
+      "test": "basin_spoke_collapse_keeps_leftover_ridge",
+      "checkout": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-282f7bdcc9ba",
+      "command": "cd /home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-282f7bdcc9ba && CARGO_TERM_COLOR=never cargo test --test projected_polygons --locked -- basin_spoke_collapse_keeps_leftover_ridge -- --exact --test-threads=1 --nocapture",
+      "exit_code": 0,
+      "signal": "basin_spoke_collapse_keeps_leftover_ridge: ok",
+      "executable": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-282f7bdcc9ba/target/debug/deps/projected_polygons-ccf60e7a7329240b",
+      "executable_sha256": "6d47c90672bbc82fe194caa039f4c8d8da812d0d73b4775a85614209d7ee083b",
+      "log": "/home/ats/Development/surfer2-rs/evidence/issue-6/logs/arm_b_dirty-debug-reduced_ridge.log",
+      "ran": true
+    },
+    {
+      "revision_id": "arm_b_dirty",
+      "profile": "debug",
+      "case": "river",
+      "test": "river_polygon_keeps_connected_tree_counts",
+      "checkout": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-282f7bdcc9ba",
+      "command": "cd /home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-282f7bdcc9ba && CARGO_TERM_COLOR=never cargo test --test projected_polygons --locked -- river_polygon_keeps_connected_tree_counts -- --exact --test-threads=1 --nocapture",
+      "exit_code": 0,
+      "signal": "river_polygon_keeps_connected_tree_counts: ok",
+      "executable": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d91d-ffd1-7df2-a99d-282f7bdcc9ba/target/debug/deps/projected_polygons-ccf60e7a7329240b",
+      "executable_sha256": "6d47c90672bbc82fe194caa039f4c8d8da812d0d73b4775a85614209d7ee083b",
+      "log": "/home/ats/Development/surfer2-rs/evidence/issue-6/logs/arm_b_dirty-debug-river.log",
+      "ran": true
+    },
+    {
+      "revision_id": "continuation_dirty",
+      "profile": "release",
+      "case": "basin_1",
+      "test": "projected_basin_1_has_connected_finite_skeleton",
+      "checkout": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d970-f5c4-7cc3-8bfd-7ec922c43176",
+      "command": "cd /home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d970-f5c4-7cc3-8bfd-7ec922c43176 && CARGO_TERM_COLOR=never cargo test --release --test projected_polygons --locked -- projected_basin_1_has_connected_finite_skeleton -- --exact --test-threads=1 --nocapture",
+      "exit_code": 101,
+      "signal": "projected_basin_1_has_connected_finite_skeleton: assertion `left == right` failed: edges=5679 nodes=5730 rank=7   left: 58  right: 1",
+      "executable": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d970-f5c4-7cc3-8bfd-7ec922c43176/target/release/deps/projected_polygons-7c7d7ee88c2c916c",
+      "executable_sha256": "8c5e5c1014672cca3f7a83c87acd6632d7548f1c0d82201ff4abc96c99ada7a0",
+      "log": "/home/ats/Development/surfer2-rs/evidence/issue-6/logs/continuation_dirty-release-basin_1.log",
+      "ran": true
+    },
+    {
+      "revision_id": "continuation_dirty",
+      "profile": "release",
+      "case": "basin_2",
+      "test": "projected_basin_2_is_one_tree",
+      "checkout": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d970-f5c4-7cc3-8bfd-7ec922c43176",
+      "command": "cd /home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d970-f5c4-7cc3-8bfd-7ec922c43176 && CARGO_TERM_COLOR=never cargo test --release --test projected_polygons --locked -- projected_basin_2_is_one_tree -- --exact --test-threads=1 --nocapture",
+      "exit_code": 101,
+      "signal": "projected_basin_2_is_one_tree: basin 2: IncompleteFaceCycle { detail: \"stage=bounded-validation face=2268: owns 78 halfedges but has no root\" }",
+      "executable": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d970-f5c4-7cc3-8bfd-7ec922c43176/target/release/deps/projected_polygons-7c7d7ee88c2c916c",
+      "executable_sha256": "8c5e5c1014672cca3f7a83c87acd6632d7548f1c0d82201ff4abc96c99ada7a0",
+      "log": "/home/ats/Development/surfer2-rs/evidence/issue-6/logs/continuation_dirty-release-basin_2.log",
+      "ran": true
+    },
+    {
+      "revision_id": "continuation_dirty",
+      "profile": "release",
+      "case": "reduced_ridge",
+      "test": "basin_spoke_collapse_keeps_leftover_ridge",
+      "checkout": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d970-f5c4-7cc3-8bfd-7ec922c43176",
+      "command": "cd /home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d970-f5c4-7cc3-8bfd-7ec922c43176 && CARGO_TERM_COLOR=never cargo test --release --test projected_polygons --locked -- basin_spoke_collapse_keeps_leftover_ridge -- --exact --test-threads=1 --nocapture",
+      "exit_code": 0,
+      "signal": "basin_spoke_collapse_keeps_leftover_ridge: ok",
+      "executable": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d970-f5c4-7cc3-8bfd-7ec922c43176/target/release/deps/projected_polygons-7c7d7ee88c2c916c",
+      "executable_sha256": "8c5e5c1014672cca3f7a83c87acd6632d7548f1c0d82201ff4abc96c99ada7a0",
+      "log": "/home/ats/Development/surfer2-rs/evidence/issue-6/logs/continuation_dirty-release-reduced_ridge.log",
+      "ran": true
+    },
+    {
+      "revision_id": "continuation_dirty",
+      "profile": "release",
+      "case": "river",
+      "test": "indi_pol_river_keeps_connected_tree",
+      "checkout": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d970-f5c4-7cc3-8bfd-7ec922c43176",
+      "command": "cd /home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d970-f5c4-7cc3-8bfd-7ec922c43176 && CARGO_TERM_COLOR=never cargo test --release --test projected_polygons --locked -- indi_pol_river_keeps_connected_tree -- --exact --test-threads=1 --nocapture",
+      "exit_code": 0,
+      "signal": "indi_pol_river_keeps_connected_tree: ok",
+      "executable": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d970-f5c4-7cc3-8bfd-7ec922c43176/target/release/deps/projected_polygons-7c7d7ee88c2c916c",
+      "executable_sha256": "8c5e5c1014672cca3f7a83c87acd6632d7548f1c0d82201ff4abc96c99ada7a0",
+      "log": "/home/ats/Development/surfer2-rs/evidence/issue-6/logs/continuation_dirty-release-river.log",
+      "ran": true
+    },
+    {
+      "revision_id": "continuation_dirty",
+      "profile": "debug",
+      "case": "basin_1",
+      "test": "projected_basin_1_has_connected_finite_skeleton",
+      "checkout": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d970-f5c4-7cc3-8bfd-7ec922c43176",
+      "command": "cd /home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d970-f5c4-7cc3-8bfd-7ec922c43176 && CARGO_TERM_COLOR=never cargo test --test projected_polygons --locked -- projected_basin_1_has_connected_finite_skeleton -- --exact --test-threads=1 --nocapture",
+      "exit_code": 101,
+      "signal": "projected_basin_1_has_connected_finite_skeleton: assertion `left == right` failed: edges=5679 nodes=5730 rank=7   left: 58  right: 1",
+      "executable": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d970-f5c4-7cc3-8bfd-7ec922c43176/target/debug/deps/projected_polygons-ccf60e7a7329240b",
+      "executable_sha256": "8c17facda69dbf742bc80e093590dbd0cae35359cdfed5a6493ac5bd9c2d34c5",
+      "log": "/home/ats/Development/surfer2-rs/evidence/issue-6/logs/continuation_dirty-debug-basin_1.log",
+      "ran": true
+    },
+    {
+      "revision_id": "continuation_dirty",
+      "profile": "debug",
+      "case": "basin_2",
+      "test": "projected_basin_2_is_one_tree",
+      "checkout": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d970-f5c4-7cc3-8bfd-7ec922c43176",
+      "command": "cd /home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d970-f5c4-7cc3-8bfd-7ec922c43176 && CARGO_TERM_COLOR=never cargo test --test projected_polygons --locked -- projected_basin_2_is_one_tree -- --exact --test-threads=1 --nocapture",
+      "exit_code": 101,
+      "signal": "projected_basin_2_is_one_tree: basin 2: IncompleteFaceCycle { detail: \"stage=bounded-validation face=2268: owns 78 halfedges but has no root\" }",
+      "executable": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d970-f5c4-7cc3-8bfd-7ec922c43176/target/debug/deps/projected_polygons-ccf60e7a7329240b",
+      "executable_sha256": "8c17facda69dbf742bc80e093590dbd0cae35359cdfed5a6493ac5bd9c2d34c5",
+      "log": "/home/ats/Development/surfer2-rs/evidence/issue-6/logs/continuation_dirty-debug-basin_2.log",
+      "ran": true
+    },
+    {
+      "revision_id": "continuation_dirty",
+      "profile": "debug",
+      "case": "reduced_ridge",
+      "test": "basin_spoke_collapse_keeps_leftover_ridge",
+      "checkout": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d970-f5c4-7cc3-8bfd-7ec922c43176",
+      "command": "cd /home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d970-f5c4-7cc3-8bfd-7ec922c43176 && CARGO_TERM_COLOR=never cargo test --test projected_polygons --locked -- basin_spoke_collapse_keeps_leftover_ridge -- --exact --test-threads=1 --nocapture",
+      "exit_code": 0,
+      "signal": "basin_spoke_collapse_keeps_leftover_ridge: ok",
+      "executable": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d970-f5c4-7cc3-8bfd-7ec922c43176/target/debug/deps/projected_polygons-ccf60e7a7329240b",
+      "executable_sha256": "8c17facda69dbf742bc80e093590dbd0cae35359cdfed5a6493ac5bd9c2d34c5",
+      "log": "/home/ats/Development/surfer2-rs/evidence/issue-6/logs/continuation_dirty-debug-reduced_ridge.log",
+      "ran": true
+    },
+    {
+      "revision_id": "continuation_dirty",
+      "profile": "debug",
+      "case": "river",
+      "test": "indi_pol_river_keeps_connected_tree",
+      "checkout": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d970-f5c4-7cc3-8bfd-7ec922c43176",
+      "command": "cd /home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d970-f5c4-7cc3-8bfd-7ec922c43176 && CARGO_TERM_COLOR=never cargo test --test projected_polygons --locked -- indi_pol_river_keeps_connected_tree -- --exact --test-threads=1 --nocapture",
+      "exit_code": 0,
+      "signal": "indi_pol_river_keeps_connected_tree: ok",
+      "executable": "/home/ats/.grok/worktrees/development-surfer2-rs/subagent-01a1d970-f5c4-7cc3-8bfd-7ec922c43176/target/debug/deps/projected_polygons-ccf60e7a7329240b",
+      "executable_sha256": "8c17facda69dbf742bc80e093590dbd0cae35359cdfed5a6493ac5bd9c2d34c5",
+      "log": "/home/ats/Development/surfer2-rs/evidence/issue-6/logs/continuation_dirty-debug-river.log",
+      "ran": true
+    }
+  ],
+  "replay": {
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "case_timeout_s": 600,
+    "finished_unix": 1794659001,
+    "finished_utc": "2026-11-14T12:23:21Z",
+    "runner_failed": false,
+    "runs": [
+      {
+        "revision_id": "arm_a",
+        "head": "1b6ed8ea9af51ed9f82f99d56306abc6f6359c7c",
+        "porcelain": "?? docs/diagnostics/issues-1-2.md",
+        "source_ok": true,
+        "source_note": ""
+      },
+      {
+        "revision_id": "arm_b_dirty",
+        "head": "7d3faf62ec7bd15f46365053922de2885dac87ca",
+        "porcelain": " M src/triangulation/collapse.rs\n M src/wavefront/supporting_line.rs\n M tests/projected_polygons.rs\n?? docs/\n?? fixtures/projected/",
+        "source_ok": true,
+        "source_note": ""
+      },
+      {
+        "revision_id": "continuation_dirty",
+        "head": "1b6ed8ea9af51ed9f82f99d56306abc6f6359c7c",
+        "porcelain": " M docs/diagnostics/issue-1-projected-basins.md\n M src/triangulation/collapse.rs\n M src/wavefront/edge.rs\n M src/wavefront/split_leftover.rs\n M src/wavefront/supporting_line.rs",
+        "source_ok": true,
+        "source_note": ""
+      },
+      {
+        "revision_id": "control",
+        "head": "d1a89fd66795f537b034f220ed4f838bd0fdea3b",
+        "porcelain": "?? docs/\n?? evidence/\n?? tests/projected_polygons.rs",
+        "source_ok": true,
+        "source_note": ""
+      }
+    ]
+  }
+}

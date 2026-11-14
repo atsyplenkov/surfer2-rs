@@ -1,0 +1,21 @@
+    Finished `release` profile [optimized] target(s) in 0.04s
+     Running tests/projected_polygons.rs (target/release/deps/projected_polygons-7c7d7ee88c2c916c)
+
+running 1 test
+test basin_feature_2_is_one_tree ... FAILED
+
+failures:
+
+---- basin_feature_2_is_one_tree stdout ----
+
+thread 'basin_feature_2_is_one_tree' (637469) panicked at tests/projected_polygons.rs:271:51:
+basin 2 skeleton: IncompleteFaceCycle { detail: "stage=bounded-validation face=346: owns 7 halfedges but has no root" }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    basin_feature_2_is_one_tree
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.16s
+
+error: test failed, to rerun pass `--test projected_polygons`

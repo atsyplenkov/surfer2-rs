@@ -1,0 +1,23 @@
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Finished `release` profile [optimized] target(s) in 0.06s
+     Running tests/projected_polygons.rs (target/release/deps/projected_polygons-7c7d7ee88c2c916c)
+
+running 1 test
+test projected_basin_2_is_one_tree ... FAILED
+
+failures:
+
+---- projected_basin_2_is_one_tree stdout ----
+
+thread 'projected_basin_2_is_one_tree' (637455) panicked at tests/projected_polygons.rs:244:51:
+basin 2: IncompleteFaceCycle { detail: "stage=bounded-validation face=600: owns 10 halfedges but has no root" }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    projected_basin_2_is_one_tree
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.16s
+
+error: test failed, to rerun pass `--test projected_polygons`

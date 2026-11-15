@@ -1,0 +1,37 @@
+{
+  "archive_files_verified": 32,
+  "restored_observer_matches_watched_json": true,
+  "restored_replay_seconds": 0.006460202996095177,
+  "checks": [
+    {
+      "name": "red",
+      "exit": 1,
+      "expected_exit": 1,
+      "seconds": 0.045299530000193045
+    },
+    {
+      "name": "parent-match",
+      "exit": 0,
+      "expected_exit": 0,
+      "seconds": 0.028085018995625433
+    },
+    {
+      "name": "motion-formulas",
+      "exit": 0,
+      "expected_exit": 0,
+      "seconds": 0.028555933000461664
+    },
+    {
+      "name": "scalar-times",
+      "exit": 0,
+      "expected_exit": 0,
+      "seconds": 0.030848647002130747
+    },
+    {
+      "name": "witness-reference",
+      "exit": 0,
+      "expected_exit": 0,
+      "seconds": 2.817230553999252
+    }
+  ]
+}

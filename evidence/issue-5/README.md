@@ -4,17 +4,20 @@ This is retained evidence for [Locate the first invalid event in the residual ba
 
 ## Read first
 
+- [Ancestry-preserving basin-2 witness](ancestry-preserving.md): the completed bounded pass, supported local scheduling mechanism, control counterexample, and remaining blocker.
 - [Fresh replay checkpoint](checkpoint.md): exact source identities, commands, public failures, and limits.
 - [Review assessment](review-synthesis.md): accepted findings and corrections to the independent review.
 - [Reported basin-2 collapse](reported-collapse.md): original-support calculations, one retiming experiment, emitted-face observations, and the reduction's changed birth ancestry.
 
 The full basin and the 11-vertex reduction both stop the reported three-support triangle with roughly 0.502 m between stored positions. Retiming only that stop reduces the spread and closes the watched face's printed cycle, but both constructions still fail. The full face then contains an `InfinityChord`, and the remaining spread falls below an existing endpoint threshold. Neither a geometric repair nor complete finite output has been demonstrated.
 
-The next investigation needs a witness preserving the full split parent on original supports 594/595 and its hit on support 601. The existing reduction replaces that parent with a synthetic edge.
+The follow-up pass found a 12-vertex witness by restoring original vertex 603. It preserves the full split parent on original supports 594/595, its finite hit on support 601, and the relevant stored motion bits on both revisions. Arm A's changed slow-vertex velocity interacts with x-only collapse timing and the all-three stop to produce the observed half-metre separation. Control has the same class of birth-replay inconsistency but a small final separation; it still returns disconnected output. Earlier local stops, active-region lifecycle and an error budget remain unresolved, so no repair or globally first-invalid-event claim follows.
 
 ## Preserved material
 
 `checkpoint.tar.gz` contains 103 files under `evidence/issue-5/`: the inherited diagnostic reductions and traces, their scripts and historical logs, and the fresh session's reports, requests, source snapshots, patch, calculations, targeted logs and controlled-experiment results. `manifest.json` records every member's byte count and SHA-256 plus the archive hash.
+
+The follow-up is stored separately in `ancestry-preserving.tar.gz` (32 files), with member hashes in `ancestry-manifest.json`. This adds files under `evidence/issue-5/session-resume/ancestry-preserving/` without changing the earlier archive. The readable report is `ancestry-preserving.md`. `ancestry-verification.json` records main-session replay and calculation checks against the freshly restored observer.
 
 The archive does not include compiled binaries, Cargo targets, the disposable control clone, `.git`, or Python caches. Binary hashes in the reports describe executions already performed; source restoration and rebuilding are the replay path. Historical reduction records cite older binaries whose exact source versions were not captured; those observations remain historical. Fresh replays are separately identified in `session-resume/`.
 
@@ -30,6 +33,7 @@ RESTORE=$(mktemp -d /tmp/surfer2-issue5-restore.XXXXXX)
 git clone --no-checkout "$EVIDENCE/evidence/issue-6/sources/revisions.bundle" "$RESTORE/repo"
 git -C "$RESTORE/repo" checkout --detach origin/evidence/arm-a
 tar -xzf "$EVIDENCE/evidence/issue-5/checkpoint.tar.gz" -C "$RESTORE/repo"
+tar -xzf "$EVIDENCE/evidence/issue-5/ancestry-preserving.tar.gz" -C "$RESTORE/repo"
 cd "$RESTORE/repo"
 S=$PWD/evidence/issue-5/session-resume
 git apply "$S/tracked.diff"
@@ -47,6 +51,15 @@ env -u SURFER2_PROTOTYPE_EDGES cargo test --release --locked \
 ```
 
 At this checkpoint it executes two tests and exits 101, with `IncompleteFaceCycle` in each. Exact face numbers are observations, not acceptance criteria.
+
+The 12-vertex red check can use the restored binary directly:
+
+```sh
+BINARY="$PWD/target/release/examples/prototype_basin" \
+  bash "$S/ancestry-preserving/red.sh"
+```
+
+It should exit 1 with a construction failure. `parent_match.py`, `witness_reference.py`, `scalar_times.py`, and `motion_formulas.py` in that directory can be rerun against the copied traces; the reference script rewrites only its copied results. The historical candidate-search script `representative.py` pins the original executable hash and expects its original target path. Use the preserved request and `red.sh` for a rebuilt observer; a different executable hash is not evidence of a different geometric result.
 
 The detailed report's commands use the original isolated binary path `$S/target/release/examples/prototype_basin`. In a restored checkout either build with `CARGO_TARGET_DIR="$S/target"` or substitute `target/release/examples/prototype_basin`. The source-line calculation scripts use checkout-relative paths. The archived result hash files include the original machine paths; use `manifest.json` to verify a relocated archive.
 

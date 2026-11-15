@@ -1,0 +1,166 @@
+{
+  "checkpoint_dependency": "77614bd1ae3c312b046aaae03ceb2b7d9c496fd0",
+  "files": [
+    {
+      "path": "evidence/issue-5/session-resume/ancestry-preserving/ancestry-chain.log",
+      "bytes": 3243,
+      "sha256": "ee0dbdd63a298962999b37e31c3c90a335a79580db4e245dd33d6abf23609e72"
+    },
+    {
+      "path": "evidence/issue-5/session-resume/ancestry-preserving/comparison-watched.json",
+      "bytes": 88721,
+      "sha256": "f5a3b5c369a6c902e8fe3954380920b33f61f0be68384e147c1ea5e57a0e40b7"
+    },
+    {
+      "path": "evidence/issue-5/session-resume/ancestry-preserving/comparison-watched.log",
+      "bytes": 47957,
+      "sha256": "90287db3ad62ca583fca521a79beabaee8333cccb7a394ec06d482e62f5f97e0"
+    },
+    {
+      "path": "evidence/issue-5/session-resume/ancestry-preserving/control.json",
+      "bytes": 77303,
+      "sha256": "b58ee4cfa5ac62f88d18778bd92f5bd00430a5bcc12967aa6c11303f08d3453f"
+    },
+    {
+      "path": "evidence/issue-5/session-resume/ancestry-preserving/control.log",
+      "bytes": 41,
+      "sha256": "7aa4cef3a3312354cc443a208d690ad3801b2bb8039c4a3b06e201184e7a7458"
+    },
+    {
+      "path": "evidence/issue-5/session-resume/ancestry-preserving/external-inputs.sha256",
+      "bytes": 1629,
+      "sha256": "d7300ad960861c6dc2e27699fb7d5eb4e9ce4e238f6bac7c88d3bce6b870275f"
+    },
+    {
+      "path": "evidence/issue-5/session-resume/ancestry-preserving/face-evidence.log",
+      "bytes": 11203,
+      "sha256": "9b802cf162139ca4b31717cba0ba1ba359059fcdc596b51549fb4d8aebbdf4b7"
+    },
+    {
+      "path": "evidence/issue-5/session-resume/ancestry-preserving/manifest.sha256",
+      "bytes": 2701,
+      "sha256": "dc379d360cac375b593a7de71a94687f6798f04afcb7a947af373afbdc472bad"
+    },
+    {
+      "path": "evidence/issue-5/session-resume/ancestry-preserving/motion_formulas.log",
+      "bytes": 663,
+      "sha256": "f952285a55c658eaa58caaa5a2c30d0f7c3db8aef28dea278b8074f5d4d1779e"
+    },
+    {
+      "path": "evidence/issue-5/session-resume/ancestry-preserving/motion_formulas.py",
+      "bytes": 1544,
+      "sha256": "e070dc6816f331b6a6b4323ad71bf965abab4acdd3774eb679ef8f324cd95232"
+    },
+    {
+      "path": "evidence/issue-5/session-resume/ancestry-preserving/parent-match.log",
+      "bytes": 357,
+      "sha256": "8d01fc9c3a81bf1703b5645f22837e0faa40b73610bdf3c7ab1073ffaad3a02a"
+    },
+    {
+      "path": "evidence/issue-5/session-resume/ancestry-preserving/parent_match.py",
+      "bytes": 1040,
+      "sha256": "8bdae477b1282526abb47e0c1f73524bd1194bc5e1bfd25b98741c71babdd618"
+    },
+    {
+      "path": "evidence/issue-5/session-resume/ancestry-preserving/red-comparison.log",
+      "bytes": 577,
+      "sha256": "6388d7f541c156a2c1428172a7faed63b04cab8c567120b18f62c35d926e74fb"
+    },
+    {
+      "path": "evidence/issue-5/session-resume/ancestry-preserving/red-control.log",
+      "bytes": 490,
+      "sha256": "2195d163dd788696112aab056ec23805b33d9d5697ae0ade63a25d3c40a65550"
+    },
+    {
+      "path": "evidence/issue-5/session-resume/ancestry-preserving/red.sh",
+      "bytes": 717,
+      "sha256": "0a7eff60a8c9ac180ab27a3f04d69688472042230809c5b1b9e98c5d80ac7640"
+    },
+    {
+      "path": "evidence/issue-5/session-resume/ancestry-preserving/replay-hashes.txt",
+      "bytes": 546,
+      "sha256": "0b6afb2461f91e2755b187577bc6eb985aeb30b63074036e2956e59500e450d5"
+    },
+    {
+      "path": "evidence/issue-5/session-resume/ancestry-preserving/report.md",
+      "bytes": 13484,
+      "sha256": "4100f1f98949cf138b1cf2cb1c5b450a77788c3dd5d5ba576a7f62db27d94160"
+    },
+    {
+      "path": "evidence/issue-5/session-resume/ancestry-preserving/representative-indices.json",
+      "bytes": 89,
+      "sha256": "a95e10888315bc3611cfb18702a3278d382168e4283886d09d68603a42534a8c"
+    },
+    {
+      "path": "evidence/issue-5/session-resume/ancestry-preserving/representative-request.ndjson",
+      "bytes": 595,
+      "sha256": "ebf5cd6fc61b364ac237314b274e7923962d7739db420322df766a4085728db5"
+    },
+    {
+      "path": "evidence/issue-5/session-resume/ancestry-preserving/representative-results.json",
+      "bytes": 1569,
+      "sha256": "61e6eb1eb8afb05204373ae984f1fe7f9c605c21c34bb849d89af143cb1a118f"
+    },
+    {
+      "path": "evidence/issue-5/session-resume/ancestry-preserving/representative-trace.json",
+      "bytes": 88739,
+      "sha256": "0f327f8b24e8992825e785590ce583123922e2c561671309b4da13d9662a0dbe"
+    },
+    {
+      "path": "evidence/issue-5/session-resume/ancestry-preserving/representative.log",
+      "bytes": 967,
+      "sha256": "15491a6fdfb354cd1275b8b5ce1d66f59659582bfb8e6bb896c5abbd2f1d3db8"
+    },
+    {
+      "path": "evidence/issue-5/session-resume/ancestry-preserving/representative.py",
+      "bytes": 5980,
+      "sha256": "791e6f10837371764b5caf2d5127ffec770150819b5465e326b61c388b9fd8f2"
+    },
+    {
+      "path": "evidence/issue-5/session-resume/ancestry-preserving/scalar-times.log",
+      "bytes": 978,
+      "sha256": "c13a8b08e099c134d133d71dd8da8c2fdae2c4d31e83bcb39c555754ea21aaf7"
+    },
+    {
+      "path": "evidence/issue-5/session-resume/ancestry-preserving/scalar_times.log",
+      "bytes": 1348,
+      "sha256": "0caeff6cf4aab9aeb9aa644fcdf42a771ab1ed47f7ba76b1d048f8b04af9b8a9"
+    },
+    {
+      "path": "evidence/issue-5/session-resume/ancestry-preserving/scalar_times.py",
+      "bytes": 1867,
+      "sha256": "63831daaaa9a73ca751d9701347a68f7b5864dd4298410997f632870e0486837"
+    },
+    {
+      "path": "evidence/issue-5/session-resume/ancestry-preserving/trace-summary.json",
+      "bytes": 205871,
+      "sha256": "7cca79e91999fca71accd97c986a254f0cfc034e714f0e4325648360d7b98070"
+    },
+    {
+      "path": "evidence/issue-5/session-resume/ancestry-preserving/trace-summary.log",
+      "bytes": 5513,
+      "sha256": "fe8440e37b9f158f2c2da0dfaf612518bf2c24515adb6b56b310977b83038996"
+    },
+    {
+      "path": "evidence/issue-5/session-resume/ancestry-preserving/trace_summary.py",
+      "bytes": 3332,
+      "sha256": "dc17662737060ac0ccc1152c62b88b30a886297c9fae6334033ff226a55d7cab"
+    },
+    {
+      "path": "evidence/issue-5/session-resume/ancestry-preserving/witness-reference.json",
+      "bytes": 40260,
+      "sha256": "a65d2a118270c985eb7f5246fcb8fc3920faa5f43e105683f9f4c15c420a0763"
+    },
+    {
+      "path": "evidence/issue-5/session-resume/ancestry-preserving/witness-reference.log",
+      "bytes": 8805,
+      "sha256": "cdd6da784b2909ceae3c52c32c44a607b2256f139850b27da8c8d4e96df09bcb"
+    },
+    {
+      "path": "evidence/issue-5/session-resume/ancestry-preserving/witness_reference.py",
+      "bytes": 5709,
+      "sha256": "ee8fbc3593a6b8320164d19ce6bd5287e789a08e0ce6c5b5dd83956f6b0ff6ef"
+    }
+  ],
+  "archive_sha256": "cdb127db429dc65e1b6a3bc2d335df61da7d81034406a4419873c0303ee14045"
+}

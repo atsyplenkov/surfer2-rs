@@ -1,0 +1,24 @@
+   Compiling surfer2 v0.1.0 (/tmp/surfer2-issue5-restore.pmoge41_/repo)
+    Finished `release` profile [optimized] target(s) in 4.41s
+     Running tests/projected_polygons.rs (target/release/deps/projected_polygons-7c7d7ee88c2c916c)
+
+running 2 tests
+test projected_basin_1_has_connected_finite_skeleton ... 
+thread 'projected_basin_1_has_connected_finite_skeleton' (1905874) panicked at tests/projected_polygons.rs:229:51:
+basin 1: IncompleteFaceCycle { detail: "stage=bounded-validation face=13: owns 5 halfedges but has no root" }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+test projected_basin_2_is_one_tree ... 
+thread 'projected_basin_2_is_one_tree' (1905886) panicked at tests/projected_polygons.rs:244:51:
+basin 2: IncompleteFaceCycle { detail: "stage=bounded-validation face=600: owns 10 halfedges but has no root" }
+FAILED
+
+failures:
+
+failures:
+    projected_basin_1_has_connected_finite_skeleton
+    projected_basin_2_is_one_tree
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.28s
+
+error: test failed, to rerun pass `--test projected_polygons`

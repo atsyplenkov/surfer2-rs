@@ -1,0 +1,4 @@
+reduced-watched face 5 root None owned 7 visited 0 closed False reciprocal False all_reached False infinity_chords []
+reduced-retime face 5 root 10 owned 7 visited 7 closed True reciprocal True all_reached True infinity_chords []
+full-watched face 600 root None owned 10 visited 0 closed False reciprocal False all_reached False infinity_chords []
+full-retime face 600 root 1200 owned 11 visited 11 closed True reciprocal True all_reached True infinity_chords [(20067, 13145)]

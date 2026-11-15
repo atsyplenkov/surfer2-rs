@@ -1,0 +1,8 @@
+Replay directory: /tmp/surfer2-issue10-replay.b6uTzn
+/tmp/surfer2-issue10-replay.b6uTzn/baseline.json matches retained trace
+baseline witness remains red, as recorded
+/tmp/surfer2-issue10-replay.b6uTzn/intervention.json matches retained trace
+intervention witness remains red, as recorded
+/tmp/surfer2-issue10-replay.b6uTzn/control.json matches retained trace
+control witness remains red, as recorded
+All retained observations reproduced. This is not a successful skeleton.

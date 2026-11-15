@@ -1,0 +1,811 @@
+{
+  "baseline": {
+    "status": "dcel_error",
+    "error": "IncompleteFaceCycle { detail: \"stage=bounded-validation face=5: owns 9 halfedges but has no root\" }",
+    "graph": null,
+    "predicted_scalar_times": [
+      {
+        "support": 596,
+        "x_f64": 649.3054124144818,
+        "y_f64": 649.3054136927502,
+        "exact_dyadic_x_minus_y": "-1748972448408685503315968/1368235626459895379172985444257",
+        "x_relative_speed": 0.01686536419211715
+      },
+      {
+        "support": 595,
+        "x_f64": 649.3054136530183,
+        "y_f64": 649.3054136530741,
+        "exact_dyadic_x_minus_y": "-89106953640203611/1596380706044722822127141724",
+        "x_relative_speed": -405056.6634279289
+      },
+      {
+        "support": 601,
+        "x_f64": 649.3054136530184,
+        "y_f64": 649.3054136530973,
+        "exact_dyadic_x_minus_y": "-887581608566432973291259428864/11240102286044503381486009015967624349715",
+        "x_relative_speed": 405056.6465625647
+      }
+    ],
+    "final_event": {
+      "constraints": [
+        [
+          0,
+          595,
+          596
+        ],
+        [
+          0,
+          601,
+          602
+        ],
+        [
+          0,
+          596,
+          597
+        ]
+      ],
+      "kind": "TriangleCollapse",
+      "positions": [
+        [
+          463811.7052512257,
+          6272413.626816563
+        ],
+        [
+          463811.7052512257,
+          6272413.62681912
+        ],
+        [
+          463811.2035737932,
+          6272413.631053105
+        ]
+      ],
+      "side": -1,
+      "spread": 0.5016953204587769,
+      "step": 7,
+      "time": 649.3054124144818,
+      "triangle": 0,
+      "vertices": [
+        4294967323,
+        4294967309,
+        4294967327
+      ]
+    },
+    "slow_motion": {
+      "origin_bits": [
+        4691722897405721061,
+        4708492260774768584
+      ],
+      "velocity_bits": [
+        13830478179884303075,
+        4607220286672777557
+      ],
+      "velocity": [
+        -0.9915316883380821,
+        1.0084083568463786
+      ]
+    },
+    "fast_birth": {
+      "birth": [
+        463760.533768851,
+        6272414.058794431
+      ],
+      "birth_time": 649.3052873722798,
+      "birth_miss": 0.020754669180605805,
+      "origin_bits": [
+        13956457460700006223,
+        4710821058328125211
+      ],
+      "velocity_bits": [
+        4690702415630985728,
+        13883109740000096256
+      ]
+    },
+    "final_stop_nodes": [
+      18,
+      18,
+      19
+    ],
+    "final_arcs": [
+      {
+        "end": [
+          463811.7052512257,
+          6272413.626816563
+        ],
+        "end_end": "Some(Stop(VertexId(27v1)))",
+        "end_time": 649.3054124144818,
+        "left": 5,
+        "right": 1,
+        "start": [
+          464087.62496075133,
+          6272133.010731185
+        ],
+        "start_end": "Start(VertexId(27v1))",
+        "start_time": 371.0291729650514,
+        "traced_vertex": 4294967323,
+        "emitted_nodes": [
+          [
+            14,
+            18
+          ]
+        ]
+      },
+      {
+        "end": [
+          463811.7052512257,
+          6272413.62681912
+        ],
+        "end_end": "Some(Stop(VertexId(13v1)))",
+        "end_time": 649.3054124144818,
+        "left": 1,
+        "right": 0,
+        "start": [
+          464466.4629152964,
+          6273057.429672915
+        ],
+        "start_end": "Start(VertexId(13v1))",
+        "start_time": 0.0,
+        "traced_vertex": 4294967309,
+        "emitted_nodes": [
+          [
+            0,
+            18
+          ]
+        ]
+      },
+      {
+        "end": [
+          463811.2035737932,
+          6272413.631053105
+        ],
+        "end_end": "Some(Stop(VertexId(31v1)))",
+        "end_time": 649.3054124144818,
+        "left": 0,
+        "right": 5,
+        "start": [
+          463760.533768851,
+          6272414.058794431
+        ],
+        "start_end": "Start(VertexId(31v1))",
+        "start_time": 649.3052873722798,
+        "traced_vertex": 4294967327,
+        "emitted_nodes": [
+          [
+            17,
+            19
+          ]
+        ]
+      }
+    ],
+    "watched_faces": [
+      {
+        "face": 0,
+        "original_support": 595,
+        "header": "face=0 source=Some(1) root=Some(HalfEdgeId(0))",
+        "halfedges": [
+          "[DEBUG-wayfinder] halfedge id=0 nodes=NodeId(0)/NodeId(1) origin=Node { point: Some(Point2 { x: 464466.4629152964, y: 6273057.429672915 }), time: 0.0, is_infinite: false } dest=Node { point: Some(Point2 { x: 464415.29940102197, y: 6273057.861455911 }), time: 0.0, is_infinite: false } next=HalfEdgeId(42) prev=HalfEdgeId(47) geometry=Input(Segment2 { start: Point2 { x: 464466.4629152964, y: 6273057.429672915 }, end: Point2 { x: 464415.29940102197, y: 6273057.861455911 } })",
+          "[DEBUG-wayfinder] halfedge id=42 nodes=NodeId(1)/NodeId(17) origin=Node { point: Some(Point2 { x: 464415.29940102197, y: 6273057.861455911 }), time: 0.0, is_infinite: false } dest=Node { point: Some(Point2 { x: 463760.533768851, y: 6272414.058794431 }), time: 649.3052873722798, is_infinite: false } next=HalfEdgeId(48) prev=HalfEdgeId(0) geometry=Segment(Segment2 { start: Point2 { x: 464415.29940102197, y: 6273057.861455911 }, end: Point2 { x: 463760.533768851, y: 6272414.058794431 } })",
+          "[DEBUG-wayfinder] halfedge id=47 nodes=NodeId(18)/NodeId(0) origin=Node { point: Some(Point2 { x: 463811.7052512257, y: 6272413.626816563 }), time: 649.3054124144818, is_infinite: false } dest=Node { point: Some(Point2 { x: 464466.4629152964, y: 6273057.429672915 }), time: 0.0, is_infinite: false } next=HalfEdgeId(0) prev=HalfEdgeId(68) geometry=Segment(Segment2 { start: Point2 { x: 463811.7052512257, y: 6272413.626816563 }, end: Point2 { x: 464466.4629152964, y: 6273057.429672915 } })",
+          "[DEBUG-wayfinder] halfedge id=48 nodes=NodeId(17)/NodeId(19) origin=Node { point: Some(Point2 { x: 463760.533768851, y: 6272414.058794431 }), time: 649.3052873722798, is_infinite: false } dest=Node { point: Some(Point2 { x: 463811.2035737932, y: 6272413.631053105 }), time: 649.3054124144818, is_infinite: false } next=HalfEdgeId(68) prev=HalfEdgeId(42) geometry=Segment(Segment2 { start: Point2 { x: 463760.533768851, y: 6272414.058794431 }, end: Point2 { x: 463811.2035737932, y: 6272413.631053105 } })",
+          "[DEBUG-wayfinder] halfedge id=68 nodes=NodeId(19)/NodeId(18) origin=Node { point: Some(Point2 { x: 463811.2035737932, y: 6272413.631053105 }), time: 649.3054124144818, is_infinite: false } dest=Node { point: Some(Point2 { x: 463811.7052512257, y: 6272413.626816563 }), time: 649.3054124144818, is_infinite: false } next=HalfEdgeId(47) prev=HalfEdgeId(48) geometry=InfinityChord"
+        ],
+        "infinity_chords": [
+          "[DEBUG-wayfinder] halfedge id=68 nodes=NodeId(19)/NodeId(18) origin=Node { point: Some(Point2 { x: 463811.2035737932, y: 6272413.631053105 }), time: 649.3054124144818, is_infinite: false } dest=Node { point: Some(Point2 { x: 463811.7052512257, y: 6272413.626816563 }), time: 649.3054124144818, is_infinite: false } next=HalfEdgeId(47) prev=HalfEdgeId(48) geometry=InfinityChord"
+        ]
+      },
+      {
+        "face": 1,
+        "original_support": 596,
+        "header": "face=1 source=Some(2) root=Some(HalfEdgeId(2))",
+        "halfedges": [
+          "[DEBUG-wayfinder] halfedge id=2 nodes=NodeId(2)/NodeId(0) origin=Node { point: Some(Point2 { x: 464461.76972466905, y: 6272500.900291164 }), time: 0.0, is_infinite: false } dest=Node { point: Some(Point2 { x: 464466.4629152964, y: 6273057.429672915 }), time: 0.0, is_infinite: false } next=HalfEdgeId(46) prev=HalfEdgeId(33) geometry=Input(Segment2 { start: Point2 { x: 464461.76972466905, y: 6272500.900291164 }, end: Point2 { x: 464466.4629152964, y: 6273057.429672915 } })",
+          "[DEBUG-wayfinder] halfedge id=33 nodes=NodeId(14)/NodeId(2) origin=Node { point: Some(Point2 { x: 464087.62496075133, y: 6272133.010731185 }), time: 371.0291729650514, is_infinite: false } dest=Node { point: Some(Point2 { x: 464461.76972466905, y: 6272500.900291164 }), time: 0.0, is_infinite: false } next=HalfEdgeId(2) prev=HalfEdgeId(45) geometry=Segment(Segment2 { start: Point2 { x: 464087.62496075133, y: 6272133.010731185 }, end: Point2 { x: 464461.76972466905, y: 6272500.900291164 } })",
+          "[DEBUG-wayfinder] halfedge id=45 nodes=NodeId(18)/NodeId(14) origin=Node { point: Some(Point2 { x: 463811.7052512257, y: 6272413.626816563 }), time: 649.3054124144818, is_infinite: false } dest=Node { point: Some(Point2 { x: 464087.62496075133, y: 6272133.010731185 }), time: 371.0291729650514, is_infinite: false } next=HalfEdgeId(33) prev=HalfEdgeId(46) geometry=Segment(Segment2 { start: Point2 { x: 463811.7052512257, y: 6272413.626816563 }, end: Point2 { x: 464087.62496075133, y: 6272133.010731185 } })",
+          "[DEBUG-wayfinder] halfedge id=46 nodes=NodeId(0)/NodeId(18) origin=Node { point: Some(Point2 { x: 464466.4629152964, y: 6273057.429672915 }), time: 0.0, is_infinite: false } dest=Node { point: Some(Point2 { x: 463811.7052512257, y: 6272413.626816563 }), time: 649.3054124144818, is_infinite: false } next=HalfEdgeId(45) prev=HalfEdgeId(2) geometry=Segment(Segment2 { start: Point2 { x: 464466.4629152964, y: 6273057.429672915 }, end: Point2 { x: 463811.7052512257, y: 6272413.626816563 } })"
+        ],
+        "infinity_chords": []
+      },
+      {
+        "face": 4,
+        "original_support": 597,
+        "header": "face=4 source=Some(3) root=Some(HalfEdgeId(8))",
+        "halfedges": [
+          "[DEBUG-wayfinder] halfedge id=8 nodes=NodeId(5)/NodeId(2) origin=Node { point: Some(Point2 { x: 464512.9399997433, y: 6272500.469097321 }), time: 0.0, is_infinite: false } dest=Node { point: Some(Point2 { x: 464461.76972466905, y: 6272500.900291164 }), time: 0.0, is_infinite: false } next=HalfEdgeId(32) prev=HalfEdgeId(27) geometry=Input(Segment2 { start: Point2 { x: 464512.9399997433, y: 6272500.469097321 }, end: Point2 { x: 464461.76972466905, y: 6272500.900291164 } })",
+          "[DEBUG-wayfinder] halfedge id=27 nodes=NodeId(12)/NodeId(5) origin=Node { point: Some(Point2 { x: 464325.86823034694, y: 6272316.522611109 }), time: 185.51628709685298, is_infinite: false } dest=Node { point: Some(Point2 { x: 464512.9399997433, y: 6272500.469097321 }), time: 0.0, is_infinite: false } next=HalfEdgeId(8) prev=HalfEdgeId(31) geometry=Segment(Segment2 { start: Point2 { x: 464325.86823034694, y: 6272316.522611109 }, end: Point2 { x: 464512.9399997433, y: 6272500.469097321 } })",
+          "[DEBUG-wayfinder] halfedge id=31 nodes=NodeId(13)/NodeId(12) origin=Node { point: Some(Point2 { x: 464274.69563447434, y: 6272316.953816223 }), time: 185.5162953689216, is_infinite: false } dest=Node { point: Some(Point2 { x: 464325.86823034694, y: 6272316.522611109 }), time: 185.51628709685298, is_infinite: false } next=HalfEdgeId(27) prev=HalfEdgeId(35) geometry=Segment(Segment2 { start: Point2 { x: 464274.69563447434, y: 6272316.953816223 }, end: Point2 { x: 464325.86823034694, y: 6272316.522611109 } })",
+          "[DEBUG-wayfinder] halfedge id=32 nodes=NodeId(2)/NodeId(14) origin=Node { point: Some(Point2 { x: 464461.76972466905, y: 6272500.900291164 }), time: 0.0, is_infinite: false } dest=Node { point: Some(Point2 { x: 464087.62496075133, y: 6272133.010731185 }), time: 371.0291729650514, is_infinite: false } next=HalfEdgeId(36) prev=HalfEdgeId(8) geometry=Segment(Segment2 { start: Point2 { x: 464461.76972466905, y: 6272500.900291164 }, end: Point2 { x: 464087.62496075133, y: 6272133.010731185 } })",
+          "[DEBUG-wayfinder] halfedge id=35 nodes=NodeId(15)/NodeId(13) origin=Node { point: Some(Point2 { x: 464087.62511073146, y: 6272133.010729892 }), time: 371.02917302656596, is_infinite: false } dest=Node { point: Some(Point2 { x: 464274.69563447434, y: 6272316.953816223 }), time: 185.5162953689216, is_infinite: false } next=HalfEdgeId(31) prev=HalfEdgeId(70) geometry=Segment(Segment2 { start: Point2 { x: 464087.62511073146, y: 6272133.010729892 }, end: Point2 { x: 464274.69563447434, y: 6272316.953816223 } })",
+          "[DEBUG-wayfinder] halfedge id=36 nodes=NodeId(14)/NodeId(16) origin=Node { point: Some(Point2 { x: 464087.62496075133, y: 6272133.010731185 }), time: 371.0291729650514, is_infinite: false } dest=Node { point: Some(Point2 { x: 464087.63233362883, y: 6272133.010668995 }), time: 371.02917302656596, is_infinite: false } next=HalfEdgeId(70) prev=HalfEdgeId(32) geometry=Segment(Segment2 { start: Point2 { x: 464087.62496075133, y: 6272133.010731185 }, end: Point2 { x: 464087.63233362883, y: 6272133.010668995 } })",
+          "[DEBUG-wayfinder] halfedge id=70 nodes=NodeId(16)/NodeId(15) origin=Node { point: Some(Point2 { x: 464087.63233362883, y: 6272133.010668995 }), time: 371.02917302656596, is_infinite: false } dest=Node { point: Some(Point2 { x: 464087.62511073146, y: 6272133.010729892 }), time: 371.02917302656596, is_infinite: false } next=HalfEdgeId(35) prev=HalfEdgeId(36) geometry=InfinityChord"
+        ],
+        "infinity_chords": [
+          "[DEBUG-wayfinder] halfedge id=70 nodes=NodeId(16)/NodeId(15) origin=Node { point: Some(Point2 { x: 464087.63233362883, y: 6272133.010668995 }), time: 371.02917302656596, is_infinite: false } dest=Node { point: Some(Point2 { x: 464087.62511073146, y: 6272133.010729892 }), time: 371.02917302656596, is_infinite: false } next=HalfEdgeId(35) prev=HalfEdgeId(36) geometry=InfinityChord"
+        ]
+      },
+      {
+        "face": 5,
+        "original_support": 601,
+        "header": "face=5 source=Some(7) root=None",
+        "halfedges": [
+          "[DEBUG-wayfinder] halfedge id=10 nodes=NodeId(6)/NodeId(7) origin=Node { point: Some(Point2 { x: 464353.15400219744, y: 6271759.726146518 }), time: 0.0, is_infinite: false } dest=Node { point: Some(Point2 { x: 464455.5125631645, y: 6271758.861808992 }), time: 0.0, is_infinite: false } next=HalfEdgeId(38) prev=HalfEdgeId(55) geometry=Input(Segment2 { start: Point2 { x: 464353.15400219744, y: 6271759.726146518 }, end: Point2 { x: 464455.5125631645, y: 6271758.861808992 } })",
+          "[DEBUG-wayfinder] halfedge id=37 nodes=NodeId(16)/NodeId(14) origin=Node { point: Some(Point2 { x: 464087.63233362883, y: 6272133.010668995 }), time: 371.02917302656596, is_infinite: false } dest=Node { point: Some(Point2 { x: 464087.62496075133, y: 6272133.010731185 }), time: 371.0291729650514, is_infinite: false } next=HalfEdgeId(44) prev=HalfEdgeId(37) geometry=Segment(Segment2 { start: Point2 { x: 464087.63233362883, y: 6272133.010668995 }, end: Point2 { x: 464087.62496075133, y: 6272133.010731185 } })",
+          "[DEBUG-wayfinder] halfedge id=38 nodes=NodeId(7)/NodeId(15) origin=Node { point: Some(Point2 { x: 464455.5125631645, y: 6271758.861808992 }), time: 0.0, is_infinite: false } dest=Node { point: Some(Point2 { x: 464087.62511073146, y: 6272133.010729892 }), time: 371.02917302656596, is_infinite: false } next=HalfEdgeId(40) prev=HalfEdgeId(10) geometry=Segment(Segment2 { start: Point2 { x: 464455.5125631645, y: 6271758.861808992 }, end: Point2 { x: 464087.62511073146, y: 6272133.010729892 } })",
+          "[DEBUG-wayfinder] halfedge id=40 nodes=NodeId(15)/NodeId(14) origin=Node { point: Some(Point2 { x: 464087.62511073146, y: 6272133.010729892 }), time: 371.02917302656596, is_infinite: false } dest=Node { point: Some(Point2 { x: 464087.62496075133, y: 6272133.010731185 }), time: 371.0291729650514, is_infinite: false } next=HalfEdgeId(40) prev=HalfEdgeId(38) geometry=Segment(Segment2 { start: Point2 { x: 464087.62511073146, y: 6272133.010729892 }, end: Point2 { x: 464087.62496075133, y: 6272133.010731185 } })",
+          "[DEBUG-wayfinder] halfedge id=44 nodes=NodeId(14)/NodeId(18) origin=Node { point: Some(Point2 { x: 464087.62496075133, y: 6272133.010731185 }), time: 371.0291729650514, is_infinite: false } dest=Node { point: Some(Point2 { x: 463811.7052512257, y: 6272413.626816563 }), time: 649.3054124144818, is_infinite: false } next=HalfEdgeId(44) prev=HalfEdgeId(37) geometry=Segment(Segment2 { start: Point2 { x: 464087.62496075133, y: 6272133.010731185 }, end: Point2 { x: 463811.7052512257, y: 6272413.626816563 } })",
+          "[DEBUG-wayfinder] halfedge id=49 nodes=NodeId(19)/NodeId(17) origin=Node { point: Some(Point2 { x: 463811.2035737932, y: 6272413.631053105 }), time: 649.3054124144818, is_infinite: false } dest=Node { point: Some(Point2 { x: 463760.533768851, y: 6272414.058794431 }), time: 649.3052873722798, is_infinite: false } next=HalfEdgeId(50) prev=HalfEdgeId(49) geometry=Segment(Segment2 { start: Point2 { x: 463811.2035737932, y: 6272413.631053105 }, end: Point2 { x: 463760.533768851, y: 6272414.058794431 } })",
+          "[DEBUG-wayfinder] halfedge id=50 nodes=NodeId(17)/NodeId(20) origin=Node { point: Some(Point2 { x: 463760.533768851, y: 6272414.058794431 }), time: 649.3052873722798, is_infinite: false } dest=Node { point: Some(Point2 { x: 463466.63065744535, y: 6272712.96810051 }), time: 945.7222450968337, is_infinite: false } next=HalfEdgeId(56) prev=HalfEdgeId(49) geometry=Segment(Segment2 { start: Point2 { x: 463760.533768851, y: 6272414.058794431 }, end: Point2 { x: 463466.63065744535, y: 6272712.96810051 } })",
+          "[DEBUG-wayfinder] halfedge id=55 nodes=NodeId(21)/NodeId(6) origin=Node { point: Some(Point2 { x: 463396.2715457947, y: 6272732.91824259 }), time: 965.0775697769459, is_infinite: false } dest=Node { point: Some(Point2 { x: 464353.15400219744, y: 6271759.726146518 }), time: 0.0, is_infinite: false } next=HalfEdgeId(10) prev=HalfEdgeId(56) geometry=Segment(Segment2 { start: Point2 { x: 463396.2715457947, y: 6272732.91824259 }, end: Point2 { x: 464353.15400219744, y: 6271759.726146518 } })",
+          "[DEBUG-wayfinder] halfedge id=56 nodes=NodeId(20)/NodeId(21) origin=Node { point: Some(Point2 { x: 463466.63065744535, y: 6272712.96810051 }), time: 945.7222450968337, is_infinite: false } dest=Node { point: Some(Point2 { x: 463396.2715457947, y: 6272732.91824259 }), time: 965.0775697769459, is_infinite: false } next=HalfEdgeId(55) prev=HalfEdgeId(50) geometry=Segment(Segment2 { start: Point2 { x: 463466.63065744535, y: 6272712.96810051 }, end: Point2 { x: 463396.2715457947, y: 6272732.91824259 } })"
+        ],
+        "infinity_chords": []
+      },
+      {
+        "face": 6,
+        "original_support": 600,
+        "header": "face=6 source=Some(6) root=Some(HalfEdgeId(12))",
+        "halfedges": [
+          "[DEBUG-wayfinder] halfedge id=12 nodes=NodeId(7)/NodeId(3) origin=Node { point: Some(Point2 { x: 464455.5125631645, y: 6271758.861808992 }), time: 0.0, is_infinite: false } dest=Node { point: Some(Point2 { x: 464458.64108305547, y: 6272129.880951004 }), time: 0.0, is_infinite: false } next=HalfEdgeId(28) prev=HalfEdgeId(39) geometry=Input(Segment2 { start: Point2 { x: 464455.5125631645, y: 6271758.861808992 }, end: Point2 { x: 464458.64108305547, y: 6272129.880951004 } })",
+          "[DEBUG-wayfinder] halfedge id=28 nodes=NodeId(3)/NodeId(13) origin=Node { point: Some(Point2 { x: 464458.64108305547, y: 6272129.880951004 }), time: 0.0, is_infinite: false } dest=Node { point: Some(Point2 { x: 464274.69563447434, y: 6272316.953816223 }), time: 185.5162953689216, is_infinite: false } next=HalfEdgeId(34) prev=HalfEdgeId(12) geometry=Segment(Segment2 { start: Point2 { x: 464458.64108305547, y: 6272129.880951004 }, end: Point2 { x: 464274.69563447434, y: 6272316.953816223 } })",
+          "[DEBUG-wayfinder] halfedge id=34 nodes=NodeId(13)/NodeId(15) origin=Node { point: Some(Point2 { x: 464274.69563447434, y: 6272316.953816223 }), time: 185.5162953689216, is_infinite: false } dest=Node { point: Some(Point2 { x: 464087.62511073146, y: 6272133.010729892 }), time: 371.02917302656596, is_infinite: false } next=HalfEdgeId(39) prev=HalfEdgeId(28) geometry=Segment(Segment2 { start: Point2 { x: 464274.69563447434, y: 6272316.953816223 }, end: Point2 { x: 464087.62511073146, y: 6272133.010729892 } })",
+          "[DEBUG-wayfinder] halfedge id=39 nodes=NodeId(15)/NodeId(7) origin=Node { point: Some(Point2 { x: 464087.62511073146, y: 6272133.010729892 }), time: 371.02917302656596, is_infinite: false } dest=Node { point: Some(Point2 { x: 464455.5125631645, y: 6271758.861808992 }), time: 0.0, is_infinite: false } next=HalfEdgeId(12) prev=HalfEdgeId(34) geometry=Segment(Segment2 { start: Point2 { x: 464087.62511073146, y: 6272133.010729892 }, end: Point2 { x: 464455.5125631645, y: 6271758.861808992 } })",
+          "[DEBUG-wayfinder] halfedge id=41 nodes=NodeId(14)/NodeId(15) origin=Node { point: Some(Point2 { x: 464087.62496075133, y: 6272133.010731185 }), time: 371.0291729650514, is_infinite: false } dest=Node { point: Some(Point2 { x: 464087.62511073146, y: 6272133.010729892 }), time: 371.02917302656596, is_infinite: false } next=HalfEdgeId(72) prev=HalfEdgeId(72) geometry=Segment(Segment2 { start: Point2 { x: 464087.62496075133, y: 6272133.010731185 }, end: Point2 { x: 464087.62511073146, y: 6272133.010729892 } })",
+          "[DEBUG-wayfinder] halfedge id=72 nodes=NodeId(15)/NodeId(14) origin=Node { point: Some(Point2 { x: 464087.62511073146, y: 6272133.010729892 }), time: 371.02917302656596, is_infinite: false } dest=Node { point: Some(Point2 { x: 464087.62496075133, y: 6272133.010731185 }), time: 371.0291729650514, is_infinite: false } next=HalfEdgeId(41) prev=HalfEdgeId(41) geometry=InfinityChord"
+        ],
+        "infinity_chords": [
+          "[DEBUG-wayfinder] halfedge id=72 nodes=NodeId(15)/NodeId(14) origin=Node { point: Some(Point2 { x: 464087.62511073146, y: 6272133.010729892 }), time: 371.02917302656596, is_infinite: false } dest=Node { point: Some(Point2 { x: 464087.62496075133, y: 6272133.010731185 }), time: 371.0291729650514, is_infinite: false } next=HalfEdgeId(41) prev=HalfEdgeId(41) geometry=InfinityChord"
+        ]
+      },
+      {
+        "face": 10,
+        "original_support": 594,
+        "header": "face=10 source=Some(0) root=Some(HalfEdgeId(20))",
+        "halfedges": [
+          "[DEBUG-wayfinder] halfedge id=20 nodes=NodeId(1)/NodeId(11) origin=Node { point: Some(Point2 { x: 464415.29940102197, y: 6273057.861455911 }), time: 0.0, is_infinite: false } dest=Node { point: Some(Point2 { x: 464416.8661114498, y: 6273243.371338161 }), time: 0.0, is_infinite: false } next=HalfEdgeId(52) prev=HalfEdgeId(43) geometry=Input(Segment2 { start: Point2 { x: 464415.29940102197, y: 6273057.861455911 }, end: Point2 { x: 464416.8661114498, y: 6273243.371338161 } })",
+          "[DEBUG-wayfinder] halfedge id=43 nodes=NodeId(17)/NodeId(1) origin=Node { point: Some(Point2 { x: 463760.533768851, y: 6272414.058794431 }), time: 649.3052873722798, is_infinite: false } dest=Node { point: Some(Point2 { x: 464415.29940102197, y: 6273057.861455911 }), time: 0.0, is_infinite: false } next=HalfEdgeId(20) prev=HalfEdgeId(51) geometry=Segment(Segment2 { start: Point2 { x: 463760.533768851, y: 6272414.058794431 }, end: Point2 { x: 464415.29940102197, y: 6273057.861455911 } })",
+          "[DEBUG-wayfinder] halfedge id=51 nodes=NodeId(20)/NodeId(17) origin=Node { point: Some(Point2 { x: 463466.63065744535, y: 6272712.96810051 }), time: 945.7222450968337, is_infinite: false } dest=Node { point: Some(Point2 { x: 463760.533768851, y: 6272414.058794431 }), time: 649.3052873722798, is_infinite: false } next=HalfEdgeId(43) prev=HalfEdgeId(52) geometry=Segment(Segment2 { start: Point2 { x: 463466.63065744535, y: 6272712.96810051 }, end: Point2 { x: 463760.533768851, y: 6272414.058794431 } })",
+          "[DEBUG-wayfinder] halfedge id=52 nodes=NodeId(11)/NodeId(20) origin=Node { point: Some(Point2 { x: 464416.8661114498, y: 6273243.371338161 }), time: 0.0, is_infinite: false } dest=Node { point: Some(Point2 { x: 463466.63065744535, y: 6272712.96810051 }), time: 945.7222450968337, is_infinite: false } next=HalfEdgeId(51) prev=HalfEdgeId(20) geometry=Segment(Segment2 { start: Point2 { x: 464416.8661114498, y: 6273243.371338161 }, end: Point2 { x: 463466.63065744535, y: 6272712.96810051 } })"
+        ],
+        "infinity_chords": []
+      }
+    ]
+  },
+  "intervention": {
+    "status": "dcel_error",
+    "error": "IncompleteFaceCycle { detail: \"stage=bounded-validation face=6 halfedge=41: not reachable from face root\" }",
+    "graph": null,
+    "predicted_scalar_times": [
+      {
+        "support": 596,
+        "x_f64": 649.3054136718612,
+        "y_f64": 649.3054135164929,
+        "exact_dyadic_x_minus_y": "9667040876/62220152548512625",
+        "x_relative_speed": 0.016865364159457386
+      },
+      {
+        "support": 595,
+        "x_f64": 649.3054136530183,
+        "y_f64": 649.3054136530741,
+        "exact_dyadic_x_minus_y": "-89106953640203611/1596380706044722822127141724",
+        "x_relative_speed": -405056.6634279289
+      },
+      {
+        "support": 601,
+        "x_f64": 649.3054136530183,
+        "y_f64": 649.3054136529942,
+        "exact_dyadic_x_minus_y": "614430006315352875/25557033691362194865389984254",
+        "x_relative_speed": 405056.64656256477
+      }
+    ],
+    "final_event": {
+      "constraints": [
+        [
+          0,
+          595,
+          596
+        ],
+        [
+          0,
+          601,
+          602
+        ],
+        [
+          0,
+          596,
+          597
+        ]
+      ],
+      "kind": "TriangleCollapse",
+      "positions": [
+        [
+          463811.7052499764,
+          6272413.626818165
+        ],
+        [
+          463811.7052499768,
+          6272413.626817892
+        ],
+        [
+          463811.705249995,
+          6272413.626818083
+        ]
+      ],
+      "side": -1,
+      "spread": 2.728777378558223e-07,
+      "step": 7,
+      "time": 649.3054136530183,
+      "triangle": 0,
+      "vertices": [
+        4294967323,
+        4294967309,
+        4294967327
+      ]
+    },
+    "slow_motion": {
+      "origin_bits": [
+        4691722897405721061,
+        4708492260774768584
+      ],
+      "velocity_bits": [
+        13830478179884597248,
+        4607220286675222528
+      ],
+      "velocity": [
+        -0.9915316883707419,
+        1.0084083573892713
+      ]
+    },
+    "fast_birth": {
+      "birth": [
+        463760.53376893967,
+        6272414.058794519
+      ],
+      "birth_time": 649.3052872843521,
+      "birth_miss": 0.014862340551540133,
+      "origin_bits": [
+        13956457460700006223,
+        4710821058328125211
+      ],
+      "velocity_bits": [
+        4690702415630985728,
+        13883109740000096256
+      ]
+    },
+    "final_stop_nodes": [
+      18,
+      18,
+      18
+    ],
+    "final_arcs": [
+      {
+        "end": [
+          463811.7052499764,
+          6272413.626818165
+        ],
+        "end_end": "Some(Stop(VertexId(27v1)))",
+        "end_time": 649.3054136530183,
+        "left": 5,
+        "right": 1,
+        "start": [
+          464087.62496075133,
+          6272133.010731185
+        ],
+        "start_end": "Start(VertexId(27v1))",
+        "start_time": 371.0291729650514,
+        "traced_vertex": 4294967323,
+        "emitted_nodes": [
+          [
+            14,
+            18
+          ]
+        ]
+      },
+      {
+        "end": [
+          463811.7052499768,
+          6272413.626817892
+        ],
+        "end_end": "Some(Stop(VertexId(13v1)))",
+        "end_time": 649.3054136530183,
+        "left": 1,
+        "right": 0,
+        "start": [
+          464466.4629152964,
+          6273057.429672915
+        ],
+        "start_end": "Start(VertexId(13v1))",
+        "start_time": 0.0,
+        "traced_vertex": 4294967309,
+        "emitted_nodes": [
+          [
+            0,
+            18
+          ]
+        ]
+      },
+      {
+        "end": [
+          463811.705249995,
+          6272413.626818083
+        ],
+        "end_end": "Some(Stop(VertexId(31v1)))",
+        "end_time": 649.3054136530183,
+        "left": 0,
+        "right": 5,
+        "start": [
+          463760.53376893967,
+          6272414.058794519
+        ],
+        "start_end": "Start(VertexId(31v1))",
+        "start_time": 649.3052872843521,
+        "traced_vertex": 4294967327,
+        "emitted_nodes": [
+          [
+            17,
+            18
+          ]
+        ]
+      }
+    ],
+    "watched_faces": [
+      {
+        "face": 0,
+        "original_support": 595,
+        "header": "face=0 source=Some(1) root=Some(HalfEdgeId(0))",
+        "halfedges": [
+          "[DEBUG-wayfinder] halfedge id=0 nodes=NodeId(0)/NodeId(1) origin=Node { point: Some(Point2 { x: 464466.4629152964, y: 6273057.429672915 }), time: 0.0, is_infinite: false } dest=Node { point: Some(Point2 { x: 464415.29940102197, y: 6273057.861455911 }), time: 0.0, is_infinite: false } next=HalfEdgeId(42) prev=HalfEdgeId(47) geometry=Input(Segment2 { start: Point2 { x: 464466.4629152964, y: 6273057.429672915 }, end: Point2 { x: 464415.29940102197, y: 6273057.861455911 } })",
+          "[DEBUG-wayfinder] halfedge id=42 nodes=NodeId(1)/NodeId(17) origin=Node { point: Some(Point2 { x: 464415.29940102197, y: 6273057.861455911 }), time: 0.0, is_infinite: false } dest=Node { point: Some(Point2 { x: 463760.53376893967, y: 6272414.058794519 }), time: 649.3052872843521, is_infinite: false } next=HalfEdgeId(48) prev=HalfEdgeId(0) geometry=Segment(Segment2 { start: Point2 { x: 464415.29940102197, y: 6273057.861455911 }, end: Point2 { x: 463760.53376893967, y: 6272414.058794519 } })",
+          "[DEBUG-wayfinder] halfedge id=47 nodes=NodeId(18)/NodeId(0) origin=Node { point: Some(Point2 { x: 463811.7052499764, y: 6272413.626818165 }), time: 649.3054136530183, is_infinite: false } dest=Node { point: Some(Point2 { x: 464466.4629152964, y: 6273057.429672915 }), time: 0.0, is_infinite: false } next=HalfEdgeId(0) prev=HalfEdgeId(48) geometry=Segment(Segment2 { start: Point2 { x: 463811.7052499764, y: 6272413.626818165 }, end: Point2 { x: 464466.4629152964, y: 6273057.429672915 } })",
+          "[DEBUG-wayfinder] halfedge id=48 nodes=NodeId(17)/NodeId(18) origin=Node { point: Some(Point2 { x: 463760.53376893967, y: 6272414.058794519 }), time: 649.3052872843521, is_infinite: false } dest=Node { point: Some(Point2 { x: 463811.7052499764, y: 6272413.626818165 }), time: 649.3054136530183, is_infinite: false } next=HalfEdgeId(47) prev=HalfEdgeId(42) geometry=Segment(Segment2 { start: Point2 { x: 463760.53376893967, y: 6272414.058794519 }, end: Point2 { x: 463811.7052499764, y: 6272413.626818165 } })"
+        ],
+        "infinity_chords": []
+      },
+      {
+        "face": 1,
+        "original_support": 596,
+        "header": "face=1 source=Some(2) root=Some(HalfEdgeId(2))",
+        "halfedges": [
+          "[DEBUG-wayfinder] halfedge id=2 nodes=NodeId(2)/NodeId(0) origin=Node { point: Some(Point2 { x: 464461.76972466905, y: 6272500.900291164 }), time: 0.0, is_infinite: false } dest=Node { point: Some(Point2 { x: 464466.4629152964, y: 6273057.429672915 }), time: 0.0, is_infinite: false } next=HalfEdgeId(46) prev=HalfEdgeId(33) geometry=Input(Segment2 { start: Point2 { x: 464461.76972466905, y: 6272500.900291164 }, end: Point2 { x: 464466.4629152964, y: 6273057.429672915 } })",
+          "[DEBUG-wayfinder] halfedge id=33 nodes=NodeId(14)/NodeId(2) origin=Node { point: Some(Point2 { x: 464087.62496075133, y: 6272133.010731185 }), time: 371.0291729650514, is_infinite: false } dest=Node { point: Some(Point2 { x: 464461.76972466905, y: 6272500.900291164 }), time: 0.0, is_infinite: false } next=HalfEdgeId(2) prev=HalfEdgeId(45) geometry=Segment(Segment2 { start: Point2 { x: 464087.62496075133, y: 6272133.010731185 }, end: Point2 { x: 464461.76972466905, y: 6272500.900291164 } })",
+          "[DEBUG-wayfinder] halfedge id=45 nodes=NodeId(18)/NodeId(14) origin=Node { point: Some(Point2 { x: 463811.7052499764, y: 6272413.626818165 }), time: 649.3054136530183, is_infinite: false } dest=Node { point: Some(Point2 { x: 464087.62496075133, y: 6272133.010731185 }), time: 371.0291729650514, is_infinite: false } next=HalfEdgeId(33) prev=HalfEdgeId(46) geometry=Segment(Segment2 { start: Point2 { x: 463811.7052499764, y: 6272413.626818165 }, end: Point2 { x: 464087.62496075133, y: 6272133.010731185 } })",
+          "[DEBUG-wayfinder] halfedge id=46 nodes=NodeId(0)/NodeId(18) origin=Node { point: Some(Point2 { x: 464466.4629152964, y: 6273057.429672915 }), time: 0.0, is_infinite: false } dest=Node { point: Some(Point2 { x: 463811.7052499764, y: 6272413.626818165 }), time: 649.3054136530183, is_infinite: false } next=HalfEdgeId(45) prev=HalfEdgeId(2) geometry=Segment(Segment2 { start: Point2 { x: 464466.4629152964, y: 6273057.429672915 }, end: Point2 { x: 463811.7052499764, y: 6272413.626818165 } })"
+        ],
+        "infinity_chords": []
+      },
+      {
+        "face": 4,
+        "original_support": 597,
+        "header": "face=4 source=Some(3) root=Some(HalfEdgeId(8))",
+        "halfedges": [
+          "[DEBUG-wayfinder] halfedge id=8 nodes=NodeId(5)/NodeId(2) origin=Node { point: Some(Point2 { x: 464512.9399997433, y: 6272500.469097321 }), time: 0.0, is_infinite: false } dest=Node { point: Some(Point2 { x: 464461.76972466905, y: 6272500.900291164 }), time: 0.0, is_infinite: false } next=HalfEdgeId(32) prev=HalfEdgeId(27) geometry=Input(Segment2 { start: Point2 { x: 464512.9399997433, y: 6272500.469097321 }, end: Point2 { x: 464461.76972466905, y: 6272500.900291164 } })",
+          "[DEBUG-wayfinder] halfedge id=27 nodes=NodeId(12)/NodeId(5) origin=Node { point: Some(Point2 { x: 464325.86823034694, y: 6272316.522611109 }), time: 185.51628709685298, is_infinite: false } dest=Node { point: Some(Point2 { x: 464512.9399997433, y: 6272500.469097321 }), time: 0.0, is_infinite: false } next=HalfEdgeId(8) prev=HalfEdgeId(31) geometry=Segment(Segment2 { start: Point2 { x: 464325.86823034694, y: 6272316.522611109 }, end: Point2 { x: 464512.9399997433, y: 6272500.469097321 } })",
+          "[DEBUG-wayfinder] halfedge id=31 nodes=NodeId(13)/NodeId(12) origin=Node { point: Some(Point2 { x: 464274.69563447434, y: 6272316.953816223 }), time: 185.5162953689216, is_infinite: false } dest=Node { point: Some(Point2 { x: 464325.86823034694, y: 6272316.522611109 }), time: 185.51628709685298, is_infinite: false } next=HalfEdgeId(27) prev=HalfEdgeId(35) geometry=Segment(Segment2 { start: Point2 { x: 464274.69563447434, y: 6272316.953816223 }, end: Point2 { x: 464325.86823034694, y: 6272316.522611109 } })",
+          "[DEBUG-wayfinder] halfedge id=32 nodes=NodeId(2)/NodeId(14) origin=Node { point: Some(Point2 { x: 464461.76972466905, y: 6272500.900291164 }), time: 0.0, is_infinite: false } dest=Node { point: Some(Point2 { x: 464087.62496075133, y: 6272133.010731185 }), time: 371.0291729650514, is_infinite: false } next=HalfEdgeId(36) prev=HalfEdgeId(8) geometry=Segment(Segment2 { start: Point2 { x: 464461.76972466905, y: 6272500.900291164 }, end: Point2 { x: 464087.62496075133, y: 6272133.010731185 } })",
+          "[DEBUG-wayfinder] halfedge id=35 nodes=NodeId(15)/NodeId(13) origin=Node { point: Some(Point2 { x: 464087.62511073146, y: 6272133.010729892 }), time: 371.02917302656596, is_infinite: false } dest=Node { point: Some(Point2 { x: 464274.69563447434, y: 6272316.953816223 }), time: 185.5162953689216, is_infinite: false } next=HalfEdgeId(31) prev=HalfEdgeId(68) geometry=Segment(Segment2 { start: Point2 { x: 464087.62511073146, y: 6272133.010729892 }, end: Point2 { x: 464274.69563447434, y: 6272316.953816223 } })",
+          "[DEBUG-wayfinder] halfedge id=36 nodes=NodeId(14)/NodeId(16) origin=Node { point: Some(Point2 { x: 464087.62496075133, y: 6272133.010731185 }), time: 371.0291729650514, is_infinite: false } dest=Node { point: Some(Point2 { x: 464087.63233362883, y: 6272133.010668995 }), time: 371.02917302656596, is_infinite: false } next=HalfEdgeId(68) prev=HalfEdgeId(32) geometry=Segment(Segment2 { start: Point2 { x: 464087.62496075133, y: 6272133.010731185 }, end: Point2 { x: 464087.63233362883, y: 6272133.010668995 } })",
+          "[DEBUG-wayfinder] halfedge id=68 nodes=NodeId(16)/NodeId(15) origin=Node { point: Some(Point2 { x: 464087.63233362883, y: 6272133.010668995 }), time: 371.02917302656596, is_infinite: false } dest=Node { point: Some(Point2 { x: 464087.62511073146, y: 6272133.010729892 }), time: 371.02917302656596, is_infinite: false } next=HalfEdgeId(35) prev=HalfEdgeId(36) geometry=InfinityChord"
+        ],
+        "infinity_chords": [
+          "[DEBUG-wayfinder] halfedge id=68 nodes=NodeId(16)/NodeId(15) origin=Node { point: Some(Point2 { x: 464087.63233362883, y: 6272133.010668995 }), time: 371.02917302656596, is_infinite: false } dest=Node { point: Some(Point2 { x: 464087.62511073146, y: 6272133.010729892 }), time: 371.02917302656596, is_infinite: false } next=HalfEdgeId(35) prev=HalfEdgeId(36) geometry=InfinityChord"
+        ]
+      },
+      {
+        "face": 5,
+        "original_support": 601,
+        "header": "face=5 source=Some(7) root=Some(HalfEdgeId(10))",
+        "halfedges": [
+          "[DEBUG-wayfinder] halfedge id=10 nodes=NodeId(6)/NodeId(7) origin=Node { point: Some(Point2 { x: 464353.15400219744, y: 6271759.726146518 }), time: 0.0, is_infinite: false } dest=Node { point: Some(Point2 { x: 464455.5125631645, y: 6271758.861808992 }), time: 0.0, is_infinite: false } next=HalfEdgeId(38) prev=HalfEdgeId(55) geometry=Input(Segment2 { start: Point2 { x: 464353.15400219744, y: 6271759.726146518 }, end: Point2 { x: 464455.5125631645, y: 6271758.861808992 } })",
+          "[DEBUG-wayfinder] halfedge id=37 nodes=NodeId(16)/NodeId(14) origin=Node { point: Some(Point2 { x: 464087.63233362883, y: 6272133.010668995 }), time: 371.02917302656596, is_infinite: false } dest=Node { point: Some(Point2 { x: 464087.62496075133, y: 6272133.010731185 }), time: 371.0291729650514, is_infinite: false } next=HalfEdgeId(44) prev=HalfEdgeId(40) geometry=Segment(Segment2 { start: Point2 { x: 464087.63233362883, y: 6272133.010668995 }, end: Point2 { x: 464087.62496075133, y: 6272133.010731185 } })",
+          "[DEBUG-wayfinder] halfedge id=38 nodes=NodeId(7)/NodeId(15) origin=Node { point: Some(Point2 { x: 464455.5125631645, y: 6271758.861808992 }), time: 0.0, is_infinite: false } dest=Node { point: Some(Point2 { x: 464087.62511073146, y: 6272133.010729892 }), time: 371.02917302656596, is_infinite: false } next=HalfEdgeId(40) prev=HalfEdgeId(10) geometry=Segment(Segment2 { start: Point2 { x: 464455.5125631645, y: 6271758.861808992 }, end: Point2 { x: 464087.62511073146, y: 6272133.010729892 } })",
+          "[DEBUG-wayfinder] halfedge id=40 nodes=NodeId(15)/NodeId(14) origin=Node { point: Some(Point2 { x: 464087.62511073146, y: 6272133.010729892 }), time: 371.02917302656596, is_infinite: false } dest=Node { point: Some(Point2 { x: 464087.62496075133, y: 6272133.010731185 }), time: 371.0291729650514, is_infinite: false } next=HalfEdgeId(37) prev=HalfEdgeId(38) geometry=Segment(Segment2 { start: Point2 { x: 464087.62511073146, y: 6272133.010729892 }, end: Point2 { x: 464087.62496075133, y: 6272133.010731185 } })",
+          "[DEBUG-wayfinder] halfedge id=44 nodes=NodeId(14)/NodeId(18) origin=Node { point: Some(Point2 { x: 464087.62496075133, y: 6272133.010731185 }), time: 371.0291729650514, is_infinite: false } dest=Node { point: Some(Point2 { x: 463811.7052499764, y: 6272413.626818165 }), time: 649.3054136530183, is_infinite: false } next=HalfEdgeId(49) prev=HalfEdgeId(37) geometry=Segment(Segment2 { start: Point2 { x: 464087.62496075133, y: 6272133.010731185 }, end: Point2 { x: 463811.7052499764, y: 6272413.626818165 } })",
+          "[DEBUG-wayfinder] halfedge id=49 nodes=NodeId(18)/NodeId(17) origin=Node { point: Some(Point2 { x: 463811.7052499764, y: 6272413.626818165 }), time: 649.3054136530183, is_infinite: false } dest=Node { point: Some(Point2 { x: 463760.53376893967, y: 6272414.058794519 }), time: 649.3052872843521, is_infinite: false } next=HalfEdgeId(50) prev=HalfEdgeId(44) geometry=Segment(Segment2 { start: Point2 { x: 463811.7052499764, y: 6272413.626818165 }, end: Point2 { x: 463760.53376893967, y: 6272414.058794519 } })",
+          "[DEBUG-wayfinder] halfedge id=50 nodes=NodeId(17)/NodeId(19) origin=Node { point: Some(Point2 { x: 463760.53376893967, y: 6272414.058794519 }), time: 649.3052872843521, is_infinite: false } dest=Node { point: Some(Point2 { x: 463466.63065744535, y: 6272712.96810051 }), time: 945.7222450968337, is_infinite: false } next=HalfEdgeId(56) prev=HalfEdgeId(49) geometry=Segment(Segment2 { start: Point2 { x: 463760.53376893967, y: 6272414.058794519 }, end: Point2 { x: 463466.63065744535, y: 6272712.96810051 } })",
+          "[DEBUG-wayfinder] halfedge id=55 nodes=NodeId(20)/NodeId(6) origin=Node { point: Some(Point2 { x: 463396.2715457947, y: 6272732.91824259 }), time: 965.0775697769459, is_infinite: false } dest=Node { point: Some(Point2 { x: 464353.15400219744, y: 6271759.726146518 }), time: 0.0, is_infinite: false } next=HalfEdgeId(10) prev=HalfEdgeId(56) geometry=Segment(Segment2 { start: Point2 { x: 463396.2715457947, y: 6272732.91824259 }, end: Point2 { x: 464353.15400219744, y: 6271759.726146518 } })",
+          "[DEBUG-wayfinder] halfedge id=56 nodes=NodeId(19)/NodeId(20) origin=Node { point: Some(Point2 { x: 463466.63065744535, y: 6272712.96810051 }), time: 945.7222450968337, is_infinite: false } dest=Node { point: Some(Point2 { x: 463396.2715457947, y: 6272732.91824259 }), time: 965.0775697769459, is_infinite: false } next=HalfEdgeId(55) prev=HalfEdgeId(50) geometry=Segment(Segment2 { start: Point2 { x: 463466.63065744535, y: 6272712.96810051 }, end: Point2 { x: 463396.2715457947, y: 6272732.91824259 } })"
+        ],
+        "infinity_chords": []
+      },
+      {
+        "face": 6,
+        "original_support": 600,
+        "header": "face=6 source=Some(6) root=Some(HalfEdgeId(12))",
+        "halfedges": [
+          "[DEBUG-wayfinder] halfedge id=12 nodes=NodeId(7)/NodeId(3) origin=Node { point: Some(Point2 { x: 464455.5125631645, y: 6271758.861808992 }), time: 0.0, is_infinite: false } dest=Node { point: Some(Point2 { x: 464458.64108305547, y: 6272129.880951004 }), time: 0.0, is_infinite: false } next=HalfEdgeId(28) prev=HalfEdgeId(39) geometry=Input(Segment2 { start: Point2 { x: 464455.5125631645, y: 6271758.861808992 }, end: Point2 { x: 464458.64108305547, y: 6272129.880951004 } })",
+          "[DEBUG-wayfinder] halfedge id=28 nodes=NodeId(3)/NodeId(13) origin=Node { point: Some(Point2 { x: 464458.64108305547, y: 6272129.880951004 }), time: 0.0, is_infinite: false } dest=Node { point: Some(Point2 { x: 464274.69563447434, y: 6272316.953816223 }), time: 185.5162953689216, is_infinite: false } next=HalfEdgeId(34) prev=HalfEdgeId(12) geometry=Segment(Segment2 { start: Point2 { x: 464458.64108305547, y: 6272129.880951004 }, end: Point2 { x: 464274.69563447434, y: 6272316.953816223 } })",
+          "[DEBUG-wayfinder] halfedge id=34 nodes=NodeId(13)/NodeId(15) origin=Node { point: Some(Point2 { x: 464274.69563447434, y: 6272316.953816223 }), time: 185.5162953689216, is_infinite: false } dest=Node { point: Some(Point2 { x: 464087.62511073146, y: 6272133.010729892 }), time: 371.02917302656596, is_infinite: false } next=HalfEdgeId(39) prev=HalfEdgeId(28) geometry=Segment(Segment2 { start: Point2 { x: 464274.69563447434, y: 6272316.953816223 }, end: Point2 { x: 464087.62511073146, y: 6272133.010729892 } })",
+          "[DEBUG-wayfinder] halfedge id=39 nodes=NodeId(15)/NodeId(7) origin=Node { point: Some(Point2 { x: 464087.62511073146, y: 6272133.010729892 }), time: 371.02917302656596, is_infinite: false } dest=Node { point: Some(Point2 { x: 464455.5125631645, y: 6271758.861808992 }), time: 0.0, is_infinite: false } next=HalfEdgeId(12) prev=HalfEdgeId(34) geometry=Segment(Segment2 { start: Point2 { x: 464087.62511073146, y: 6272133.010729892 }, end: Point2 { x: 464455.5125631645, y: 6271758.861808992 } })",
+          "[DEBUG-wayfinder] halfedge id=41 nodes=NodeId(14)/NodeId(15) origin=Node { point: Some(Point2 { x: 464087.62496075133, y: 6272133.010731185 }), time: 371.0291729650514, is_infinite: false } dest=Node { point: Some(Point2 { x: 464087.62511073146, y: 6272133.010729892 }), time: 371.02917302656596, is_infinite: false } next=HalfEdgeId(70) prev=HalfEdgeId(70) geometry=Segment(Segment2 { start: Point2 { x: 464087.62496075133, y: 6272133.010731185 }, end: Point2 { x: 464087.62511073146, y: 6272133.010729892 } })",
+          "[DEBUG-wayfinder] halfedge id=70 nodes=NodeId(15)/NodeId(14) origin=Node { point: Some(Point2 { x: 464087.62511073146, y: 6272133.010729892 }), time: 371.02917302656596, is_infinite: false } dest=Node { point: Some(Point2 { x: 464087.62496075133, y: 6272133.010731185 }), time: 371.0291729650514, is_infinite: false } next=HalfEdgeId(41) prev=HalfEdgeId(41) geometry=InfinityChord"
+        ],
+        "infinity_chords": [
+          "[DEBUG-wayfinder] halfedge id=70 nodes=NodeId(15)/NodeId(14) origin=Node { point: Some(Point2 { x: 464087.62511073146, y: 6272133.010729892 }), time: 371.02917302656596, is_infinite: false } dest=Node { point: Some(Point2 { x: 464087.62496075133, y: 6272133.010731185 }), time: 371.0291729650514, is_infinite: false } next=HalfEdgeId(41) prev=HalfEdgeId(41) geometry=InfinityChord"
+        ]
+      },
+      {
+        "face": 10,
+        "original_support": 594,
+        "header": "face=10 source=Some(0) root=Some(HalfEdgeId(20))",
+        "halfedges": [
+          "[DEBUG-wayfinder] halfedge id=20 nodes=NodeId(1)/NodeId(11) origin=Node { point: Some(Point2 { x: 464415.29940102197, y: 6273057.861455911 }), time: 0.0, is_infinite: false } dest=Node { point: Some(Point2 { x: 464416.8661114498, y: 6273243.371338161 }), time: 0.0, is_infinite: false } next=HalfEdgeId(52) prev=HalfEdgeId(43) geometry=Input(Segment2 { start: Point2 { x: 464415.29940102197, y: 6273057.861455911 }, end: Point2 { x: 464416.8661114498, y: 6273243.371338161 } })",
+          "[DEBUG-wayfinder] halfedge id=43 nodes=NodeId(17)/NodeId(1) origin=Node { point: Some(Point2 { x: 463760.53376893967, y: 6272414.058794519 }), time: 649.3052872843521, is_infinite: false } dest=Node { point: Some(Point2 { x: 464415.29940102197, y: 6273057.861455911 }), time: 0.0, is_infinite: false } next=HalfEdgeId(20) prev=HalfEdgeId(51) geometry=Segment(Segment2 { start: Point2 { x: 463760.53376893967, y: 6272414.058794519 }, end: Point2 { x: 464415.29940102197, y: 6273057.861455911 } })",
+          "[DEBUG-wayfinder] halfedge id=51 nodes=NodeId(19)/NodeId(17) origin=Node { point: Some(Point2 { x: 463466.63065744535, y: 6272712.96810051 }), time: 945.7222450968337, is_infinite: false } dest=Node { point: Some(Point2 { x: 463760.53376893967, y: 6272414.058794519 }), time: 649.3052872843521, is_infinite: false } next=HalfEdgeId(43) prev=HalfEdgeId(52) geometry=Segment(Segment2 { start: Point2 { x: 463466.63065744535, y: 6272712.96810051 }, end: Point2 { x: 463760.53376893967, y: 6272414.058794519 } })",
+          "[DEBUG-wayfinder] halfedge id=52 nodes=NodeId(11)/NodeId(19) origin=Node { point: Some(Point2 { x: 464416.8661114498, y: 6273243.371338161 }), time: 0.0, is_infinite: false } dest=Node { point: Some(Point2 { x: 463466.63065744535, y: 6272712.96810051 }), time: 945.7222450968337, is_infinite: false } next=HalfEdgeId(51) prev=HalfEdgeId(20) geometry=Segment(Segment2 { start: Point2 { x: 464416.8661114498, y: 6273243.371338161 }, end: Point2 { x: 463466.63065744535, y: 6272712.96810051 } })"
+        ],
+        "infinity_chords": []
+      }
+    ]
+  },
+  "control": {
+    "status": "disconnected",
+    "error": null,
+    "graph": {
+      "components": 2,
+      "edges": 19,
+      "nodes": 21,
+      "rank": 0,
+      "stored_segments": 19
+    },
+    "predicted_scalar_times": [
+      {
+        "support": 596,
+        "x_f64": 649.3054136718612,
+        "y_f64": 649.3054135164929,
+        "exact_dyadic_x_minus_y": "9667040876/62220152548512625",
+        "x_relative_speed": 0.016865364159457386
+      },
+      {
+        "support": 595,
+        "x_f64": 649.3054136530183,
+        "y_f64": 649.3054136530741,
+        "exact_dyadic_x_minus_y": "-89106953640203611/1596380706044722822127141724",
+        "x_relative_speed": -405056.6634279289
+      },
+      {
+        "support": 601,
+        "x_f64": 649.3054136530183,
+        "y_f64": 649.3054136529942,
+        "exact_dyadic_x_minus_y": "614430006315352875/25557033691362194865389984254",
+        "x_relative_speed": 405056.64656256477
+      }
+    ],
+    "final_event": {
+      "constraints": [
+        [
+          0,
+          595,
+          596
+        ],
+        [
+          0,
+          601,
+          602
+        ],
+        [
+          0,
+          596,
+          597
+        ]
+      ],
+      "kind": "TriangleCollapse",
+      "positions": [
+        [
+          463811.7052499764,
+          6272413.626818165
+        ],
+        [
+          463811.7052499768,
+          6272413.626817892
+        ],
+        [
+          463811.705249995,
+          6272413.626818083
+        ]
+      ],
+      "side": -1,
+      "spread": 2.728777378558223e-07,
+      "step": 5,
+      "time": 649.3054136530183,
+      "triangle": 0,
+      "vertices": [
+        4294967323,
+        4294967309,
+        4294967325
+      ]
+    },
+    "slow_motion": {
+      "origin_bits": [
+        4691722897405721061,
+        4708492260774768584
+      ],
+      "velocity_bits": [
+        13830478179884597248,
+        4607220286675222528
+      ],
+      "velocity": [
+        -0.9915316883707419,
+        1.0084083573892713
+      ]
+    },
+    "fast_birth": {
+      "birth": [
+        463760.5337689864,
+        6272414.058794565
+      ],
+      "birth_time": 649.3052872379936,
+      "birth_miss": 0.033640813853329295,
+      "origin_bits": [
+        13956457460700006223,
+        4710821058328125211
+      ],
+      "velocity_bits": [
+        4690702415630985728,
+        13883109740000096256
+      ]
+    },
+    "final_stop_nodes": [
+      16,
+      16,
+      16
+    ],
+    "final_arcs": [
+      {
+        "end": [
+          463811.7052499764,
+          6272413.626818165
+        ],
+        "end_end": "Some(Stop(VertexId(27v1)))",
+        "end_time": 649.3054136530183,
+        "left": 5,
+        "right": 1,
+        "start": [
+          463883.2309092592,
+          6272340.88373416
+        ],
+        "start_end": "Start(VertexId(27v1))",
+        "start_time": 577.1688797279922,
+        "traced_vertex": 4294967323,
+        "emitted_nodes": [
+          [
+            14,
+            16
+          ]
+        ]
+      },
+      {
+        "end": [
+          463811.7052499768,
+          6272413.626817892
+        ],
+        "end_end": "Some(Stop(VertexId(13v1)))",
+        "end_time": 649.3054136530183,
+        "left": 1,
+        "right": 0,
+        "start": [
+          464466.4629152964,
+          6273057.429672915
+        ],
+        "start_end": "Start(VertexId(13v1))",
+        "start_time": 0.0,
+        "traced_vertex": 4294967309,
+        "emitted_nodes": [
+          [
+            0,
+            16
+          ]
+        ]
+      },
+      {
+        "end": [
+          463811.705249995,
+          6272413.626818083
+        ],
+        "end_end": "Some(Stop(VertexId(29v1)))",
+        "end_time": 649.3054136530183,
+        "left": 0,
+        "right": 5,
+        "start": [
+          463760.5337689864,
+          6272414.058794565
+        ],
+        "start_end": "Start(VertexId(29v1))",
+        "start_time": 649.3052872379936,
+        "traced_vertex": 4294967325,
+        "emitted_nodes": [
+          [
+            15,
+            16
+          ]
+        ]
+      }
+    ],
+    "watched_faces": [
+      {
+        "face": 0,
+        "original_support": 595,
+        "header": "face=0 source=Some(1) root=Some(HalfEdgeId(0))",
+        "halfedges": [
+          "[DEBUG-wayfinder] halfedge id=0 nodes=NodeId(0)/NodeId(1) origin=Node { point: Some(Point2 { x: 464466.4629152964, y: 6273057.429672915 }), time: 0.0, is_infinite: false } dest=Node { point: Some(Point2 { x: 464415.29940102197, y: 6273057.861455911 }), time: 0.0, is_infinite: false } next=HalfEdgeId(36) prev=HalfEdgeId(41) geometry=Input(Segment2 { start: Point2 { x: 464466.4629152964, y: 6273057.429672915 }, end: Point2 { x: 464415.29940102197, y: 6273057.861455911 } })",
+          "[DEBUG-wayfinder] halfedge id=36 nodes=NodeId(1)/NodeId(15) origin=Node { point: Some(Point2 { x: 464415.29940102197, y: 6273057.861455911 }), time: 0.0, is_infinite: false } dest=Node { point: Some(Point2 { x: 463760.5337689864, y: 6272414.058794565 }), time: 649.3052872379936, is_infinite: false } next=HalfEdgeId(42) prev=HalfEdgeId(0) geometry=Segment(Segment2 { start: Point2 { x: 464415.29940102197, y: 6273057.861455911 }, end: Point2 { x: 463760.5337689864, y: 6272414.058794565 } })",
+          "[DEBUG-wayfinder] halfedge id=41 nodes=NodeId(16)/NodeId(0) origin=Node { point: Some(Point2 { x: 463811.7052499764, y: 6272413.626818165 }), time: 649.3054136530183, is_infinite: false } dest=Node { point: Some(Point2 { x: 464466.4629152964, y: 6273057.429672915 }), time: 0.0, is_infinite: false } next=HalfEdgeId(0) prev=HalfEdgeId(42) geometry=Segment(Segment2 { start: Point2 { x: 463811.7052499764, y: 6272413.626818165 }, end: Point2 { x: 464466.4629152964, y: 6273057.429672915 } })",
+          "[DEBUG-wayfinder] halfedge id=42 nodes=NodeId(15)/NodeId(16) origin=Node { point: Some(Point2 { x: 463760.5337689864, y: 6272414.058794565 }), time: 649.3052872379936, is_infinite: false } dest=Node { point: Some(Point2 { x: 463811.7052499764, y: 6272413.626818165 }), time: 649.3054136530183, is_infinite: false } next=HalfEdgeId(41) prev=HalfEdgeId(36) geometry=Segment(Segment2 { start: Point2 { x: 463760.5337689864, y: 6272414.058794565 }, end: Point2 { x: 463811.7052499764, y: 6272413.626818165 } })"
+        ],
+        "infinity_chords": []
+      },
+      {
+        "face": 1,
+        "original_support": 596,
+        "header": "face=1 source=Some(2) root=Some(HalfEdgeId(2))",
+        "halfedges": [
+          "[DEBUG-wayfinder] halfedge id=2 nodes=NodeId(2)/NodeId(0) origin=Node { point: Some(Point2 { x: 464461.76972466905, y: 6272500.900291164 }), time: 0.0, is_infinite: false } dest=Node { point: Some(Point2 { x: 464466.4629152964, y: 6273057.429672915 }), time: 0.0, is_infinite: false } next=HalfEdgeId(40) prev=HalfEdgeId(29) geometry=Input(Segment2 { start: Point2 { x: 464461.76972466905, y: 6272500.900291164 }, end: Point2 { x: 464466.4629152964, y: 6273057.429672915 } })",
+          "[DEBUG-wayfinder] halfedge id=29 nodes=NodeId(13)/NodeId(2) origin=Node { point: Some(Point2 { x: 464274.6955918901, y: 6272316.953789542 }), time: 185.51632272147165, is_infinite: false } dest=Node { point: Some(Point2 { x: 464461.76972466905, y: 6272500.900291164 }), time: 0.0, is_infinite: false } next=HalfEdgeId(2) prev=HalfEdgeId(35) geometry=Segment(Segment2 { start: Point2 { x: 464274.6955918901, y: 6272316.953789542 }, end: Point2 { x: 464461.76972466905, y: 6272500.900291164 } })",
+          "[DEBUG-wayfinder] halfedge id=35 nodes=NodeId(14)/NodeId(13) origin=Node { point: Some(Point2 { x: 463883.2309092592, y: 6272340.88373416 }), time: 577.1688797279922, is_infinite: false } dest=Node { point: Some(Point2 { x: 464274.6955918901, y: 6272316.953789542 }), time: 185.51632272147165, is_infinite: false } next=HalfEdgeId(29) prev=HalfEdgeId(39) geometry=Segment(Segment2 { start: Point2 { x: 463883.2309092592, y: 6272340.88373416 }, end: Point2 { x: 464274.6955918901, y: 6272316.953789542 } })",
+          "[DEBUG-wayfinder] halfedge id=39 nodes=NodeId(16)/NodeId(14) origin=Node { point: Some(Point2 { x: 463811.7052499764, y: 6272413.626818165 }), time: 649.3054136530183, is_infinite: false } dest=Node { point: Some(Point2 { x: 463883.2309092592, y: 6272340.88373416 }), time: 577.1688797279922, is_infinite: false } next=HalfEdgeId(35) prev=HalfEdgeId(40) geometry=Segment(Segment2 { start: Point2 { x: 463811.7052499764, y: 6272413.626818165 }, end: Point2 { x: 463883.2309092592, y: 6272340.88373416 } })",
+          "[DEBUG-wayfinder] halfedge id=40 nodes=NodeId(0)/NodeId(16) origin=Node { point: Some(Point2 { x: 464466.4629152964, y: 6273057.429672915 }), time: 0.0, is_infinite: false } dest=Node { point: Some(Point2 { x: 463811.7052499764, y: 6272413.626818165 }), time: 649.3054136530183, is_infinite: false } next=HalfEdgeId(39) prev=HalfEdgeId(2) geometry=Segment(Segment2 { start: Point2 { x: 464466.4629152964, y: 6273057.429672915 }, end: Point2 { x: 463811.7052499764, y: 6272413.626818165 } })"
+        ],
+        "infinity_chords": []
+      },
+      {
+        "face": 4,
+        "original_support": 597,
+        "header": "face=4 source=Some(3) root=Some(HalfEdgeId(8))",
+        "halfedges": [
+          "[DEBUG-wayfinder] halfedge id=8 nodes=NodeId(5)/NodeId(2) origin=Node { point: Some(Point2 { x: 464512.9399997433, y: 6272500.469097321 }), time: 0.0, is_infinite: false } dest=Node { point: Some(Point2 { x: 464461.76972466905, y: 6272500.900291164 }), time: 0.0, is_infinite: false } next=HalfEdgeId(28) prev=HalfEdgeId(27) geometry=Input(Segment2 { start: Point2 { x: 464512.9399997433, y: 6272500.469097321 }, end: Point2 { x: 464461.76972466905, y: 6272500.900291164 } })",
+          "[DEBUG-wayfinder] halfedge id=27 nodes=NodeId(12)/NodeId(5) origin=Node { point: Some(Point2 { x: 464325.86823034694, y: 6272316.522611109 }), time: 185.51628709685298, is_infinite: false } dest=Node { point: Some(Point2 { x: 464512.9399997433, y: 6272500.469097321 }), time: 0.0, is_infinite: false } next=HalfEdgeId(8) prev=HalfEdgeId(63) geometry=Segment(Segment2 { start: Point2 { x: 464325.86823034694, y: 6272316.522611109 }, end: Point2 { x: 464512.9399997433, y: 6272500.469097321 } })",
+          "[DEBUG-wayfinder] halfedge id=28 nodes=NodeId(2)/NodeId(13) origin=Node { point: Some(Point2 { x: 464461.76972466905, y: 6272500.900291164 }), time: 0.0, is_infinite: false } dest=Node { point: Some(Point2 { x: 464274.6955918901, y: 6272316.953789542 }), time: 185.51632272147165, is_infinite: false } next=HalfEdgeId(63) prev=HalfEdgeId(8) geometry=Segment(Segment2 { start: Point2 { x: 464461.76972466905, y: 6272500.900291164 }, end: Point2 { x: 464274.6955918901, y: 6272316.953789542 } })",
+          "[DEBUG-wayfinder] halfedge id=63 nodes=NodeId(13)/NodeId(12) origin=Node { point: Some(Point2 { x: 464274.6955918901, y: 6272316.953789542 }), time: 185.51632272147165, is_infinite: false } dest=Node { point: Some(Point2 { x: 464325.86823034694, y: 6272316.522611109 }), time: 185.51628709685298, is_infinite: false } next=HalfEdgeId(27) prev=HalfEdgeId(28) geometry=InfinityChord"
+        ],
+        "infinity_chords": [
+          "[DEBUG-wayfinder] halfedge id=63 nodes=NodeId(13)/NodeId(12) origin=Node { point: Some(Point2 { x: 464274.6955918901, y: 6272316.953789542 }), time: 185.51632272147165, is_infinite: false } dest=Node { point: Some(Point2 { x: 464325.86823034694, y: 6272316.522611109 }), time: 185.51628709685298, is_infinite: false } next=HalfEdgeId(27) prev=HalfEdgeId(28) geometry=InfinityChord"
+        ]
+      },
+      {
+        "face": 5,
+        "original_support": 601,
+        "header": "face=5 source=Some(7) root=Some(HalfEdgeId(10))",
+        "halfedges": [
+          "[DEBUG-wayfinder] halfedge id=10 nodes=NodeId(6)/NodeId(7) origin=Node { point: Some(Point2 { x: 464353.15400219744, y: 6271759.726146518 }), time: 0.0, is_infinite: false } dest=Node { point: Some(Point2 { x: 464455.5125631645, y: 6271758.861808992 }), time: 0.0, is_infinite: false } next=HalfEdgeId(32) prev=HalfEdgeId(49) geometry=Input(Segment2 { start: Point2 { x: 464353.15400219744, y: 6271759.726146518 }, end: Point2 { x: 464455.5125631645, y: 6271758.861808992 } })",
+          "[DEBUG-wayfinder] halfedge id=32 nodes=NodeId(7)/NodeId(14) origin=Node { point: Some(Point2 { x: 464455.5125631645, y: 6271758.861808992 }), time: 0.0, is_infinite: false } dest=Node { point: Some(Point2 { x: 463883.2309092592, y: 6272340.88373416 }), time: 577.1688797279922, is_infinite: false } next=HalfEdgeId(38) prev=HalfEdgeId(10) geometry=Segment(Segment2 { start: Point2 { x: 464455.5125631645, y: 6271758.861808992 }, end: Point2 { x: 463883.2309092592, y: 6272340.88373416 } })",
+          "[DEBUG-wayfinder] halfedge id=38 nodes=NodeId(14)/NodeId(16) origin=Node { point: Some(Point2 { x: 463883.2309092592, y: 6272340.88373416 }), time: 577.1688797279922, is_infinite: false } dest=Node { point: Some(Point2 { x: 463811.7052499764, y: 6272413.626818165 }), time: 649.3054136530183, is_infinite: false } next=HalfEdgeId(43) prev=HalfEdgeId(32) geometry=Segment(Segment2 { start: Point2 { x: 463883.2309092592, y: 6272340.88373416 }, end: Point2 { x: 463811.7052499764, y: 6272413.626818165 } })",
+          "[DEBUG-wayfinder] halfedge id=43 nodes=NodeId(16)/NodeId(15) origin=Node { point: Some(Point2 { x: 463811.7052499764, y: 6272413.626818165 }), time: 649.3054136530183, is_infinite: false } dest=Node { point: Some(Point2 { x: 463760.5337689864, y: 6272414.058794565 }), time: 649.3052872379936, is_infinite: false } next=HalfEdgeId(44) prev=HalfEdgeId(38) geometry=Segment(Segment2 { start: Point2 { x: 463811.7052499764, y: 6272413.626818165 }, end: Point2 { x: 463760.5337689864, y: 6272414.058794565 } })",
+          "[DEBUG-wayfinder] halfedge id=44 nodes=NodeId(15)/NodeId(17) origin=Node { point: Some(Point2 { x: 463760.5337689864, y: 6272414.058794565 }), time: 649.3052872379936, is_infinite: false } dest=Node { point: Some(Point2 { x: 463466.63065615523, y: 6272712.968101462 }), time: 945.7222463808401, is_infinite: false } next=HalfEdgeId(50) prev=HalfEdgeId(43) geometry=Segment(Segment2 { start: Point2 { x: 463760.5337689864, y: 6272414.058794565 }, end: Point2 { x: 463466.63065615523, y: 6272712.968101462 } })",
+          "[DEBUG-wayfinder] halfedge id=49 nodes=NodeId(18)/NodeId(6) origin=Node { point: Some(Point2 { x: 463396.2715460901, y: 6272732.918242598 }), time: 965.0775695125587, is_infinite: false } dest=Node { point: Some(Point2 { x: 464353.15400219744, y: 6271759.726146518 }), time: 0.0, is_infinite: false } next=HalfEdgeId(10) prev=HalfEdgeId(50) geometry=Segment(Segment2 { start: Point2 { x: 463396.2715460901, y: 6272732.918242598 }, end: Point2 { x: 464353.15400219744, y: 6271759.726146518 } })",
+          "[DEBUG-wayfinder] halfedge id=50 nodes=NodeId(17)/NodeId(18) origin=Node { point: Some(Point2 { x: 463466.63065615523, y: 6272712.968101462 }), time: 945.7222463808401, is_infinite: false } dest=Node { point: Some(Point2 { x: 463396.2715460901, y: 6272732.918242598 }), time: 965.0775695125587, is_infinite: false } next=HalfEdgeId(49) prev=HalfEdgeId(44) geometry=Segment(Segment2 { start: Point2 { x: 463466.63065615523, y: 6272712.968101462 }, end: Point2 { x: 463396.2715460901, y: 6272732.918242598 } })"
+        ],
+        "infinity_chords": []
+      },
+      {
+        "face": 6,
+        "original_support": 600,
+        "header": "face=6 source=Some(6) root=Some(HalfEdgeId(12))",
+        "halfedges": [
+          "[DEBUG-wayfinder] halfedge id=12 nodes=NodeId(7)/NodeId(3) origin=Node { point: Some(Point2 { x: 464455.5125631645, y: 6271758.861808992 }), time: 0.0, is_infinite: false } dest=Node { point: Some(Point2 { x: 464458.64108305547, y: 6272129.880951004 }), time: 0.0, is_infinite: false } next=HalfEdgeId(30) prev=HalfEdgeId(33) geometry=Input(Segment2 { start: Point2 { x: 464455.5125631645, y: 6271758.861808992 }, end: Point2 { x: 464458.64108305547, y: 6272129.880951004 } })",
+          "[DEBUG-wayfinder] halfedge id=30 nodes=NodeId(3)/NodeId(13) origin=Node { point: Some(Point2 { x: 464458.64108305547, y: 6272129.880951004 }), time: 0.0, is_infinite: false } dest=Node { point: Some(Point2 { x: 464274.6955918901, y: 6272316.953789542 }), time: 185.51632272147165, is_infinite: false } next=HalfEdgeId(34) prev=HalfEdgeId(12) geometry=Segment(Segment2 { start: Point2 { x: 464458.64108305547, y: 6272129.880951004 }, end: Point2 { x: 464274.6955918901, y: 6272316.953789542 } })",
+          "[DEBUG-wayfinder] halfedge id=33 nodes=NodeId(14)/NodeId(7) origin=Node { point: Some(Point2 { x: 463883.2309092592, y: 6272340.88373416 }), time: 577.1688797279922, is_infinite: false } dest=Node { point: Some(Point2 { x: 464455.5125631645, y: 6271758.861808992 }), time: 0.0, is_infinite: false } next=HalfEdgeId(12) prev=HalfEdgeId(34) geometry=Segment(Segment2 { start: Point2 { x: 463883.2309092592, y: 6272340.88373416 }, end: Point2 { x: 464455.5125631645, y: 6271758.861808992 } })",
+          "[DEBUG-wayfinder] halfedge id=34 nodes=NodeId(13)/NodeId(14) origin=Node { point: Some(Point2 { x: 464274.6955918901, y: 6272316.953789542 }), time: 185.51632272147165, is_infinite: false } dest=Node { point: Some(Point2 { x: 463883.2309092592, y: 6272340.88373416 }), time: 577.1688797279922, is_infinite: false } next=HalfEdgeId(33) prev=HalfEdgeId(30) geometry=Segment(Segment2 { start: Point2 { x: 464274.6955918901, y: 6272316.953789542 }, end: Point2 { x: 463883.2309092592, y: 6272340.88373416 } })"
+        ],
+        "infinity_chords": []
+      },
+      {
+        "face": 10,
+        "original_support": 594,
+        "header": "face=10 source=Some(0) root=Some(HalfEdgeId(20))",
+        "halfedges": [
+          "[DEBUG-wayfinder] halfedge id=20 nodes=NodeId(1)/NodeId(11) origin=Node { point: Some(Point2 { x: 464415.29940102197, y: 6273057.861455911 }), time: 0.0, is_infinite: false } dest=Node { point: Some(Point2 { x: 464416.8661114498, y: 6273243.371338161 }), time: 0.0, is_infinite: false } next=HalfEdgeId(46) prev=HalfEdgeId(37) geometry=Input(Segment2 { start: Point2 { x: 464415.29940102197, y: 6273057.861455911 }, end: Point2 { x: 464416.8661114498, y: 6273243.371338161 } })",
+          "[DEBUG-wayfinder] halfedge id=37 nodes=NodeId(15)/NodeId(1) origin=Node { point: Some(Point2 { x: 463760.5337689864, y: 6272414.058794565 }), time: 649.3052872379936, is_infinite: false } dest=Node { point: Some(Point2 { x: 464415.29940102197, y: 6273057.861455911 }), time: 0.0, is_infinite: false } next=HalfEdgeId(20) prev=HalfEdgeId(45) geometry=Segment(Segment2 { start: Point2 { x: 463760.5337689864, y: 6272414.058794565 }, end: Point2 { x: 464415.29940102197, y: 6273057.861455911 } })",
+          "[DEBUG-wayfinder] halfedge id=45 nodes=NodeId(17)/NodeId(15) origin=Node { point: Some(Point2 { x: 463466.63065615523, y: 6272712.968101462 }), time: 945.7222463808401, is_infinite: false } dest=Node { point: Some(Point2 { x: 463760.5337689864, y: 6272414.058794565 }), time: 649.3052872379936, is_infinite: false } next=HalfEdgeId(37) prev=HalfEdgeId(46) geometry=Segment(Segment2 { start: Point2 { x: 463466.63065615523, y: 6272712.968101462 }, end: Point2 { x: 463760.5337689864, y: 6272414.058794565 } })",
+          "[DEBUG-wayfinder] halfedge id=46 nodes=NodeId(11)/NodeId(17) origin=Node { point: Some(Point2 { x: 464416.8661114498, y: 6273243.371338161 }), time: 0.0, is_infinite: false } dest=Node { point: Some(Point2 { x: 463466.63065615523, y: 6272712.968101462 }), time: 945.7222463808401, is_infinite: false } next=HalfEdgeId(45) prev=HalfEdgeId(20) geometry=Segment(Segment2 { start: Point2 { x: 464416.8661114498, y: 6273243.371338161 }, end: Point2 { x: 463466.63065615523, y: 6272712.968101462 } })"
+        ],
+        "infinity_chords": []
+      }
+    ]
+  },
+  "isolation": {
+    "only_changed_velocity_vertex": 4294967323,
+    "same_initial_vertices": true,
+    "same_events_through_earlier_stop": true,
+    "removed_finalization_vertex_ids": [
+      4294967332
+    ],
+    "new_vertex_ids": [],
+    "no_direct_time_or_birth_override": true
+  }
+}

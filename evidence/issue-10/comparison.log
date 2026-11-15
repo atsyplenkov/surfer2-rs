@@ -1,0 +1,13 @@
+baseline dcel_error IncompleteFaceCycle { detail: "stage=bounded-validation face=5: owns 9 halfedges but has no root" }
+  split time: 649.3052873722798 birth replay miss: 0.020754669180605805
+  final time: 649.3054124144818 spread: 0.5016953204587769 stop nodes: [18, 18, 19]
+  watched chords: [(595, 1), (597, 1), (600, 1)]
+intervention dcel_error IncompleteFaceCycle { detail: "stage=bounded-validation face=6 halfedge=41: not reachable from face root" }
+  split time: 649.3052872843521 birth replay miss: 0.014862340551540133
+  final time: 649.3054136530183 spread: 2.728777378558223e-07 stop nodes: [18, 18, 18]
+  watched chords: [(597, 1), (600, 1)]
+control disconnected {'components': 2, 'edges': 19, 'nodes': 21, 'rank': 0, 'stored_segments': 19}
+  split time: 649.3052872379936 birth replay miss: 0.033640813853329295
+  final time: 649.3054136530183 spread: 2.728777378558223e-07 stop nodes: [16, 16, 16]
+  watched chords: [(597, 1)]
+isolation checks passed: {'only_changed_velocity_vertex': 4294967323, 'same_initial_vertices': True, 'same_events_through_earlier_stop': True, 'removed_finalization_vertex_ids': [4294967332], 'new_vertex_ids': [], 'no_direct_time_or_birth_override': True}

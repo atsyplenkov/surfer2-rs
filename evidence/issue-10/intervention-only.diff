@@ -1,0 +1,19 @@
+--- a/src/propagator.rs
++++ b/src/propagator.rs
+@@ -911,6 +911,16 @@
+                 let (p0, v) = wavefront_vertex_motion(sla, slb, pos, time);
+                 pos_zero = p0;
+                 vel = v;
++                // THROWAWAY: witness-local motion choice, original supports 601/596.
++                if self.kt.edges[ea].source_input_edge == Some(7)
++                    && self.kt.edges[eb].source_input_edge == Some(2)
++                {
++                    let p1 = crate::wavefront::supporting_line::intersect_lines(
++                        sla.point_at(1.0), sla.direction, slb.point_at(1.0), slb.direction,
++                    ).unwrap();
++                    vel = Point2::new(p1.x - p0.x, p1.y - p0.y);
++                    eprintln!("[DEBUG-issue10] slow-motion sources=7/2 time={time:?} origin={p0:?} baseline={v:?} selected={vel:?}");
++                }
+                 motion = classify_successor_motion(sla, slb);
+             }
+         }

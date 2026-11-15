@@ -1,0 +1,33 @@
+{
+  "baseline": {
+    "head": "1b6ed8ea9af51ed9f82f99d56306abc6f6359c7c",
+    "binary_sha256": "cc9db4dcecf16ac052915a95a311c9f41a2d249938a1043ec8e633f52daea20b",
+    "repeat_json_equal": true,
+    "repeat_log_equal": true,
+    "repeat_wall_seconds": 0.0064823950015124865,
+    "preserved_json_equal": true
+  },
+  "intervention": {
+    "head": "1b6ed8ea9af51ed9f82f99d56306abc6f6359c7c",
+    "binary_sha256": "4f9ecb38b099956cab08e962a38b5c002a03538ae018ce34516a301b85144115",
+    "repeat_json_equal": true,
+    "repeat_log_equal": true,
+    "repeat_wall_seconds": 0.006259650006541051
+  },
+  "control": {
+    "head": "d1a89fd66795f537b034f220ed4f838bd0fdea3b",
+    "binary_sha256": "c977376cf352f1a67f7bdbcb519cf5a684299970b72acd285c73fb84298a7f32",
+    "repeat_json_equal": true,
+    "repeat_log_equal": true,
+    "repeat_wall_seconds": 0.005779109000286553,
+    "preserved_json_equal": false,
+    "preserved_json_equal_excluding_new_empty_interventions_field": true
+  },
+  "toolchain": {
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n",
+    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)\n",
+    "python": "Python 3.14.8\n"
+  },
+  "platform": "Linux-7.2.15-1-omarchy-x86_64-with-glibc2.44",
+  "profile": "release; --offline --locked; Cargo.toml lto=thin codegen-units=1"
+}

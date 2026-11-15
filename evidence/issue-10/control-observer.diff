@@ -1,0 +1,163 @@
+diff --git i/src/dcel/mod.rs w/src/dcel/mod.rs
+index dc42f51..f387791 100644
+--- i/src/dcel/mod.rs
++++ w/src/dcel/mod.rs
+@@ -206,6 +206,19 @@ impl Skeleton {
+ /// ```
+ pub(crate) fn build_dcel(kt: &KineticTriangulation) -> Result<Skeleton, SkeletonError> {
+     let (sk, walk_failures) = emit_skeleton_with_diagnostics(kt)?;
++    for (fi,face) in sk.faces.iter().enumerate() {
++        if !crate::prototype_diagnostics::watches(face.source_input_edge) { continue; }
++        eprintln!("[DEBUG-wayfinder] emitted-face face={} source={:?} root={:?}",fi,face.source_input_edge,face.halfedge);
++        for (i,he) in sk.halfedges.iter().enumerate().filter(|(_,he)|he.face.0 as usize==fi) {
++            eprintln!("[DEBUG-wayfinder] halfedge id={} nodes={:?}/{:?} origin={:?} dest={:?} next={:?} prev={:?} geometry={:?}",i,he.origin,sk.halfedges[he.twin.0 as usize].origin,
++                sk.nodes[he.origin.0 as usize],sk.nodes[sk.halfedges[he.twin.0 as usize].origin.0 as usize],
++                he.next,he.prev,he.geometry);
++        }
++        for s in sk.stored_segments().iter().filter(|s|s.left_face==fi || s.right_face==fi) {
++            let exported=sk.finite_segments().any(|f|f.start_node==s.start_node && f.end_node==s.end_node);
++            eprintln!("[DEBUG-wayfinder] stored-segment {:?} finite_exported={}",s,exported);
++        }
++    }
+     let unbounded = FaceId(sk.faces.len().saturating_sub(1) as u32);
+     match validate_bounded_face_cycles(&sk.halfedges, &sk.faces, unbounded) {
+         // Non-empty walk_failures here mean repair resolved them; validation passed.
+@@ -364,6 +377,16 @@ fn emit_skeleton_with_diagnostics(
+     }
+ 
+     let (expanded, identity_unions) = expand_arcs(&kt.arcs);
++    let watched_arc=|arc:&crate::triangulation::kinetic::ArcRecord| {
++        [arc.left_face,arc.right_face].iter().any(|f|
++            kt.faces.get(*f as usize).is_some_and(|f|crate::prototype_diagnostics::watches(f.source_input_edge)))
++    };
++    for arc in kt.arcs.iter().filter(|a|watched_arc(a)) {
++        eprintln!("[DEBUG-wayfinder] raw-arc {:?}",arc);
++    }
++    for arc in expanded.iter().filter(|a|watched_arc(a)) {
++        eprintln!("[DEBUG-wayfinder] expanded-arc {:?}",arc);
++    }
+     for (a, b) in identity_unions {
+         uf.union(a, b);
+     }
+@@ -392,6 +415,9 @@ fn emit_skeleton_with_diagnostics(
+                 // Kinetic trajectories evaluate a shared event independently.
+                 // Export the node's representative on every incident arc so
+                 // consumers can reconstruct topology from coordinates alone.
++                if watched_arc(arc) {
++                    eprintln!("[DEBUG-issue10] endpoint-map start={:?} end={:?} nodes={:?}/{:?}", arc.start_end, arc.end_end, n0, n1);
++                }
+                 let node_start = nodes[n0.0 as usize].point.unwrap();
+                 let node_end = nodes[n1.0 as usize].point.unwrap();
+                 let he = halfedges.len() as u32;
+diff --git i/src/lib.rs w/src/lib.rs
+index b942f85..12b77d6 100644
+--- i/src/lib.rs
++++ w/src/lib.rs
+@@ -16,6 +16,7 @@ pub mod input;
+ pub(crate) mod numeric;
+ pub(crate) mod offset;
+ pub(crate) mod propagator;
++mod prototype_diagnostics;
+ pub(crate) mod stats;
+ /// CDT + kinetic triangulation. Integration tests use [`triangulation::build_basic_triangulation`].
+ pub mod triangulation;
+diff --git i/src/propagator.rs w/src/propagator.rs
+index 669ae1c..95eb377 100644
+--- i/src/propagator.rs
++++ w/src/propagator.rs
+@@ -616,6 +616,12 @@ impl Propagator {
+         nv.angle = ang;
+         nv.incident_edges = [ea_id, eb_id];
+         let nvid = self.kt.vertices.insert(nv);
++        if [ea_id,eb_id].into_iter().flatten().any(|e|crate::prototype_diagnostics::watches(self.kt.edges[e].source_input_edge)) {
++            eprintln!("[DEBUG-wayfinder] constraint-child id={:?} tid={} side={} time={:?} parents={:?} parent_slots={:?} selected={:?} collapsing={:?} fallback={} birth={:?} origin={:?} velocity={:?}",
++                nvid,self.kt.triangles[tid].tidx,edge_idx,time,[va,vb],
++                [self.kt.vertices[va].incident_edges,self.kt.vertices[vb].incident_edges],
++                [ea_id,eb_id],collapsing_eid,!(ea_id.is_some()&&eb_id.is_some()&&ea_id!=eb_id),pos,pos_zero,velocity);
++        }
+         // Far ends before the fan walk (C++: v is ea.vertex(1) and eb.vertex(0)).
+         let ea_far = ea_id.map(|e| self.kt.edges[e].endpoints[0]);
+         let eb_far = eb_id.map(|e| self.kt.edges[e].endpoints[1]);
+@@ -752,6 +758,10 @@ impl Propagator {
+         } else {
+             0.5
+         };
++        if self.kt.triangles[tid].wavefronts.iter().flatten().any(|e|crate::prototype_diagnostics::watches(self.kt.edges[*e].source_input_edge)) {
++            eprintln!("[DEBUG-wayfinder] refine tid={} time={:?} side={} pos={:?} ends={:?} ab2={:?} tparam={:?}",
++                self.kt.triangles[tid].tidx,time,edge_idx,pos,[posa,posb],ab2,tparam);
++        }
+         if !(0.0..=1.0).contains(&tparam) {
+             let flip_edge = if d_va > d_vb {
+                 cw(edge_idx)
+@@ -908,6 +918,10 @@ impl Propagator {
+         nv.pos_start = pos;
+         nv.angle = ang;
+         nv.incident_edges = [a, b];
++        if [a,b].into_iter().flatten().any(|e|crate::prototype_diagnostics::watches(self.kt.edges[e].source_input_edge)) {
++            eprintln!("[DEBUG-wayfinder] split-child time={:?} edges={:?} motion={:?} birth={:?} origin={:?} velocity={:?}",
++                time,[a,b],motion,pos,pos_zero,vel);
++        }
+         Ok((self.kt.vertices.insert(nv), motion))
+     }
+ 
+@@ -957,6 +971,10 @@ impl Propagator {
+                     }
+                 })?;
+                 let natural = compute_collapse(&self.kt, tr, time)?;
++                if tr.wavefronts.iter().flatten().any(|e|crate::prototype_diagnostics::watches(self.kt.edges[*e].source_input_edge)) {
++                    eprintln!("[DEBUG-wayfinder] leftover tid={} child={:?} nconst={} motion={:?} natural={:?}",
++                        tr.tidx,child,nconst,motion,natural);
++                }
+                 if leftover_resolve(nconst, motion, natural.type_) != LeftoverSchedule::CollapseNow
+                 {
+                     return Ok(());
+@@ -1781,7 +1799,12 @@ fn recompute_collapse(
+     if !t.live() {
+         return Ok(CollapseSpec::never(t.component));
+     }
+-    compute_collapse(kt, t, now)
++    let answer = compute_collapse(kt, t, now);
++    if t.wavefronts.iter().flatten().any(|e|crate::prototype_diagnostics::watches(kt.edges[*e].source_input_edge)) {
++        eprintln!("[DEBUG-wayfinder] recompute tid={} now={:?} vertices={:?} sources={:?} answer={:?}",
++            t.tidx,now,t.vertices,t.wavefronts.map(|e|e.and_then(|e|kt.edges[e].source_input_edge)),answer);
++    }
++    answer
+ }
+ 
+ fn seed_queue(
+diff --git i/src/triangulation/collapse.rs w/src/triangulation/collapse.rs
+index 144ce36..0582f4f 100644
+--- i/src/triangulation/collapse.rs
++++ w/src/triangulation/collapse.rs
+@@ -101,6 +101,9 @@ pub fn compute_collapse(
+             let mut tmin = f64::INFINITY;
+             for s in 0..3 {
+                 if let Some(tc) = constraint_collapse_time(kt, t, s, time_now) {
++                    if t.wavefronts.iter().flatten().any(|e| crate::prototype_diagnostics::watches(kt.edges[*e].source_input_edge)) {
++                        eprintln!("[DEBUG-wayfinder] three tid={} now={:?} side={} edge_time={:?}",t.tidx,time_now,s,tc);
++                    }
+                     tmin = tmin.min(tc);
+                 }
+             }
+@@ -136,6 +139,9 @@ fn collapse_bounded_constrained_2(
+             ));
+         }
+     }
++    if t.wavefronts.iter().flatten().any(|e| crate::prototype_diagnostics::watches(kt.edges[*e].source_input_edge)) {
++        eprintln!("[DEBUG-wayfinder] two tid={} now={:?} specs={:?} area_now={:?}",t.tidx,time_now,specs,signed_area_at(kt,t,time_now));
++    }
+     match specs.len() {
+         0 => {
+             if signed_area_at(kt, t, time_now) < 0.0 {
+@@ -215,6 +221,11 @@ fn collapse_bounded_constrained_1(
+         vs[i] = [v.velocity.x, v.velocity.y];
+     }
+     let det = determinant_poly_f64(ps[0], vs[0], ps[1], vs[1], ps[2], vs[2]);
++    if crate::prototype_diagnostics::watches(e.source_input_edge) {
++        eprintln!("[DEBUG-wayfinder] one tid={} now={:?} source={:?} endpoints={:?} edge={:?} det={:?} next_root={:?} opposite_line_hit={:?}",
++            t.tidx,time_now,e.source_input_edge,e.endpoints,edge,det,det.next_root_from(time_now),
++            time_vertex_on_supporting_line(&kt.vertices[t.vertices[c_idx].unwrap()],e.supporting_line));
++    }
+ 
+     let parallel = matches!(
+         edge.type_,

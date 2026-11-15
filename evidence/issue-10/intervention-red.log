@@ -1,0 +1,6 @@
+[DEBUG-issue10] slow-motion sources=7/2 time=371.0291729650514 origin=Point2 { x: 464455.5121430441, y: 6271758.861812539 } baseline=Point2 { x: -0.9915316883380821, y: 1.0084083568463786 } selected=Point2 { x: -0.9915316883707419, y: 1.0084083573892713 }
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+    import json,sys; d=json.load(sys.stdin); assert d["status"] == "connected", "expected connected finite skeleton; observed " + str(d.get("error", d["status"])); print("PASS: connected coordinate graph", d.get("graph"))
+                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: expected connected finite skeleton; observed IncompleteFaceCycle { detail: "stage=bounded-validation face=6 halfedge=41: not reachable from face root" }

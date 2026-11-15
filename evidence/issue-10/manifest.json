@@ -4,8 +4,8 @@
     "sha256": "3b37f74f2300b9ee8d5fe2beb9a8bbbc8104ee7178236f11c0a3bf04760ce3f2"
   },
   "README.md": {
-    "bytes": 18371,
-    "sha256": "510a19ed7b235585ff7928aa1349fb2224613e35f5181adf19cfc0db0d54dc4f"
+    "bytes": 19197,
+    "sha256": "8667d20e40fa4ffe4d8a02d74009127ff89897b16445e257317e391d65dd4e1b"
   },
   "active-build.log": {
     "bytes": 122,
@@ -170,5 +170,13 @@
   "ticket-snapshot.json": {
     "bytes": 6516,
     "sha256": "b26038982f43ec12d5a078600cc27911649131f0f56beaece88d1b9af6d556b7"
+  },
+  "visual-comparison.png": {
+    "bytes": 119146,
+    "sha256": "833c15e990abd136667ce3f2780dc3ec78b2b292837f0369e465b4f3dab240f7"
+  },
+  "visualize.py": {
+    "bytes": 6397,
+    "sha256": "302d2e02db3996b6a74becf301744ef5aaae5dec17fed0a00e0a7137f023f398"
   }
 }

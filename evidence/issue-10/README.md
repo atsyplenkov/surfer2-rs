@@ -4,6 +4,14 @@
 
 Decision: [Establish valid birth and collapse rules for the basin-2 witness](https://github.com/atsyplenkov/surfer2-rs/issues/10), under [Chart an evidence-backed repair for projected-basin skeletons](https://github.com/atsyplenkov/surfer2-rs/issues/3). The ticket remains open for live maintainer discussion. This branch must not be merged into master.
 
+## Visual comparison
+
+![Baseline and single-motion experiment at the final and earlier junctions](visual-comparison.png)
+
+The picture uses recorded raw arcs and identical left/right scales within each row; x and y scales are equal. Circles mark recorded stops, with enlarged symbols for visibility. Red brackets measure separation and are not skeleton segments. The node labels report emitted identities separately from the plotted raw coordinates. The upper row shows the final gap shrinking; the lower row shows the earlier gap unchanged. This picture does not show source-support residuals or establish correct finite output.
+
+Recreate it with `python3 evidence/issue-10/visualize.py` (Pillow and Liberation Sans fonts required). It reads the preserved traces and comparison only; no additional engine experiment was run.
+
 ## Evidence and scope
 
 The starting point is the [preserved ancestry-matched witness](https://github.com/atsyplenkov/surfer2-rs/blob/e3cfa2a65315f01e1f0082a36bd1f03adb858600/evidence/issue-5/ancestry-preserving.md), with its [archives and source-restoration instructions](https://github.com/atsyplenkov/surfer2-rs/blob/e3cfa2a65315f01e1f0082a36bd1f03adb858600/evidence/issue-5/README.md). Original vertices are 594–603, 1143, and 3151. Their binary64 input bits are unchanged. The three closing connectors are synthetic, outside the matched local ancestry; this is not a replacement for the full basin's history.
